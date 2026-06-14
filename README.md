@@ -6,7 +6,8 @@ The current backend lives in `backend/` and implements the Arcadia migration pla
 
 - Hotels, staff, rooms, departments, guests, menu, feedback, bot config, and ticketing APIs.
 - Staff JWT login, refresh/logout, and guest phone OTP token flow.
-- WhatsApp and voice webhook entry points.
+- WhatsApp and voice webhook entry points with PostgreSQL-backed guest bot sessions.
+- WhatsApp campaign queueing for checked-in guest offers and template sends.
 - Ticket/chat/voice WebSocket endpoints.
 - PostgreSQL 16 and Redis 7 Docker Compose services.
 - Alembic migration scaffold.
@@ -56,6 +57,7 @@ DATABASE_URL=sqlite:///./hotel_cloud_dev.db
 - `/api/v1/hotels/{hotel_id}/guests`
 - `/api/v1/hotels/{hotel_id}/feedback`
 - `/api/v1/hotels/{hotel_id}/bot-config`
+- `/api/v1/hotels/{hotel_id}/campaigns`
 - `/webhook/whatsapp`
 - `/webhook/voice/inbound`
 - `/ws/hotels/{hotel_id}/tickets`

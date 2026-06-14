@@ -8,7 +8,7 @@ from app.database.base import Base, TenantOwnedMixin, TimestampMixin, UuidPrimar
 
 class BotConfig(Base, UuidPrimaryKeyMixin, TenantOwnedMixin, TimestampMixin):
     __tablename__ = "bot_config"
-    __table_args__ = (UniqueConstraint("tenant_id", name="uq_bot_config_tenant"),)
+    __table_args__ = (UniqueConstraint("hotel_id", name="uq_bot_config_hotel"),)
 
     main_menu: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
     services: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)

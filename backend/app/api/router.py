@@ -4,6 +4,7 @@ from app.modules.activity.routes import router as activity_router
 from app.modules.auth.routes import router as auth_router
 from app.modules.audit.routes import router as audit_router
 from app.modules.bot_config.routes import router as bot_config_router
+from app.modules.campaign.routes import router as campaign_router
 from app.modules.dashboard.routes import router as dashboard_router
 from app.modules.department.routes import router as department_router
 from app.modules.feedback.routes import router as feedback_router
@@ -33,6 +34,7 @@ api_router.include_router(menu_router)
 api_router.include_router(guest_router)
 api_router.include_router(feedback_router)
 api_router.include_router(bot_config_router)
+api_router.include_router(campaign_router)
 api_router.include_router(tenant_router)
 api_router.include_router(user_router)
 api_router.include_router(role_router)

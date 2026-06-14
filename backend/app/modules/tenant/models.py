@@ -22,6 +22,7 @@ class Tenant(Base, UuidPrimaryKeyMixin, TimestampMixin):
     address: Mapped[str | None] = mapped_column(String(255))
     contact_email: Mapped[str | None] = mapped_column(String(255))
     contact_phone: Mapped[str | None] = mapped_column(String(40))
+    whatsapp_phone_number_id: Mapped[str | None] = mapped_column(String(80), unique=True, index=True)
     timezone: Mapped[str] = mapped_column(String(80), default="UTC", nullable=False)
     subscription: Mapped[str] = mapped_column(String(80), default="trial", nullable=False)
     owner_user_id: Mapped[str | None] = mapped_column(String(36), index=True)

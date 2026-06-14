@@ -6,7 +6,7 @@ from app.database.base import Base, TenantOwnedMixin, TimestampMixin, UuidPrimar
 
 class Room(Base, UuidPrimaryKeyMixin, TenantOwnedMixin, TimestampMixin):
     __tablename__ = "rooms"
-    __table_args__ = (UniqueConstraint("tenant_id", "room_number", name="uq_rooms_tenant_room_number"),)
+    __table_args__ = (UniqueConstraint("hotel_id", "room_number", name="uq_rooms_hotel_room_number"),)
 
     room_number: Mapped[str] = mapped_column(String(40), nullable=False)
     room_type: Mapped[str | None] = mapped_column(String(80))

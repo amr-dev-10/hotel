@@ -9,6 +9,7 @@ class HotelCreate(BaseModel):
     address: str | None = Field(default=None, max_length=255)
     contact_email: EmailStr | None = None
     contact_phone: str | None = Field(default=None, max_length=40)
+    whatsapp_phone_number_id: str | None = Field(default=None, max_length=80)
     timezone: str = Field(default="UTC", max_length=80)
     subscription: str = Field(default="trial", max_length=80)
     status: TenantStatus = TenantStatus.ACTIVE
@@ -19,6 +20,7 @@ class HotelUpdate(BaseModel):
     address: str | None = Field(default=None, max_length=255)
     contact_email: EmailStr | None = None
     contact_phone: str | None = Field(default=None, max_length=40)
+    whatsapp_phone_number_id: str | None = Field(default=None, max_length=80)
     timezone: str | None = Field(default=None, max_length=80)
     subscription: str | None = Field(default=None, max_length=80)
     status: TenantStatus | None = None
@@ -32,6 +34,7 @@ class HotelRead(BaseModel):
     address: str | None
     contact_email: str | None
     contact_phone: str | None
+    whatsapp_phone_number_id: str | None
     timezone: str
     subscription: str
     status: TenantStatus

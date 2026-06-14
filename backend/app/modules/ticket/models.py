@@ -1,6 +1,7 @@
 from enum import Enum
+from datetime import datetime
 
-from sqlalchemy import Enum as SqlEnum, String, Text, UniqueConstraint
+from sqlalchemy import DateTime, Enum as SqlEnum, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database.base import Base, TenantOwnedMixin, TimestampMixin, UuidPrimaryKeyMixin
@@ -24,7 +25,7 @@ class TicketStatus(str, Enum):
 
 class Ticket(Base, UuidPrimaryKeyMixin, TenantOwnedMixin, TimestampMixin):
     __tablename__ = "tickets"
-    __table_args__ = (UniqueConstraint("tenant_id", "ticket_code", name="uq_tickets_tenant_code"),)
+    __table_args__ = (UniqueConstraint("hotel_id", "ticket_code", name="uq_tickets_hotel_code"),)
 
     workflow_id: Mapped[str] = mapped_column(String(36), index=True, nullable=False)
     ticket_code: Mapped[str | None] = mapped_column(String(40), index=True)
@@ -45,6 +46,8 @@ class Ticket(Base, UuidPrimaryKeyMixin, TenantOwnedMixin, TimestampMixin):
     source: Mapped[str] = mapped_column(String(40), default="android", nullable=False)
     assigned_to: Mapped[str | None] = mapped_column(String(36), index=True)
     created_by: Mapped[str] = mapped_column(String(36), index=True, nullable=False)
+    sla_due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
 
 
 class TicketMessage(Base, UuidPrimaryKeyMixin, TenantOwnedMixin, TimestampMixin):

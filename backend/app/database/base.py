@@ -2,7 +2,7 @@ from datetime import datetime
 from uuid import uuid4
 
 from sqlalchemy import DateTime, func
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, declared_attr, mapped_column, synonym
 from sqlalchemy.types import Uuid
 
 
@@ -21,5 +21,13 @@ class TimestampMixin:
     )
 
 
-class TenantOwnedMixin:
-    tenant_id: Mapped[str] = mapped_column(Uuid(as_uuid=False), index=True, nullable=False)
+class HotelOwnedMixin:
+    hotel_id: Mapped[str] = mapped_column(Uuid(as_uuid=False), index=True, nullable=False)
+
+    @declared_attr
+    def tenant_id(cls):
+        return synonym("hotel_id")
+
+
+class TenantOwnedMixin(HotelOwnedMixin):
+    """Compatibility alias while v1 moves tenant-owned tables to hotel_id."""

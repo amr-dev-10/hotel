@@ -21,6 +21,10 @@ class TenantContext:
     tenant_id: UUID
     role_ids: list[UUID]
 
+    @property
+    def hotel_id(self) -> UUID:
+        return self.tenant_id
+
 
 @dataclass(frozen=True)
 class PlatformContext:
@@ -48,7 +52,11 @@ def require_tenant_context(
     if payload.get("platform_admin"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Tenant token required")
 
-    tenant_id = UUID(payload["tenant_id"])
+    hotel_claim = payload.get("hotel_id") or payload.get("tenant_id")
+    if hotel_claim is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing hotel claim")
+
+    tenant_id = UUID(hotel_claim)
     tenant = db.scalar(select(Tenant).where(Tenant.id == str(tenant_id)))
     if tenant is None or tenant.status != TenantStatus.ACTIVE:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Tenant is not active")

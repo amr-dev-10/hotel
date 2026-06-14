@@ -25,3 +25,35 @@ class WhatsAppService:
             response = await client.post(url, headers=headers, json=payload)
             response.raise_for_status()
             return response.json()
+
+    async def send_template(
+        self,
+        phone_number_id: str,
+        to_phone: str,
+        template_name: str,
+        parameters: list[str],
+        language_code: str = "en",
+    ) -> dict[str, Any]:
+        if not self.access_token:
+            raise RuntimeError("WHATSAPP_ACCESS_TOKEN is not configured")
+        url = f"{self.api_url}/{phone_number_id}/messages"
+        headers = {"Authorization": f"Bearer {self.access_token}"}
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": to_phone,
+            "type": "template",
+            "template": {
+                "name": template_name,
+                "language": {"code": language_code},
+                "components": [
+                    {
+                        "type": "body",
+                        "parameters": [{"type": "text", "text": value} for value in parameters],
+                    }
+                ],
+            },
+        }
+        async with httpx.AsyncClient(timeout=20) as client:
+            response = await client.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+            return response.json()

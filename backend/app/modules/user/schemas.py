@@ -9,6 +9,7 @@ class UserCreate(BaseModel):
     job_role: str | None = Field(default=None, max_length=120)
     profile_image_url: str | None = Field(default=None, max_length=500)
     is_hotel_owner: bool = False
+    is_on_duty: bool = True
 
 
 class UserRead(BaseModel):
@@ -21,6 +22,7 @@ class UserRead(BaseModel):
     profile_image_url: str | None
     is_hotel_owner: bool
     is_active: bool
+    is_on_duty: bool
 
     model_config = {"from_attributes": True}
 
@@ -34,6 +36,7 @@ class StaffCreate(BaseModel):
     profile_image_url: str | None = Field(default=None, max_length=500)
     is_hotel_owner: bool = False
     is_active: bool = True
+    is_on_duty: bool = True
 
 
 class StaffUpdate(BaseModel):
@@ -45,6 +48,7 @@ class StaffUpdate(BaseModel):
     profile_image_url: str | None = Field(default=None, max_length=500)
     is_hotel_owner: bool | None = None
     is_active: bool | None = None
+    is_on_duty: bool | None = None
 
 
 class StaffRead(BaseModel):
@@ -57,3 +61,4 @@ class StaffRead(BaseModel):
     profile_image_url: str | None
     is_hotel_owner: bool
     is_active: bool
+    is_on_duty: bool

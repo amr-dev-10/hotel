@@ -30,6 +30,12 @@ def create_user(
         tenant_id=str(context.tenant_id),
         email=payload.email,
         password_hash=hash_password(payload.password),
+        name=payload.name,
+        department=payload.department,
+        job_role=payload.job_role,
+        profile_image_url=payload.profile_image_url,
+        is_hotel_owner=payload.is_hotel_owner,
+        is_on_duty=payload.is_on_duty,
     )
     db.add(user)
     db.commit()

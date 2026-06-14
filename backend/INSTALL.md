@@ -46,7 +46,7 @@ python -m pip install -r backend\requirements.txt
 Copy-Item backend\.env.example backend\.env
 ```
 
-Edit `backend\.env` and set real values for `JWT_SECRET`, WhatsApp, Gemini, and Firebase when those integrations are ready.
+Edit `backend\.env` and set real values for `JWT_SECRET`, WhatsApp, Gemini, and Firebase when those integrations are ready. Set `WHATSAPP_APP_SECRET` to enable HMAC verification for incoming Meta webhook POST requests.
 
 ## Start PostgreSQL And Redis
 
@@ -89,6 +89,7 @@ Open:
 - Guests: `/api/v1/hotels/{hotel_id}/guests`
 - Feedback: `/api/v1/hotels/{hotel_id}/feedback`
 - Bot config: `/api/v1/hotels/{hotel_id}/bot-config`
+- Campaigns: `/api/v1/hotels/{hotel_id}/campaigns`
 - WhatsApp webhook: `/webhook/whatsapp`
 - Voice webhook: `/webhook/voice/inbound`
 - WebSockets: `/ws/hotels/{hotel_id}/tickets`, `/ws/hotels/{hotel_id}/chat/{ticket_id}`, `/ws/voice`

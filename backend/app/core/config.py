@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     guest_otp_code: str = "123456"
     whatsapp_verify_token: str = "change-this-whatsapp-verify-token"
+    whatsapp_app_secret: str | None = None
     whatsapp_access_token: str | None = None
     whatsapp_graph_api_url: str = "https://graph.facebook.com/v20.0"
     gemini_api_key: str | None = None

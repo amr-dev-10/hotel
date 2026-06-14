@@ -23,6 +23,7 @@ def _staff_to_read(user: User) -> StaffRead:
         profile_image_url=user.profile_image_url,
         is_hotel_owner=user.is_hotel_owner,
         is_active=user.is_active,
+        is_on_duty=user.is_on_duty,
     )
 
 
@@ -65,6 +66,7 @@ def create_staff(
         profile_image_url=payload.profile_image_url,
         is_hotel_owner=payload.is_hotel_owner,
         is_active=payload.is_active,
+        is_on_duty=payload.is_on_duty,
     )
     db.add(user)
     db.commit()

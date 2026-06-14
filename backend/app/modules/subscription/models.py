@@ -26,7 +26,7 @@ class Subscription(Base, UuidPrimaryKeyMixin, TenantOwnedMixin, TimestampMixin):
 
 class TenantUsage(Base, UuidPrimaryKeyMixin, TenantOwnedMixin, TimestampMixin):
     __tablename__ = "tenant_usage"
-    __table_args__ = (UniqueConstraint("tenant_id", "metric", name="uq_tenant_usage_metric"),)
+    __table_args__ = (UniqueConstraint("hotel_id", "metric", name="uq_hotel_usage_metric"),)
 
     metric: Mapped[str] = mapped_column(String(80), nullable=False)
     used: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

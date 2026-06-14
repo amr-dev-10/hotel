@@ -8,6 +8,7 @@ from app.database.base import Base
 from app.modules.activity.models import Activity
 from app.modules.audit.models import AuditLog
 from app.modules.bot_config.models import BotConfig
+from app.modules.campaign.models import Campaign, CampaignDelivery
 from app.modules.department.models import Department
 from app.modules.fcm.models import FcmToken
 from app.modules.feedback.models import Feedback
@@ -22,6 +23,7 @@ from app.modules.subscription.models import Plan, Subscription, TenantUsage
 from app.modules.tenant.models import PlatformUser, Tenant
 from app.modules.ticket.models import Ticket, TicketAssignment, TicketAttachment, TicketHistory, TicketMessage
 from app.modules.user.models import User
+from app.modules.whatsapp_session.models import WhatsAppSession
 from app.modules.workflow.models import Workflow, WorkflowStage, WorkflowTransition
 
 engine = create_engine(settings.database_url, pool_pre_ping=True)
@@ -31,6 +33,8 @@ _model_imports = (
     Activity,
     AuditLog,
     BotConfig,
+    Campaign,
+    CampaignDelivery,
     Department,
     FcmToken,
     Feedback,
@@ -58,6 +62,7 @@ _model_imports = (
     TicketHistory,
     TicketMessage,
     User,
+    WhatsAppSession,
     Workflow,
     WorkflowStage,
     WorkflowTransition,

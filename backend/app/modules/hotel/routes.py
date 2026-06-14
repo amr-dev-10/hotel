@@ -50,6 +50,7 @@ def create_hotel(payload: HotelCreate, db: Session = Depends(get_db)) -> Tenant:
         address=payload.address,
         contact_email=payload.contact_email,
         contact_phone=payload.contact_phone,
+        whatsapp_phone_number_id=payload.whatsapp_phone_number_id,
         timezone=payload.timezone,
         subscription=payload.subscription,
         status=payload.status,
