@@ -1,0 +1,32 @@
+from collections.abc import Sequence
+from datetime import date
+
+from sqlalchemy import or_, select
+from sqlalchemy.orm import Session
+
+from app.models.guest import Guest
+from app.repositories.base import BaseRepository
+
+
+class GuestRepository(BaseRepository[Guest]):
+    def __init__(self, db: Session) -> None:
+        super().__init__(db, Guest)
+
+    def find_active_by_phone(self, hotel_id: str, phone: str) -> Guest | None:
+        today = date.today()
+        return self.db.execute(
+            select(Guest).where(
+                Guest.hotel_id == hotel_id,
+                or_(Guest.phone == phone, Guest.whatsapp_phone == phone),
+                Guest.status == "checked_in",
+                or_(Guest.check_out_date.is_(None), Guest.check_out_date >= today),
+            )
+        ).scalar_one_or_none()
+
+    def list_active(self, hotel_id: str) -> Sequence[Guest]:
+        return self.db.execute(
+            select(Guest).where(
+                Guest.hotel_id == hotel_id,
+                Guest.status == "checked_in",
+            )
+        ).scalars().all()

@@ -1,6 +1,7 @@
 # Arcadia Backend Setup
 
-Codex only added code and setup files. It did not install Python packages, start Docker, or modify your local environment.
+The backend has been rebuilt from the v1 architecture documents in `docs/v1/`.
+Dependencies and local tooling are pinned so development can continue from a stable base.
 
 ## Library Versions
 
@@ -60,8 +61,10 @@ Or create a local PostgreSQL 16 database named `arcadia` and run Redis 7 on port
 
 ## Run Migrations
 
+The Alembic environment imports SQLAlchemy model metadata from `app.models`.
+
 ```powershell
-alembic -c backend\alembic.ini revision --autogenerate -m "initial arcadia schema"
+alembic -c backend\alembic.ini revision --autogenerate -m "arcadia v1 schema"
 alembic -c backend\alembic.ini upgrade head
 ```
 
@@ -76,20 +79,23 @@ Open:
 - `http://localhost:8000/health`
 - `http://localhost:8000/docs`
 
-## Main Routes Created
+## Main Routes
 
-- Auth: `/api/v1/auth/login`, `/api/v1/auth/refresh`, `/api/v1/auth/logout`, `/api/v1/auth/guest/verify-phone`, `/api/v1/auth/guest/confirm-otp`
-- Hotels: `/api/v1/hotels`, `/api/v1/hotels/{hotel_id}`, `/api/v1/hotels/{hotel_id}/stats`
-- Staff: `/api/v1/hotels/{hotel_id}/users`
-- Rooms: `/api/v1/hotels/{hotel_id}/rooms`
-- Departments: `/api/v1/hotels/{hotel_id}/departments`
-- Tickets: `/api/v1/hotels/{hotel_id}/tickets`
-- Ticket messages: `/api/v1/hotels/{hotel_id}/tickets/{ticket_id}/messages`
-- Menu: `/api/v1/hotels/{hotel_id}/menu/categories`, `/api/v1/hotels/{hotel_id}/menu/items`
-- Guests: `/api/v1/hotels/{hotel_id}/guests`
-- Feedback: `/api/v1/hotels/{hotel_id}/feedback`
-- Bot config: `/api/v1/hotels/{hotel_id}/bot-config`
-- Campaigns: `/api/v1/hotels/{hotel_id}/campaigns`
-- WhatsApp webhook: `/webhook/whatsapp`
-- Voice webhook: `/webhook/voice/inbound`
-- WebSockets: `/ws/hotels/{hotel_id}/tickets`, `/ws/hotels/{hotel_id}/chat/{ticket_id}`, `/ws/voice`
+- `GET /health`
+- `POST /api/v1/hotels/bootstrap`
+- `POST /api/v1/auth/login`
+- `GET /api/v1/auth/me`
+- `/api/v1/hotels/{hotel_id}/users`
+- `/api/v1/hotels/{hotel_id}/rooms`
+- `/api/v1/hotels/{hotel_id}/departments`
+- `/api/v1/hotels/{hotel_id}/guests`
+- `/api/v1/hotels/{hotel_id}/tickets`
+- `/api/v1/hotels/{hotel_id}/menu/categories`
+- `/api/v1/hotels/{hotel_id}/menu/items`
+- `/api/v1/hotels/{hotel_id}/bot-config`
+- `/api/v1/hotels/{hotel_id}/campaigns`
+- `/api/v1/hotels/{hotel_id}/feedback`
+- `GET /webhook/whatsapp`
+- `POST /webhook/whatsapp`
+- `/ws/{hotel_id}/tickets`
+- `/ws/{hotel_id}/chat/{ticket_id}`

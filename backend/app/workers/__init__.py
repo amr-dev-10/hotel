@@ -1,1 +1,1 @@
-
+"""Celery worker tasks."""

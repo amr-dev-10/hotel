@@ -3,57 +3,92 @@ from typing import Any
 import httpx
 
 from app.core.config import settings
+from app.core.security import verify_meta_signature
 
 
 class WhatsAppService:
-    def __init__(self, access_token: str | None = None, api_url: str | None = None) -> None:
-        self.access_token = access_token or settings.whatsapp_access_token
-        self.api_url = (api_url or settings.whatsapp_graph_api_url).rstrip("/")
+    def verify_webhook_signature(self, raw_body: bytes, signature_header: str | None) -> bool:
+        return verify_meta_signature(raw_body, signature_header, settings.whatsapp_app_secret)
 
-    async def send_text(self, phone_number_id: str, to_phone: str, body: str) -> dict[str, Any]:
-        if not self.access_token:
-            raise RuntimeError("WHATSAPP_ACCESS_TOKEN is not configured")
-        url = f"{self.api_url}/{phone_number_id}/messages"
-        headers = {"Authorization": f"Bearer {self.access_token}"}
-        payload = {
-            "messaging_product": "whatsapp",
-            "to": to_phone,
-            "type": "text",
-            "text": {"body": body},
-        }
-        async with httpx.AsyncClient(timeout=20) as client:
-            response = await client.post(url, headers=headers, json=payload)
-            response.raise_for_status()
-            return response.json()
+    def send_text(self, phone_number_id: str | None, to_phone: str, text: str) -> dict[str, Any]:
+        return self._send(
+            phone_number_id,
+            {
+                "messaging_product": "whatsapp",
+                "to": to_phone,
+                "type": "text",
+                "text": {"body": text},
+            },
+        )
 
-    async def send_template(
+    def send_interactive_list(
         self,
-        phone_number_id: str,
+        phone_number_id: str | None,
+        to_phone: str,
+        body: str,
+        button_text: str,
+        rows: list[dict[str, str]],
+        section_title: str = "Options",
+    ) -> dict[str, Any]:
+        return self._send(
+            phone_number_id,
+            {
+                "messaging_product": "whatsapp",
+                "to": to_phone,
+                "type": "interactive",
+                "interactive": {
+                    "type": "list",
+                    "body": {"text": body},
+                    "action": {
+                        "button": button_text,
+                        "sections": [{"title": section_title, "rows": rows}],
+                    },
+                },
+            },
+        )
+
+    def send_template(
+        self,
+        phone_number_id: str | None,
         to_phone: str,
         template_name: str,
-        parameters: list[str],
+        params: list[str],
         language_code: str = "en",
     ) -> dict[str, Any]:
-        if not self.access_token:
-            raise RuntimeError("WHATSAPP_ACCESS_TOKEN is not configured")
-        url = f"{self.api_url}/{phone_number_id}/messages"
-        headers = {"Authorization": f"Bearer {self.access_token}"}
-        payload = {
-            "messaging_product": "whatsapp",
-            "to": to_phone,
-            "type": "template",
-            "template": {
-                "name": template_name,
-                "language": {"code": language_code},
-                "components": [
-                    {
-                        "type": "body",
-                        "parameters": [{"type": "text", "text": value} for value in parameters],
-                    }
-                ],
+        return self._send(
+            phone_number_id,
+            {
+                "messaging_product": "whatsapp",
+                "to": to_phone,
+                "type": "template",
+                "template": {
+                    "name": template_name,
+                    "language": {"code": language_code},
+                    "components": [
+                        {
+                            "type": "body",
+                            "parameters": [
+                                {"type": "text", "text": value} for value in params
+                            ],
+                        }
+                    ],
+                },
             },
-        }
-        async with httpx.AsyncClient(timeout=20) as client:
-            response = await client.post(url, headers=headers, json=payload)
-            response.raise_for_status()
-            return response.json()
+        )
+
+    def _send(self, phone_number_id: str | None, payload: dict[str, Any]) -> dict[str, Any]:
+        if settings.whatsapp_dry_run or not settings.whatsapp_access_token or not phone_number_id:
+            return {"dry_run": True, "payload": payload}
+
+        url = (
+            f"https://graph.facebook.com/{settings.whatsapp_api_version}/"
+            f"{phone_number_id}/messages"
+        )
+        response = httpx.post(
+            url,
+            json=payload,
+            headers={"Authorization": f"Bearer {settings.whatsapp_access_token}"},
+            timeout=10,
+        )
+        response.raise_for_status()
+        return response.json()

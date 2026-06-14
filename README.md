@@ -1,18 +1,15 @@
 # Arcadia Hotel Platform Backend
 
-FastAPI backend for a multi-tenant hotel management platform using PostgreSQL, Redis-backed real-time flows, JWT auth, Android-ready REST APIs, and WebSockets.
+FastAPI backend for the Arcadia hotel management platform, rebuilt from the v1 architecture shared in `docs/v1/`.
 
-The current backend lives in `backend/` and implements the Arcadia migration plan:
+The backend follows the v1 principles:
 
-- Hotels, staff, rooms, departments, guests, menu, feedback, bot config, and ticketing APIs.
-- Staff JWT login, refresh/logout, and guest phone OTP token flow.
-- WhatsApp and voice webhook entry points with PostgreSQL-backed guest bot sessions.
-- WhatsApp campaign queueing for checked-in guest offers and template sends.
-- Ticket/chat/voice WebSocket endpoints.
-- PostgreSQL 16 and Redis 7 Docker Compose services.
-- Alembic migration scaffold.
-
-Codex did not install packages. See [backend/INSTALL.md](backend/INSTALL.md) for pinned library versions and installation steps.
+- Modular monolith first.
+- PostgreSQL as the production source of truth.
+- `hotel_id` scoping on tenant data.
+- REST as the data API and WebSockets as the live update layer.
+- WhatsApp, Gemini, FCM, Redis, and Celery behind integration boundaries.
+- Config-driven WhatsApp bot flows stored in the database.
 
 ## Quick Setup
 
@@ -21,8 +18,6 @@ cd /mnt/c/Users/Lenovo/Documents/Hotel\ Managment
 python3 -m venv .venv
 . .venv/bin/activate
 pip install -r backend/requirements.txt
-cp backend/.env.example backend/.env
-docker compose up -d postgres redis
 uvicorn app.main:app --app-dir backend --reload --host 0.0.0.0 --port 8000
 ```
 
@@ -31,35 +26,28 @@ Open:
 - API health: `http://localhost:8000/health`
 - API docs/testing UI: `http://localhost:8000/docs`
 
-## Database
+## Current API
 
-Default config expects PostgreSQL:
-
-```text
-postgresql+psycopg://postgres:postgres@localhost:5432/arcadia
-```
-
-For quick local smoke tests without PostgreSQL, set:
-
-```text
-DATABASE_URL=sqlite:///./hotel_cloud_dev.db
-```
-
-## Main API Groups
-
-- `/api/v1/auth`
-- `/api/v1/hotels`
+- `GET /health`
+- `POST /api/v1/hotels/bootstrap`
+- `POST /api/v1/auth/login`
 - `/api/v1/hotels/{hotel_id}/users`
 - `/api/v1/hotels/{hotel_id}/rooms`
 - `/api/v1/hotels/{hotel_id}/departments`
+- `/api/v1/hotels/{hotel_id}/guests`
 - `/api/v1/hotels/{hotel_id}/tickets`
 - `/api/v1/hotels/{hotel_id}/menu`
-- `/api/v1/hotels/{hotel_id}/guests`
-- `/api/v1/hotels/{hotel_id}/feedback`
 - `/api/v1/hotels/{hotel_id}/bot-config`
 - `/api/v1/hotels/{hotel_id}/campaigns`
-- `/webhook/whatsapp`
-- `/webhook/voice/inbound`
-- `/ws/hotels/{hotel_id}/tickets`
-- `/ws/hotels/{hotel_id}/chat/{ticket_id}`
-- `/ws/voice`
+- `/api/v1/hotels/{hotel_id}/feedback`
+- `GET /webhook/whatsapp`
+- `POST /webhook/whatsapp`
+- `/ws/{hotel_id}/tickets`
+- `/ws/{hotel_id}/chat/{ticket_id}`
+
+## Design Docs
+
+The shared v1 files are preserved in:
+
+- `docs/v1/my_architecture_design_v1.md`
+- `docs/v1/whatsapp_guest_flows_v1.md`

@@ -1,31 +1,50 @@
+from collections.abc import Sequence
 from typing import Generic, TypeVar
 
-from fastapi import HTTPException, status
 from sqlalchemy import Select, select
 from sqlalchemy.orm import Session
 
-from app.database.base import Base
-
-ModelT = TypeVar("ModelT", bound=Base)
+ModelT = TypeVar("ModelT")
 
 
 class BaseRepository(Generic[ModelT]):
-    def __init__(self, db: Session, model: type[ModelT], hotel_id: str) -> None:
+    def __init__(self, db: Session, model: type[ModelT]) -> None:
         self.db = db
         self.model = model
-        self.hotel_id = hotel_id
 
-    def select_scoped(self) -> Select[tuple[ModelT]]:
-        return select(self.model).where(self.model.hotel_id == self.hotel_id)
+    def get(self, item_id: str) -> ModelT | None:
+        return self.db.get(self.model, item_id)
 
-    def get_required(self, record_id: str) -> ModelT:
-        row = self.db.scalar(self.select_scoped().where(self.model.id == record_id))
-        if row is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"{self.model.__name__} not found")
-        return row
+    def get_for_hotel(self, hotel_id: str, item_id: str) -> ModelT | None:
+        statement = select(self.model).where(
+            self.model.id == item_id,
+            self.model.hotel_id == hotel_id,
+        )
+        return self.db.execute(statement).scalar_one_or_none()
 
-    def add(self, row: ModelT) -> ModelT:
-        if str(row.hotel_id) != self.hotel_id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cross-hotel write rejected")
-        self.db.add(row)
-        return row
+    def list_for_hotel(
+        self,
+        hotel_id: str,
+        limit: int = 50,
+        cursor: str | None = None,
+    ) -> Sequence[ModelT]:
+        statement: Select = select(self.model).where(self.model.hotel_id == hotel_id)
+        if hasattr(self.model, "deleted_at"):
+            statement = statement.where(self.model.deleted_at.is_(None))
+        if cursor:
+            statement = statement.where(self.model.id > cursor)
+        statement = statement.order_by(self.model.id).limit(limit)
+        return self.db.execute(statement).scalars().all()
+
+    def add(self, instance: ModelT, commit: bool = True) -> ModelT:
+        self.db.add(instance)
+        if commit:
+            self.db.commit()
+            self.db.refresh(instance)
+        return instance
+
+    def commit(self, instance: ModelT | None = None) -> ModelT | None:
+        self.db.commit()
+        if instance is not None:
+            self.db.refresh(instance)
+        return instance

@@ -1,26 +1,157 @@
-from typing import Any
+from datetime import timedelta
+from uuid import uuid4
 
-from app.services.realtime import realtime_manager
+from sqlalchemy.orm import Session
+
+from app.core.exceptions import not_found
+from app.models.base import utcnow
+from app.models.ticket import Ticket
+from app.repositories.bot_config_repository import BotConfigRepository
+from app.repositories.department_repository import DepartmentRepository
+from app.repositories.ticket_repository import TicketRepository
+from app.repositories.user_repository import UserRepository
+from app.schemas.ticket import TicketCreate
+from app.services.notification_service import NotificationService
 
 
-async def publish_ticket_event(hotel_id: str, event_type: str, payload: dict[str, Any]) -> None:
-    await realtime_manager.broadcast(
-        f"hotel:{hotel_id}:tickets",
-        {
-            "type": event_type,
-            "hotel_id": hotel_id,
-            "payload": payload,
-        },
-    )
+class TicketService:
+    def __init__(self, db: Session) -> None:
+        self.db = db
+        self.tickets = TicketRepository(db)
+        self.departments = DepartmentRepository(db)
+        self.users = UserRepository(db)
+        self.bot_configs = BotConfigRepository(db)
+        self.notifications = NotificationService()
 
+    def create_ticket(
+        self,
+        hotel_id: str,
+        payload: TicketCreate,
+        actor_id: str | None = None,
+        commit: bool = True,
+    ) -> Ticket:
+        department = None
+        if payload.department_id:
+            department = self.departments.get_for_hotel(hotel_id, payload.department_id)
+        if not department and payload.department_key:
+            department = self.departments.get_by_key(hotel_id, payload.department_key)
+        if not department:
+            department = self.departments.first_active(hotel_id)
+        if not department:
+            raise not_found("No active department exists for this hotel")
 
-async def publish_chat_event(hotel_id: str, ticket_id: str, payload: dict[str, Any]) -> None:
-    await realtime_manager.broadcast(
-        f"hotel:{hotel_id}:ticket:{ticket_id}:chat",
-        {
-            "type": "chat.message",
-            "hotel_id": hotel_id,
-            "ticket_id": ticket_id,
-            "payload": payload,
-        },
-    )
+        assignee = None
+        if payload.assigned_to:
+            assignee = self.users.get_for_hotel(hotel_id, payload.assigned_to)
+        if not assignee:
+            assignee = self.users.first_on_duty_for_department(hotel_id, department.id)
+
+        now = utcnow()
+        ticket = Ticket(
+            hotel_id=hotel_id,
+            ticket_code=self._ticket_code(),
+            guest_id=payload.guest_id,
+            room_id=payload.room_id,
+            department_id=department.id,
+            assigned_to=assignee.id if assignee else None,
+            stage="Open",
+            type=payload.type,
+            item_description=payload.item_description,
+            source=payload.source,
+            priority=payload.priority,
+            sla_due_at=now + timedelta(minutes=self._sla_minutes(hotel_id, department.key)),
+        )
+        self.db.add(ticket)
+        self.db.flush()
+        self.tickets.add_event(
+            ticket,
+            "created",
+            {
+                "source": payload.source,
+                "item_description": payload.item_description,
+                "priority": payload.priority,
+            },
+            actor_id=actor_id,
+        )
+        if assignee:
+            self.tickets.add_event(
+                ticket,
+                "assigned",
+                {"assigned_to": assignee.id, "assigned_to_name": assignee.name},
+                actor_id=actor_id,
+            )
+        if commit:
+            self.db.commit()
+            self.db.refresh(ticket)
+            self._publish_created(ticket, assignee_name=assignee.name if assignee else None)
+        return ticket
+
+    def update_stage(
+        self,
+        hotel_id: str,
+        ticket_id: str,
+        stage: str,
+        note: str | None = None,
+        actor_id: str | None = None,
+    ) -> Ticket:
+        ticket = self.tickets.get_for_hotel(hotel_id, ticket_id)
+        if not ticket:
+            raise not_found("Ticket not found")
+        ticket.stage = stage
+        if stage.lower() in {"completed", "resolved", "closed"}:
+            ticket.stage = "Completed"
+            ticket.resolved_at = utcnow()
+        self.tickets.add_event(
+            ticket,
+            "stage_changed",
+            {"stage": ticket.stage, "note": note},
+            actor_id=actor_id,
+        )
+        self.db.commit()
+        self.db.refresh(ticket)
+        self.notifications.publish_ticket_event(
+            hotel_id,
+            {
+                "event": "ticket.stage_changed",
+                "ticket_id": ticket.id,
+                "stage": ticket.stage,
+                "note": note,
+            },
+        )
+        return ticket
+
+    def _sla_minutes(self, hotel_id: str, department_key: str) -> int:
+        config = self.bot_configs.get_for_hotel(hotel_id)
+        if config and config.sla_config:
+            value = config.sla_config.get(department_key, config.sla_config.get("default"))
+            if isinstance(value, int):
+                return value
+            if isinstance(value, str) and value.isdigit():
+                return int(value)
+        return 20
+
+    def _ticket_code(self) -> str:
+        return f"REQ-{utcnow().strftime('%H%M%S-%d%m%y')}-{uuid4().hex[:4].upper()}"
+
+    def _publish_created(self, ticket: Ticket, assignee_name: str | None) -> None:
+        self.notifications.publish_ticket_event(
+            ticket.hotel_id,
+            {
+                "event": "ticket.created",
+                "ticket_id": ticket.id,
+                "ticket_code": ticket.ticket_code,
+                "department_id": ticket.department_id,
+                "room_id": ticket.room_id,
+                "guest_id": ticket.guest_id,
+                "item": ticket.item_description,
+                "assigned_to": ticket.assigned_to,
+                "assigned_to_name": assignee_name,
+                "sla_due_at": ticket.sla_due_at,
+            },
+        )
+        self.notifications.send_fcm_to_user(
+            ticket.assigned_to,
+            "New Ticket",
+            ticket.item_description,
+            {"ticket_id": ticket.id, "hotel_id": ticket.hotel_id},
+        )

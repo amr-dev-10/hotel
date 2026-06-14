@@ -1,10 +1,10 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
+import hashlib
 import hmac
-from hashlib import sha256
 from typing import Any
-from uuid import UUID
 
 import jwt
+from fastapi import HTTPException, status
 from passlib.context import CryptContext
 
 from app.core.config import settings
@@ -21,39 +21,56 @@ def verify_password(password: str, password_hash: str) -> bool:
 
 
 def create_access_token(
-    *,
-    user_id: UUID,
-    tenant_id: UUID | None = None,
-    role_ids: list[UUID] | None = None,
-    platform_admin: bool = False,
+    subject: str,
+    hotel_id: str,
+    claims: dict[str, Any] | None = None,
+    expires_delta: timedelta | None = None,
 ) -> str:
-    expires_at = datetime.now(timezone.utc) + timedelta(
-        minutes=settings.access_token_expire_minutes
+    now = datetime.now(UTC)
+    expire = now + (
+        expires_delta or timedelta(minutes=settings.access_token_expire_minutes)
     )
     payload: dict[str, Any] = {
-        "sub": str(user_id),
-        "exp": expires_at,
+        "sub": subject,
+        "hotel_id": hotel_id,
+        "iat": int(now.timestamp()),
+        "exp": int(expire.timestamp()),
     }
-
-    if platform_admin:
-        payload["platform_admin"] = True
-    else:
-        hotel_id = str(tenant_id)
-        payload["hotel_id"] = hotel_id
-        payload["tenant_id"] = hotel_id
-        payload["role_ids"] = [str(role_id) for role_id in role_ids or []]
-
+    if claims:
+        payload.update(claims)
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
-def verify_hmac_sha256_signature(secret: str, body: bytes, signature_header: str | None) -> bool:
-    if not signature_header:
+def decode_access_token(token: str) -> dict[str, Any]:
+    try:
+        return jwt.decode(
+            token,
+            settings.jwt_secret,
+            algorithms=[settings.jwt_algorithm],
+        )
+    except jwt.PyJWTError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from exc
+
+
+def verify_meta_signature(
+    raw_body: bytes,
+    signature_header: str | None,
+    app_secret: str | None = None,
+) -> bool:
+    secret = app_secret or settings.whatsapp_app_secret
+    if not secret:
+        return True
+    if not signature_header or not signature_header.startswith("sha256="):
         return False
 
-    prefix = "sha256="
-    received = signature_header
-    if received.startswith(prefix):
-        received = received[len(prefix) :]
-
-    expected = hmac.new(secret.encode("utf-8"), body, sha256).hexdigest()
-    return hmac.compare_digest(received, expected)
+    expected = hmac.new(
+        secret.encode("utf-8"),
+        raw_body,
+        hashlib.sha256,
+    ).hexdigest()
+    received = signature_header.removeprefix("sha256=")
+    return hmac.compare_digest(expected, received)

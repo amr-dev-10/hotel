@@ -9,3 +9,5 @@ __pycache__/
 *.db
 .DS_Store
 npm-debug.log*
+backend/uvicorn.pid
+backend/uvicorn.*.log

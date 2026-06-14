@@ -1,20 +1,31 @@
-from app.core.config import settings
+from typing import Any
+
+from app.services.defaults import DEFAULT_SERVICES
 
 
-class GeminiClassifier:
-    def __init__(self, api_key: str | None = None, model_name: str | None = None) -> None:
-        self.api_key = api_key or settings.gemini_api_key
-        self.model_name = model_name or settings.gemini_model
-
-    async def classify(self, text: str) -> str:
-        if not self.api_key:
-            raise RuntimeError("GEMINI_API_KEY is not configured")
-
-        import google.generativeai as genai
-
-        genai.configure(api_key=self.api_key)
-        model = genai.GenerativeModel(self.model_name)
-        response = await model.generate_content_async(
-            f"Classify this hotel guest request into a concise department key: {text}"
-        )
-        return response.text.strip()
+class GeminiService:
+    def classify_free_text(
+        self,
+        text: str,
+        services: list[dict[str, Any]] | None = None,
+        guest_name: str | None = None,
+    ) -> dict[str, Any]:
+        lowered = text.lower()
+        for service in services or DEFAULT_SERVICES:
+            haystack = [
+                service.get("id", ""),
+                service.get("title", ""),
+                service.get("item", ""),
+                service.get("department_key", ""),
+                *(service.get("keywords") or []),
+            ]
+            if any(str(part).lower() in lowered for part in haystack if part):
+                return {
+                    "matched": True,
+                    "service_id": service.get("id"),
+                    "department_key": service.get("department_key"),
+                    "item": service.get("item") or service.get("title"),
+                    "priority": service.get("priority", 2),
+                    "guest_name": guest_name,
+                }
+        return {"matched": False}
