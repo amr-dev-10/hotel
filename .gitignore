@@ -1,6 +1,12 @@
 node_modules/
 dist/
+.next/
+out/
+coverage/
+.turbo/
 .env
+apps/dashboard/.env.local
+apps/dashboard/next-dev*.log
 backend/.env
 .venv/
 __pycache__/
