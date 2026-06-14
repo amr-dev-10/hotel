@@ -9,7 +9,6 @@ from app.models.user import User
 from app.repositories.hotel_repository import HotelRepository
 from app.schemas.auth import CurrentUserRead
 from app.schemas.hotel import HotelBootstrapRequest, HotelRead
-from app.services.demo_data_service import DemoDataService
 from app.services.hotel_service import HotelService
 
 router = APIRouter()
@@ -22,21 +21,6 @@ def bootstrap_hotel(payload: HotelBootstrapRequest, db: Session = Depends(get_db
         {
             "hotel": HotelRead.model_validate(result["hotel"]).model_dump(),
             "owner": CurrentUserRead.model_validate(result["owner"]).model_dump(),
-            "access_token": result["access_token"],
-            "refresh_token": result.get("refresh_token"),
-            "token_type": result["token_type"],
-        }
-    )
-
-
-@router.post("/demo-seed")
-def seed_demo_hotel(db: Session = Depends(get_db)) -> dict:
-    result = DemoDataService(db).seed()
-    return ok(
-        {
-            "hotel": HotelRead.model_validate(result["hotel"]).model_dump(),
-            "owner": CurrentUserRead.model_validate(result["owner"]).model_dump(),
-            "credentials": result["credentials"],
             "access_token": result["access_token"],
             "refresh_token": result.get("refresh_token"),
             "token_type": result["token_type"],
