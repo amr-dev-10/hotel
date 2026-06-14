@@ -52,6 +52,11 @@ export async function apiPatch<T, TPayload = unknown>(
   return response.data.data;
 }
 
+export async function apiDelete<T>(url: string, config?: AxiosRequestConfig) {
+  const response = await api.delete<ApiEnvelope<T>>(url, config);
+  return response.data.data;
+}
+
 export function apiErrorMessage(error: unknown) {
   if (axios.isAxiosError(error)) {
     const detail = error.response?.data as { detail?: string; message?: string } | undefined;

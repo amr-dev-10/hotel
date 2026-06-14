@@ -47,6 +47,15 @@ export function useAcceptTicket(hotelId: string) {
   });
 }
 
+export function useRejectTicket(hotelId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (ticketId: string) => apiPost<Ticket>(`/hotels/${hotelId}/tickets/${ticketId}/reject`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.tickets.all(hotelId) }),
+  });
+}
+
 export function useCompleteTicket(hotelId: string) {
   const queryClient = useQueryClient();
 
@@ -61,6 +70,16 @@ export function useApproveTicket(hotelId: string) {
 
   return useMutation({
     mutationFn: (ticketId: string) => apiPost<Ticket>(`/hotels/${hotelId}/tickets/${ticketId}/approve`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.tickets.all(hotelId) }),
+  });
+}
+
+export function useReopenTicket(hotelId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ ticketId, note }: { ticketId: string; note?: string }) =>
+      apiPost<Ticket>(`/hotels/${hotelId}/tickets/${ticketId}/reopen`, { stage: "reopened", note }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.tickets.all(hotelId) }),
   });
 }

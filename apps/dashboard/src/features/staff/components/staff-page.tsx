@@ -1,5 +1,8 @@
 "use client";
 
+import Link from "next/link";
+
+import { Button } from "@/components/ui/button";
 import { CreateStaffDialog } from "@/features/staff/components/create-staff-dialog";
 import { StaffDirectory } from "@/features/staff/components/staff-directory";
 
@@ -11,7 +14,12 @@ export function StaffPage({ hotelId }: { hotelId: string }) {
           <h2 className="text-xl font-semibold">Staff Settings</h2>
           <p className="text-sm text-slate-500">View staff hierarchy signals and add operational users.</p>
         </div>
-        <CreateStaffDialog hotelId={hotelId} />
+        <div className="flex gap-2">
+          <Button asChild type="button" variant="secondary">
+            <Link href={`/${hotelId}/settings/staff/new`}>Open form</Link>
+          </Button>
+          <CreateStaffDialog hotelId={hotelId} />
+        </div>
       </div>
       <StaffDirectory hotelId={hotelId} />
     </div>

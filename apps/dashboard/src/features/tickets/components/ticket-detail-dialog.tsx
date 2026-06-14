@@ -1,9 +1,11 @@
 "use client";
 
 import { format } from "date-fns";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -83,7 +85,7 @@ export function TicketDetailDialog({ hotelId, tickets }: { hotelId: string; tick
                   <div className="grid gap-2">
                     {escalations.data.map((item) => (
                       <div className="rounded bg-slate-50 p-3 text-sm" key={item.id}>
-                        <p className="font-medium">Level {item.level}</p>
+                        <p className="font-medium">Level {item.escalation_level ?? item.level}</p>
                         <p className="text-slate-500">{item.reason}</p>
                       </div>
                     ))}
@@ -93,6 +95,12 @@ export function TicketDetailDialog({ hotelId, tickets }: { hotelId: string; tick
                 ) : null}
               </div>
             </section>
+
+            <div className="flex justify-end">
+              <Button asChild type="button">
+                <Link href={`/${hotelId}/tickets/${ticket.id}`}>Open full page</Link>
+              </Button>
+            </div>
           </div>
         ) : (
           <DataState empty emptyTitle="Select a ticket from the board to inspect its workflow history." />

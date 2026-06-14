@@ -10,16 +10,24 @@ export type AppAction =
   | "accept"
   | "assign"
   | "approve"
+  | "delete"
   | "export";
 
 export type AppSubject =
   | "all"
+  | "AI"
   | "Analytics"
+  | "Hierarchy"
   | "Housekeeping"
+  | "HotelSettings"
   | "Reservation"
+  | "Role"
   | "Room"
   | "Staff"
-  | "Ticket";
+  | "Ticket"
+  | "User"
+  | "WhatsApp"
+  | "Workflow";
 
 export type AppAbility = MongoAbility<[AppAction, AppSubject]>;
 
@@ -41,11 +49,15 @@ export function buildAbility(user: CurrentUser | null): AppAbility {
     can(["view", "edit"], "Room");
     can("view", "Analytics");
     can("view", "Staff");
+    can("view", "User");
+    can("view", "Hierarchy");
+    can("view", "WhatsApp");
   } else {
     can(["view", "accept", "create"], "Ticket");
     can(["view", "edit"], "Housekeeping");
     can("view", "Room");
     can("view", "Reservation");
+    can("view", "Hierarchy");
   }
 
   return build();

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Mail, ShieldCheck, UserRoundCheck, UserRoundX } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -28,7 +29,9 @@ export function StaffDirectory({ hotelId }: { hotelId: string }) {
         <article className="rounded-md border border-slate-200 bg-white p-4 shadow-sm" key={user.id}>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h2 className="truncate text-base font-semibold">{user.name}</h2>
+              <Link href={`/${hotelId}/settings/staff/${user.id}`} className="hover:text-[#0F3D91]">
+                <h2 className="truncate text-base font-semibold">{user.name}</h2>
+              </Link>
               <p className="mt-1 flex items-center gap-2 truncate text-sm text-slate-500">
                 <Mail className="size-4" />
                 {user.email}
