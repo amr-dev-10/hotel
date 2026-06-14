@@ -5,19 +5,28 @@ from app.api.dependencies import require_permission
 from app.core.database import get_db
 from app.core.responses import ok
 from app.models.user import User
-from app.repositories.folio_repository import FolioItemRepository, FolioRepository, TaxConfigRepository
+from app.repositories.folio_repository import (
+    FolioItemRepository,
+    FolioRepository,
+    PaymentTransactionRepository,
+    TaxConfigRepository,
+)
 from app.schemas.folio import (
     FolioItemCreate,
     FolioItemRead,
     FolioRead,
     PaymentCreate,
+    PaymentGatewayOrderCreate,
     PaymentRead,
+    PaymentTransactionRead,
+    PaymentWebhookPayload,
     RefundCreate,
     RefundRead,
     TaxConfigCreate,
     TaxConfigRead,
 )
 from app.services.folio_service import FolioService
+from app.services.payment_gateway_service import PaymentGatewayService
 
 router = APIRouter()
 
@@ -30,6 +39,29 @@ def list_folios(
 ) -> dict:
     folios = FolioRepository(db).list_for_hotel(hotel_id)
     return ok([FolioRead.model_validate(item).model_dump() for item in folios])
+
+
+@router.get("/payment-transactions")
+def list_payment_transactions(
+    hotel_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("folio.view")),
+) -> dict:
+    transactions = PaymentTransactionRepository(db).list_for_hotel(hotel_id)
+    return ok([PaymentTransactionRead.model_validate(item).model_dump() for item in transactions])
+
+
+@router.post("/payment-transactions/{gateway}/{gateway_txn_id}/webhook")
+def payment_webhook(
+    hotel_id: str,
+    gateway: str,
+    gateway_txn_id: str,
+    payload: PaymentWebhookPayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("hotel.settings.manage")),
+) -> dict:
+    transaction = PaymentGatewayService(db).handle_webhook(gateway, gateway_txn_id, payload)
+    return ok(PaymentTransactionRead.model_validate(transaction).model_dump())
 
 
 @router.get("/{folio_id}")
@@ -47,6 +79,18 @@ def get_folio(
             "items": [FolioItemRead.model_validate(item).model_dump() for item in items],
         }
     )
+
+
+@router.post("/{folio_id}/payment-orders")
+def create_payment_order(
+    hotel_id: str,
+    folio_id: str,
+    payload: PaymentGatewayOrderCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("folio.manage")),
+) -> dict:
+    transaction = PaymentGatewayService(db).create_order(hotel_id, folio_id, payload, current_user.id)
+    return ok(PaymentTransactionRead.model_validate(transaction).model_dump())
 
 
 @router.post("/{folio_id}/items")

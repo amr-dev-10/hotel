@@ -3,7 +3,7 @@ from collections.abc import Sequence
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.reservation import Reservation, ReservationGuest, StayRecord
+from app.models.reservation import Reservation, ReservationGuest, ReservationRoomType, StayRecord
 from app.repositories.base import BaseRepository
 
 
@@ -43,6 +43,19 @@ class ReservationGuestRepository(BaseRepository[ReservationGuest]):
                 ReservationGuest.is_primary.is_(True),
             )
         ).scalar_one_or_none()
+
+
+class ReservationRoomTypeRepository(BaseRepository[ReservationRoomType]):
+    def __init__(self, db: Session) -> None:
+        super().__init__(db, ReservationRoomType)
+
+    def list_for_reservation(self, hotel_id: str, reservation_id: str) -> Sequence[ReservationRoomType]:
+        return self.db.execute(
+            select(ReservationRoomType).where(
+                ReservationRoomType.hotel_id == hotel_id,
+                ReservationRoomType.reservation_id == reservation_id,
+            )
+        ).scalars().all()
 
 
 class StayRecordRepository(BaseRepository[StayRecord]):

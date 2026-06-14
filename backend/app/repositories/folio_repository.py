@@ -3,7 +3,7 @@ from collections.abc import Sequence
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.folio import FolioItem, GuestFolio, Payment, Refund, TaxConfig
+from app.models.folio import FolioItem, GuestFolio, Payment, PaymentTransaction, Refund, TaxConfig
 from app.repositories.base import BaseRepository
 
 
@@ -46,6 +46,27 @@ class FolioItemRepository(BaseRepository[FolioItem]):
 class PaymentRepository(BaseRepository[Payment]):
     def __init__(self, db: Session) -> None:
         super().__init__(db, Payment)
+
+
+class PaymentTransactionRepository(BaseRepository[PaymentTransaction]):
+    def __init__(self, db: Session) -> None:
+        super().__init__(db, PaymentTransaction)
+
+    def list_for_payment(self, hotel_id: str, payment_id: str) -> Sequence[PaymentTransaction]:
+        return self.db.execute(
+            select(PaymentTransaction).where(
+                PaymentTransaction.hotel_id == hotel_id,
+                PaymentTransaction.payment_id == payment_id,
+            )
+        ).scalars().all()
+
+    def get_by_gateway_txn(self, gateway: str, gateway_txn_id: str) -> PaymentTransaction | None:
+        return self.db.execute(
+            select(PaymentTransaction).where(
+                PaymentTransaction.gateway == gateway,
+                PaymentTransaction.gateway_txn_id == gateway_txn_id,
+            )
+        ).scalar_one_or_none()
 
 
 class RefundRepository(BaseRepository[Refund]):

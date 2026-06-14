@@ -128,6 +128,19 @@ class FolioService:
         if folio.balance_due <= 0 and folio.status == "closed":
             folio.status = "settled"
         self.audit.log(hotel_id, "folio.payment.added", "folio", folio.id, collected_by)
+        from app.services.payment_gateway_service import PaymentGatewayService
+
+        PaymentGatewayService(self.db).record_transaction(
+            hotel_id,
+            payment.id,
+            payment.amount,
+            payment.currency,
+            gateway=payment.payment_method or "manual",
+            gateway_status="captured" if payment.status == "completed" else payment.status,
+            raw_request={"source": "folio_payment"},
+            raw_response={"stub": True},
+            commit=False,
+        )
         self.db.commit()
         self.db.refresh(payment)
         return payment

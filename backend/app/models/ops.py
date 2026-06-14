@@ -118,6 +118,75 @@ class AnalyticsSnapshot(UUIDPrimaryKeyMixin, Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class JobExecution(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "job_executions"
+
+    job_name: Mapped[str] = mapped_column(String(160), index=True)
+    job_type: Mapped[str] = mapped_column(String(40), default="manual", index=True)
+    hotel_id: Mapped[str | None] = mapped_column(ForeignKey("hotels.id"), index=True)
+    status: Mapped[str] = mapped_column(String(40), default="queued", index=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    duration_ms: Mapped[int | None] = mapped_column(Integer)
+    input_params: Mapped[dict] = mapped_column(JSON, default=dict)
+    result: Mapped[dict] = mapped_column(JSON, default=dict)
+    error_message: Mapped[str | None] = mapped_column(Text)
+    error_traceback: Mapped[str | None] = mapped_column(Text)
+    retry_count: Mapped[int] = mapped_column(Integer, default=0)
+    max_retries: Mapped[int] = mapped_column(Integer, default=3)
+    next_retry_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    celery_task_id: Mapped[str | None] = mapped_column(String(180), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ApiRateLimit(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "api_rate_limits"
+    __table_args__ = (UniqueConstraint("hotel_id", "endpoint_group", name="uq_api_rate_limit_group"),)
+
+    hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
+    endpoint_group: Mapped[str] = mapped_column(String(80), index=True)
+    max_requests: Mapped[int] = mapped_column(Integer)
+    window_seconds: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ExportJob(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "export_jobs"
+
+    hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
+    export_type: Mapped[str] = mapped_column(String(80), index=True)
+    format: Mapped[str] = mapped_column(String(20), default="csv")
+    filters: Mapped[dict] = mapped_column(JSON, default=dict)
+    status: Mapped[str] = mapped_column(String(40), default="queued", index=True)
+    file_url: Mapped[str | None] = mapped_column(String(800))
+    file_size_bytes: Mapped[int | None] = mapped_column(Integer)
+    row_count: Mapped[int | None] = mapped_column(Integer)
+    requested_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ImportJob(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "import_jobs"
+
+    hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
+    import_type: Mapped[str] = mapped_column(String(80), index=True)
+    source_file_url: Mapped[str] = mapped_column(String(800))
+    status: Mapped[str] = mapped_column(String(40), default="uploaded", index=True)
+    total_rows: Mapped[int] = mapped_column(Integer, default=0)
+    processed_rows: Mapped[int] = mapped_column(Integer, default=0)
+    successful_rows: Mapped[int] = mapped_column(Integer, default=0)
+    failed_rows: Mapped[int] = mapped_column(Integer, default=0)
+    errors: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    raw_rows: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    uploaded_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class HousekeepingSchedule(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "housekeeping_schedules"
 

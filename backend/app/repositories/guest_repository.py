@@ -4,7 +4,7 @@ from datetime import date
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.models.guest import Guest
+from app.models.guest import Guest, GuestConsent
 from app.repositories.base import BaseRepository
 
 
@@ -30,3 +30,16 @@ class GuestRepository(BaseRepository[Guest]):
                 Guest.status == "checked_in",
             )
         ).scalars().all()
+
+
+class GuestConsentRepository(BaseRepository[GuestConsent]):
+    def __init__(self, db: Session) -> None:
+        super().__init__(db, GuestConsent)
+
+    def get_for_guest(self, hotel_id: str, guest_id: str) -> GuestConsent | None:
+        return self.db.execute(
+            select(GuestConsent).where(
+                GuestConsent.hotel_id == hotel_id,
+                GuestConsent.guest_id == guest_id,
+            )
+        ).scalar_one_or_none()

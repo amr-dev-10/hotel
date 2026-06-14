@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.v1 import (
     analytics,
     auth,
+    availability,
     bot_config,
     campaigns,
     departments,
@@ -19,6 +20,7 @@ from app.api.v1 import (
     menu,
     ops,
     organizations,
+    platform,
     rate_plans,
     reservations,
     restaurant,
@@ -55,6 +57,11 @@ api_router.include_router(
     reservations.router,
     prefix="/hotels/{hotel_id}/reservations",
     tags=["reservations"],
+)
+api_router.include_router(
+    availability.router,
+    prefix="/hotels/{hotel_id}/availability",
+    tags=["availability"],
 )
 api_router.include_router(
     rate_plans.router,
@@ -132,6 +139,11 @@ api_router.include_router(
     live_chat.router,
     prefix="/hotels/{hotel_id}/live-chat",
     tags=["live-chat"],
+)
+api_router.include_router(
+    platform.router,
+    prefix="/hotels/{hotel_id}",
+    tags=["platform"],
 )
 api_router.include_router(
     knowledge.router,

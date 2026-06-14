@@ -42,3 +42,16 @@ class RoomRepository(BaseRepository[Room]):
                 Room.deleted_at.is_(None),
             )
         ).scalar_one_or_none()
+
+    def list_by_type(self, hotel_id: str, room_type_id: str) -> list[Room]:
+        return list(
+            self.db.execute(
+                select(Room)
+                .where(
+                    Room.hotel_id == hotel_id,
+                    Room.room_type_id == room_type_id,
+                    Room.deleted_at.is_(None),
+                )
+                .order_by(Room.room_number)
+            ).scalars().all()
+        )

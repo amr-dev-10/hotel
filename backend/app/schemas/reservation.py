@@ -11,17 +11,25 @@ class ReservationGuestCreate(BaseModel):
     relationship: str | None = None
 
 
+class ReservationRoomTypeCreate(BaseModel):
+    room_type_id: str
+    quantity: int = Field(default=1, gt=0)
+    rate_plan_id: str | None = None
+
+
 class ReservationCreate(BaseModel):
     guest_name: str | None = Field(default=None, min_length=2, max_length=255)
     phone: str | None = None
     whatsapp_phone: str | None = None
     room_id: str | None = None
     rate_plan_id: str | None = None
+    room_type_id: str | None = None
     checkin_date: date
     checkout_date: date
     source: str = "walk_in"
     notes: str | None = None
     guests: list[ReservationGuestCreate] = Field(default_factory=list)
+    room_types: list[ReservationRoomTypeCreate] = Field(default_factory=list)
 
 
 class ReservationUpdate(BaseModel):
@@ -65,6 +73,27 @@ class ReservationGuestRead(ORMModel):
     is_primary: bool
     relationship: str | None = None
     added_at: datetime
+
+
+class ReservationRoomTypeRead(ORMModel):
+    id: str
+    hotel_id: str
+    reservation_id: str
+    room_type_id: str
+    quantity: int
+    rate_plan_id: str | None = None
+    assigned_room_id: str | None = None
+    assigned_at: datetime | None = None
+
+
+class ReservationRoomAssignment(BaseModel):
+    reservation_room_type_id: str
+    room_id: str
+
+
+class ReservationCheckInRequest(BaseModel):
+    auto_assign: bool = False
+    room_assignments: list[ReservationRoomAssignment] = Field(default_factory=list)
 
 
 class RoomChangeRequest(BaseModel):

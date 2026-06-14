@@ -6,12 +6,18 @@ from app.core.database import get_db
 from app.core.exceptions import not_found
 from app.core.responses import ok
 from app.models.user import User
-from app.repositories.reservation_repository import ReservationRepository, StayRecordRepository
+from app.repositories.reservation_repository import (
+    ReservationRepository,
+    ReservationRoomTypeRepository,
+    StayRecordRepository,
+)
 from app.schemas.reservation import (
+    ReservationCheckInRequest,
     ReservationCreate,
     ReservationGuestNew,
     ReservationGuestRead,
     ReservationRead,
+    ReservationRoomTypeRead,
     ReservationUpdate,
     RoomChangeRequest,
     StayRecordRead,
@@ -103,10 +109,11 @@ def add_reservation_guest(
 def check_in(
     hotel_id: str,
     reservation_id: str,
+    payload: ReservationCheckInRequest | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("guest.create")),
 ) -> dict:
-    reservation = ReservationService(db).check_in(hotel_id, reservation_id, current_user.id)
+    reservation = ReservationService(db).check_in(hotel_id, reservation_id, current_user.id, payload)
     return ok(ReservationRead.model_validate(reservation).model_dump())
 
 
@@ -114,10 +121,11 @@ def check_in(
 def checkin_alias(
     hotel_id: str,
     reservation_id: str,
+    payload: ReservationCheckInRequest | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("guest.create")),
 ) -> dict:
-    reservation = ReservationService(db).check_in(hotel_id, reservation_id, current_user.id)
+    reservation = ReservationService(db).check_in(hotel_id, reservation_id, current_user.id, payload)
     return ok(ReservationRead.model_validate(reservation).model_dump())
 
 
@@ -169,3 +177,14 @@ def list_stay_records(
 ) -> dict:
     stays = StayRecordRepository(db).list_for_reservation(hotel_id, reservation_id)
     return ok([StayRecordRead.model_validate(item).model_dump() for item in stays])
+
+
+@router.get("/{reservation_id}/room-types")
+def list_reservation_room_types(
+    hotel_id: str,
+    reservation_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("guest.view")),
+) -> dict:
+    rows = ReservationRoomTypeRepository(db).list_for_reservation(hotel_id, reservation_id)
+    return ok([ReservationRoomTypeRead.model_validate(item).model_dump() for item in rows])

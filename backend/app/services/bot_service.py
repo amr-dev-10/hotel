@@ -23,8 +23,10 @@ from app.repositories.whatsapp_repository import (
     WhatsAppConversationRepository,
 )
 from app.repositories.whatsapp_session_repository import WhatsAppSessionRepository
+from app.schemas.consent import GuestConsentUpsert
 from app.schemas.reservation import ReservationCreate
 from app.schemas.ticket import TicketCreate
+from app.services.consent_service import GuestConsentService
 from app.services.defaults import DEFAULT_BOT_MESSAGES, DEFAULT_MAIN_MENU, DEFAULT_SERVICES
 from app.services.knowledge_service import FAQService, KnowledgeDocumentService
 from app.services.whatsapp_ops_service import ConversationWindowService, LiveChatService
@@ -256,6 +258,16 @@ class BotService:
             reservation.status = "checked_in"
             guest.status = "checked_in"
             room.status = "occupied"
+            GuestConsentService(self.db).upsert(
+                hotel_id,
+                guest.id,
+                GuestConsentUpsert(
+                    whatsapp_opt_in=True,
+                    marketing_opt_in=True,
+                    consent_source="whatsapp_bot",
+                ),
+                commit=False,
+            )
         self.db.add(
             StayRecord(
                 hotel_id=hotel_id,

@@ -5,11 +5,15 @@ from sqlalchemy.orm import Session
 
 from app.models.ops import (
     AnalyticsSnapshot,
+    ApiRateLimit,
     AuditLog,
+    ExportJob,
     HotelSecret,
     HousekeepingChecklist,
     HousekeepingSchedule,
+    ImportJob,
     Invoice,
+    JobExecution,
     LostFoundItem,
     MaintenanceOrder,
     MediaFile,
@@ -77,6 +81,47 @@ class AnalyticsSnapshotRepository(BaseRepository[AnalyticsSnapshot]):
             )
             .order_by(AnalyticsSnapshot.snapshot_date)
         ).scalars().all()
+
+
+class JobExecutionRepository(BaseRepository[JobExecution]):
+    def __init__(self, db: Session) -> None:
+        super().__init__(db, JobExecution)
+
+    def list_filtered(
+        self,
+        hotel_id: str | None = None,
+        status: str | None = None,
+        limit: int = 100,
+    ) -> Sequence[JobExecution]:
+        statement = select(JobExecution)
+        if hotel_id:
+            statement = statement.where(JobExecution.hotel_id == hotel_id)
+        if status:
+            statement = statement.where(JobExecution.status == status)
+        return self.db.execute(statement.order_by(JobExecution.created_at.desc()).limit(limit)).scalars().all()
+
+
+class ApiRateLimitRepository(BaseRepository[ApiRateLimit]):
+    def __init__(self, db: Session) -> None:
+        super().__init__(db, ApiRateLimit)
+
+    def get_for_group(self, hotel_id: str, endpoint_group: str) -> ApiRateLimit | None:
+        return self.db.execute(
+            select(ApiRateLimit).where(
+                ApiRateLimit.hotel_id == hotel_id,
+                ApiRateLimit.endpoint_group == endpoint_group,
+            )
+        ).scalar_one_or_none()
+
+
+class ExportJobRepository(BaseRepository[ExportJob]):
+    def __init__(self, db: Session) -> None:
+        super().__init__(db, ExportJob)
+
+
+class ImportJobRepository(BaseRepository[ImportJob]):
+    def __init__(self, db: Session) -> None:
+        super().__init__(db, ImportJob)
 
 
 class HousekeepingScheduleRepository(BaseRepository[HousekeepingSchedule]):

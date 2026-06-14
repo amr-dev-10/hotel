@@ -59,6 +59,13 @@ class PaymentCreate(BaseModel):
     status: str = "completed"
 
 
+class PaymentGatewayOrderCreate(BaseModel):
+    amount: Decimal
+    currency: str = "INR"
+    gateway: str = "manual"
+    raw_request: dict = Field(default_factory=dict)
+
+
 class PaymentRead(ORMModel):
     id: str
     hotel_id: str
@@ -70,6 +77,28 @@ class PaymentRead(ORMModel):
     status: str
     collected_by: str | None = None
     created_at: datetime
+
+
+class PaymentTransactionRead(ORMModel):
+    id: str
+    payment_id: str
+    hotel_id: str
+    gateway: str
+    gateway_order_id: str | None = None
+    gateway_txn_id: str | None = None
+    gateway_status: str
+    amount: Decimal
+    currency: str
+    raw_request: dict
+    raw_response: dict
+    webhook_received_at: datetime | None = None
+    created_at: datetime
+
+
+class PaymentWebhookPayload(BaseModel):
+    gateway_txn_id: str
+    gateway_status: str = "captured"
+    raw_response: dict = Field(default_factory=dict)
 
 
 class RefundCreate(BaseModel):

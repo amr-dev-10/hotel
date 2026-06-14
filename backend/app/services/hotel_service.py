@@ -23,6 +23,7 @@ from app.services.defaults import (
     DEFAULT_SLA_CONFIG,
 )
 from app.services.rbac_service import RBACService
+from app.services.rate_limit_service import RateLimitService
 from app.services.usage_service import FeatureService
 
 
@@ -154,6 +155,7 @@ class HotelService:
                 )
             )
         FeatureService(self.db).seed_defaults()
+        RateLimitService(self.db).seed_defaults(hotel.id)
         RBACService(self.db).seed_owner_role(hotel.id, owner)
         self.db.add(
             BotVersion(

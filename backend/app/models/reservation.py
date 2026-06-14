@@ -37,6 +37,18 @@ class ReservationGuest(UUIDPrimaryKeyMixin, Base):
     added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class ReservationRoomType(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "reservation_room_types"
+
+    hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
+    reservation_id: Mapped[str] = mapped_column(ForeignKey("reservations.id"), index=True)
+    room_type_id: Mapped[str] = mapped_column(ForeignKey("room_types.id"), index=True)
+    quantity: Mapped[int] = mapped_column(default=1)
+    rate_plan_id: Mapped[str | None] = mapped_column(ForeignKey("rate_plans.id"))
+    assigned_room_id: Mapped[str | None] = mapped_column(ForeignKey("rooms.id"), index=True)
+    assigned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class StayRecord(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "stay_records"
 

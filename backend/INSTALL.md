@@ -1,6 +1,6 @@
 # Arcadia Backend Setup
 
-The backend has been rebuilt from the versioned architecture documents in `docs/`, currently through v4.
+The backend has been rebuilt from the versioned architecture documents in `docs/`, currently through v5.
 Dependencies and local tooling are pinned so development can continue from a stable base.
 
 ## Library Versions
@@ -102,7 +102,11 @@ Open:
 - `/api/v1/hotels/{hotel_id}/reservations/{reservation_id}/checkout`
 - `/api/v1/hotels/{hotel_id}/reservations/{reservation_id}/change-room`
 - `/api/v1/hotels/{hotel_id}/reservations/{reservation_id}/guests`
+- `/api/v1/hotels/{hotel_id}/reservations/{reservation_id}/room-types`
 - `/api/v1/hotels/{hotel_id}/reservations/{reservation_id}/stays`
+- `/api/v1/hotels/{hotel_id}/availability/blocks`
+- `/api/v1/hotels/{hotel_id}/availability/rooms`
+- `/api/v1/hotels/{hotel_id}/availability/calendar`
 - `/api/v1/hotels/{hotel_id}/rate-plans`
 - `/api/v1/hotels/{hotel_id}/folios`
 - `/api/v1/hotels/{hotel_id}/tax-configs`
@@ -121,6 +125,10 @@ Open:
 - `/api/v1/hotels/{hotel_id}/saas/features`
 - `/api/v1/hotels/{hotel_id}/saas/plan-features`
 - `/api/v1/hotels/{hotel_id}/saas/usage-limits`
+- `/api/v1/hotels/{hotel_id}/exports`
+- `/api/v1/hotels/{hotel_id}/imports`
+- `/api/v1/hotels/{hotel_id}/jobs`
+- `/api/v1/hotels/{hotel_id}/rate-limits`
 - `/api/v1/hotels/{hotel_id}/menu/categories`
 - `/api/v1/hotels/{hotel_id}/menu/items`
 - `/api/v1/hotels/{hotel_id}/bot-config`

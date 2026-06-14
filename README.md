@@ -1,8 +1,8 @@
 # Arcadia Hotel Platform Backend
 
-FastAPI backend for the Arcadia hotel management platform, currently upgraded through the v4 definitive architecture shared in `docs/v4/`.
+FastAPI backend for the Arcadia hotel management platform, currently upgraded through the v5 final architecture shared in `docs/v5/`.
 
-The backend follows the v4 principles:
+The backend follows the v5 principles:
 
 - Modular monolith first.
 - PostgreSQL as the production source of truth.
@@ -35,6 +35,10 @@ The backend follows the v4 principles:
 - Knowledge document versions, rollback, and embedding processing status.
 - WhatsApp onboarding, test messages, and conversation-window billing rows.
 - SaaS features, plan features, and monthly usage limits.
+- Room availability blocks prevent double booking and support maintenance/VIP holds.
+- Reservations can be booked by room type and assigned to actual rooms at check-in.
+- Payment gateway transactions are stubbed for later Razorpay/Stripe/UPI integration.
+- Import/export jobs, job execution tracking, API rate limits, consent enforcement, and AI provider abstraction are implemented.
 
 ## Quick Setup
 
@@ -69,6 +73,8 @@ Open:
 - `/api/v1/hotels/{hotel_id}/guests`
 - `/api/v1/hotels/{hotel_id}/reservations`
 - `/api/v1/hotels/{hotel_id}/reservations/{reservation_id}/guests`
+- `/api/v1/hotels/{hotel_id}/reservations/{reservation_id}/room-types`
+- `/api/v1/hotels/{hotel_id}/availability`
 - `/api/v1/hotels/{hotel_id}/reservations/{reservation_id}/change-room`
 - `/api/v1/hotels/{hotel_id}/reservations/{reservation_id}/stays`
 - `/api/v1/hotels/{hotel_id}/rate-plans`
@@ -83,6 +89,10 @@ Open:
 - `/api/v1/hotels/{hotel_id}/shifts`
 - `/api/v1/hotels/{hotel_id}/workflows`
 - `/api/v1/hotels/{hotel_id}/saas`
+- `/api/v1/hotels/{hotel_id}/exports`
+- `/api/v1/hotels/{hotel_id}/imports`
+- `/api/v1/hotels/{hotel_id}/jobs`
+- `/api/v1/hotels/{hotel_id}/rate-limits`
 - `/api/v1/hotels/{hotel_id}/menu`
 - `/api/v1/hotels/{hotel_id}/bot-config`
 - `/api/v1/hotels/{hotel_id}/campaigns`
@@ -122,7 +132,9 @@ The shared v1 files are preserved in:
 - `docs/v2.1/architecture_v2_extended.md`
 - `docs/v3/architecture_v3_final.md`
 - `docs/v4/architecture_v4_definitive.md`
+- `docs/v5/architecture_v5_final.md`
+- `docs/v5/backup_dr_plan.md`
 
 ## Migration Note
 
-Fresh development and test databases can be auto-created. Existing PostgreSQL databases need an Alembic migration for the v4 tables and new columns before running this code.
+Fresh development and test databases can be auto-created. Existing PostgreSQL databases need an Alembic migration for the v5 tables and new columns before running this code. Production should also add the PostgreSQL GiST exclusion constraint for overlapping `room_blocks`.

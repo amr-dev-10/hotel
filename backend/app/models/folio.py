@@ -2,7 +2,7 @@ from datetime import date as date_type
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, JSON, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -78,4 +78,21 @@ class Refund(UUIDPrimaryKeyMixin, Base):
     reason: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(40), default="processed", index=True)
     processed_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class PaymentTransaction(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "payment_transactions"
+
+    payment_id: Mapped[str] = mapped_column(ForeignKey("payments.id"), index=True)
+    hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
+    gateway: Mapped[str] = mapped_column(String(40), default="manual", index=True)
+    gateway_order_id: Mapped[str | None] = mapped_column(String(180), index=True)
+    gateway_txn_id: Mapped[str | None] = mapped_column(String(180), index=True)
+    gateway_status: Mapped[str] = mapped_column(String(40), default="captured", index=True)
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    currency: Mapped[str] = mapped_column(String(10), default="INR")
+    raw_request: Mapped[dict] = mapped_column(JSON, default=dict)
+    raw_response: Mapped[dict] = mapped_column(JSON, default=dict)
+    webhook_received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

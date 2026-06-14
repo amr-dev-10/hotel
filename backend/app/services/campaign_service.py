@@ -10,6 +10,7 @@ from app.repositories.guest_repository import GuestRepository
 from app.repositories.hotel_repository import HotelRepository
 from app.repositories.whatsapp_repository import WhatsAppAccountRepository
 from app.schemas.campaign import CampaignCreate
+from app.services.consent_service import GuestConsentService
 from app.services.usage_service import UsageService
 from app.services.whatsapp_ops_service import ConversationWindowService, WhatsAppUsageService
 from app.services.whatsapp_service import WhatsAppService
@@ -61,6 +62,18 @@ class CampaignService:
         for guest in recipients:
             phone = guest.whatsapp_phone or guest.phone
             if not phone:
+                continue
+            if not GuestConsentService(self.db).has_whatsapp_marketing_consent(hotel_id, guest.id):
+                self.db.add(
+                    CampaignDelivery(
+                        hotel_id=hotel_id,
+                        campaign_id=campaign.id,
+                        guest_id=guest.id,
+                        phone=phone,
+                        status="skipped",
+                        error_detail="no_consent",
+                    )
+                )
                 continue
             delivery = CampaignDelivery(
                 hotel_id=hotel_id,
@@ -126,6 +139,8 @@ class CampaignService:
         failed_count = campaign.failed_count
         for delivery in deliveries:
             if delivery.status == "sent":
+                continue
+            if delivery.status == "skipped":
                 continue
             try:
                 self.whatsapp.send_template(

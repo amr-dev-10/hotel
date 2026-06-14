@@ -1,9 +1,10 @@
+from app.models.availability import RoomBlock
 from app.models.bot_config import BotConfig
 from app.models.campaign import Campaign, CampaignDelivery
 from app.models.department import Department
 from app.models.feedback import Feedback
-from app.models.folio import FolioItem, GuestFolio, Payment, Refund, TaxConfig
-from app.models.guest import Guest
+from app.models.folio import FolioItem, GuestFolio, Payment, PaymentTransaction, Refund, TaxConfig
+from app.models.guest import Guest, GuestConsent
 from app.models.hotel import Hotel
 from app.models.inventory import (
     InventoryItem,
@@ -26,11 +27,15 @@ from app.models.knowledge import (
 from app.models.menu import MenuCategory, MenuItem
 from app.models.ops import (
     AnalyticsSnapshot,
+    ApiRateLimit,
     AuditLog,
+    ExportJob,
     HotelSecret,
     HousekeepingChecklist,
     HousekeepingSchedule,
+    ImportJob,
     Invoice,
+    JobExecution,
     LostFoundItem,
     MaintenanceOrder,
     MediaFile,
@@ -40,7 +45,7 @@ from app.models.ops import (
 from app.models.organization import Organization, OrganizationHotel, OrganizationUser
 from app.models.rate_plan import RatePlan, RatePlanPeriod
 from app.models.rbac import Permission, PermissionGroup, Role, role_permissions, user_roles
-from app.models.reservation import Reservation, ReservationGuest, StayRecord
+from app.models.reservation import Reservation, ReservationGuest, ReservationRoomType, StayRecord
 from app.models.restaurant import RestaurantOrder, RestaurantOrderItem, RestaurantTable
 from app.models.room import Room, RoomType
 from app.models.saas import Feature, PlanFeature, UsageLimit
@@ -63,6 +68,7 @@ from app.models.workflow import WorkflowDefinition, WorkflowState, WorkflowTrans
 __all__ = [
     "AuditLog",
     "AnalyticsSnapshot",
+    "ApiRateLimit",
     "BotConfig",
     "BotVersion",
     "Campaign",
@@ -75,7 +81,9 @@ __all__ = [
     "Feature",
     "Feedback",
     "FolioItem",
+    "ExportJob",
     "Guest",
+    "GuestConsent",
     "GuestFolio",
     "HotelSecret",
     "Hotel",
@@ -83,9 +91,11 @@ __all__ = [
     "HotelLanguage",
     "HousekeepingChecklist",
     "HousekeepingSchedule",
+    "ImportJob",
     "InventoryItem",
     "InventoryTransaction",
     "Invoice",
+    "JobExecution",
     "KnowledgeDocument",
     "KnowledgeDocumentVersion",
     "KnowledgeEmbedding",
@@ -100,6 +110,7 @@ __all__ = [
     "OrganizationHotel",
     "OrganizationUser",
     "Payment",
+    "PaymentTransaction",
     "PlanFeature",
     "Permission",
     "PermissionGroup",
@@ -110,11 +121,13 @@ __all__ = [
     "Refund",
     "Reservation",
     "ReservationGuest",
+    "ReservationRoomType",
     "RestaurantOrder",
     "RestaurantOrderItem",
     "RestaurantTable",
     "Role",
     "Room",
+    "RoomBlock",
     "RoomType",
     "ServiceForm",
     "ServiceFormField",
