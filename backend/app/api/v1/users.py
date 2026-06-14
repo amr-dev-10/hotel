@@ -41,6 +41,8 @@ def create_user(
         email=payload.email,
         hashed_password=AuthService.password_hash(payload.password),
         department_id=payload.department_id,
+        reports_to=payload.reports_to,
+        staff_level=payload.staff_level,
         job_role=payload.job_role,
         is_hotel_owner=False,
         is_active=True,

@@ -12,6 +12,7 @@ class TicketCreate(BaseModel):
     department_key: str | None = None
     assigned_to: str | None = None
     type: str = "Ticket"
+    task_category: str | None = None
     item_description: str = Field(min_length=2)
     source: str = "dashboard"
     priority: int = Field(default=2, ge=1, le=5)
@@ -32,6 +33,7 @@ class TicketRead(ORMModel):
     assigned_to: str | None = None
     stage: str
     type: str
+    task_category: str | None = None
     item_description: str
     source: str
     priority: int
@@ -39,6 +41,17 @@ class TicketRead(ORMModel):
     resolved_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
+
+
+class TicketAcceptanceRead(ORMModel):
+    id: str
+    ticket_id: str
+    offered_to: str
+    offered_at: datetime
+    response: str
+    responded_at: datetime | None = None
+    auto_expired: bool
+    expire_after_minutes: int
 
 
 class TicketEventRead(ORMModel):

@@ -10,6 +10,7 @@ from app.models.ops import Subscription
 from app.models.rate_plan import RatePlan
 from app.models.room import Room, RoomType
 from app.models.user import User
+from app.models.workflow import WorkflowDefinition, WorkflowState, WorkflowTransition
 from app.models.whatsapp import WhatsAppAccount
 from app.repositories.hotel_repository import HotelRepository
 from app.repositories.user_repository import UserRepository
@@ -21,9 +22,13 @@ from app.services.defaults import (
     DEFAULT_MAIN_MENU,
     DEFAULT_SERVICES,
     DEFAULT_SLA_CONFIG,
+    DEFAULT_TICKET_WORKFLOW,
 )
 from app.services.rbac_service import RBACService
 from app.services.rate_limit_service import RateLimitService
+from app.services.escalation_service import EscalationRuleService
+from app.services.routing_service import RoutingRuleService
+from app.services.sla_service import SLAService
 from app.services.usage_service import FeatureService
 
 
@@ -59,6 +64,7 @@ class HotelService:
             email=payload.owner_email,
             hashed_password=AuthService.password_hash(payload.owner_password),
             job_role="Owner",
+            staff_level="admin",
             is_hotel_owner=True,
             is_active=True,
             is_on_duty=True,
@@ -156,6 +162,10 @@ class HotelService:
             )
         FeatureService(self.db).seed_defaults()
         RateLimitService(self.db).seed_defaults(hotel.id)
+        SLAService(self.db).seed_defaults(hotel.id, department_ids)
+        EscalationRuleService(self.db).seed_defaults(hotel.id)
+        RoutingRuleService(self.db).seed_defaults(hotel.id)
+        self._seed_ticket_workflow(hotel.id)
         RBACService(self.db).seed_owner_role(hotel.id, owner)
         self.db.add(
             BotVersion(
@@ -177,3 +187,42 @@ class HotelService:
         self.db.refresh(owner)
         token = AuthService(self.db).token_for_user(owner)
         return {"hotel": hotel, "owner": owner, **token}
+
+    def _seed_ticket_workflow(self, hotel_id: str) -> None:
+        workflow = WorkflowDefinition(
+            hotel_id=hotel_id,
+            name=DEFAULT_TICKET_WORKFLOW["name"],
+            entity_type=DEFAULT_TICKET_WORKFLOW["entity_type"],
+            is_default=DEFAULT_TICKET_WORKFLOW["is_default"],
+            is_active=True,
+        )
+        self.db.add(workflow)
+        self.db.flush()
+        state_by_key: dict[str, WorkflowState] = {}
+        for state_data in DEFAULT_TICKET_WORKFLOW["states"]:
+            state = WorkflowState(
+                hotel_id=hotel_id,
+                workflow_id=workflow.id,
+                name=state_data["name"],
+                state_key=state_data["state_key"],
+                state_type=state_data.get("state_type", "intermediate"),
+                sort_order=state_data.get("sort_order", 0),
+                required_permission=state_data.get("required_permission"),
+            )
+            self.db.add(state)
+            self.db.flush()
+            state_by_key[state.state_key] = state
+        for transition_data in DEFAULT_TICKET_WORKFLOW["transitions"]:
+            from_state = state_by_key[transition_data["from_state_key"]]
+            to_state = state_by_key[transition_data["to_state_key"]]
+            self.db.add(
+                WorkflowTransition(
+                    hotel_id=hotel_id,
+                    workflow_id=workflow.id,
+                    from_state_id=from_state.id,
+                    to_state_id=to_state.id,
+                    trigger_type=transition_data.get("trigger_type", "manual"),
+                    required_permission=transition_data.get("required_permission"),
+                    notify_roles=transition_data.get("notify_roles", []),
+                )
+            )

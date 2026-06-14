@@ -36,6 +36,40 @@ class UserRepository(BaseRepository[User]):
             )
         ).scalars().all()
 
+    def list_active_for_hotel(self, hotel_id: str) -> Sequence[User]:
+        return self.db.execute(
+            select(User).where(
+                User.hotel_id == hotel_id,
+                User.is_active.is_(True),
+                User.deleted_at.is_(None),
+            )
+        ).scalars().all()
+
+    def get_active(self, user_id: str) -> User | None:
+        return self.db.execute(
+            select(User).where(
+                User.id == user_id,
+                User.is_active.is_(True),
+                User.deleted_at.is_(None),
+            )
+        ).scalar_one_or_none()
+
+    def find_by_staff_level(
+        self,
+        hotel_id: str,
+        staff_level: str,
+        department_id: str | None = None,
+    ) -> User | None:
+        statement = select(User).where(
+            User.hotel_id == hotel_id,
+            User.staff_level == staff_level,
+            User.is_active.is_(True),
+            User.deleted_at.is_(None),
+        )
+        if department_id:
+            statement = statement.where(User.department_id == department_id)
+        return self.db.execute(statement.order_by(User.is_on_duty.desc(), User.updated_at)).scalars().first()
+
     def first_on_duty_for_department(
         self,
         hotel_id: str,

@@ -116,6 +116,55 @@ DEFAULT_SLA_CONFIG = {
     "default": 20,
 }
 
+DEFAULT_TICKET_WORKFLOW = {
+    "name": "Standard Ticket Flow",
+    "entity_type": "ticket",
+    "is_default": True,
+    "states": [
+        {"name": "Created", "state_key": "created", "state_type": "initial", "sort_order": 1},
+        {"name": "Pending Accept", "state_key": "pending_accept", "state_type": "intermediate", "sort_order": 2},
+        {"name": "Accepted", "state_key": "accepted", "state_type": "intermediate", "sort_order": 3},
+        {"name": "In Progress", "state_key": "in_progress", "state_type": "intermediate", "sort_order": 4},
+        {
+            "name": "Pending Approval",
+            "state_key": "pending_approval",
+            "state_type": "intermediate",
+            "sort_order": 5,
+            "required_permission": "ticket.approve",
+        },
+        {"name": "Approved", "state_key": "approved", "state_type": "terminal", "sort_order": 6},
+        {"name": "Reopened", "state_key": "reopened", "state_type": "intermediate", "sort_order": 7},
+        {"name": "Cancelled", "state_key": "cancelled", "state_type": "terminal", "sort_order": 8},
+    ],
+    "transitions": [
+        {"from_state_key": "created", "to_state_key": "pending_accept", "trigger_type": "auto"},
+        {
+            "from_state_key": "pending_accept",
+            "to_state_key": "accepted",
+            "required_permission": "ticket.view",
+        },
+        {"from_state_key": "accepted", "to_state_key": "in_progress", "required_permission": "ticket.view"},
+        {
+            "from_state_key": "in_progress",
+            "to_state_key": "pending_approval",
+            "required_permission": "ticket.view",
+        },
+        {
+            "from_state_key": "pending_approval",
+            "to_state_key": "approved",
+            "required_permission": "ticket.approve",
+            "notify_roles": ["manager"],
+        },
+        {
+            "from_state_key": "pending_approval",
+            "to_state_key": "reopened",
+            "required_permission": "ticket.approve",
+        },
+        {"from_state_key": "reopened", "to_state_key": "accepted", "trigger_type": "auto"},
+        {"from_state_key": "created", "to_state_key": "cancelled", "required_permission": "ticket.close"},
+    ],
+}
+
 DEFAULT_PERMISSIONS = [
     ("ticket.view", "View tickets", "tickets"),
     ("ticket.create", "Create tickets", "tickets"),

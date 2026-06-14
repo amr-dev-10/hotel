@@ -1,8 +1,8 @@
 # Arcadia Hotel Platform Backend
 
-FastAPI backend for the Arcadia hotel management platform, currently upgraded through the v5 final architecture shared in `docs/v5/`.
+FastAPI backend for the Arcadia hotel management platform, currently upgraded through the v5.1 architecture shared in `docs/v5.1/`.
 
-The backend follows the v5 principles:
+The backend follows the v5.1 principles:
 
 - Modular monolith first.
 - PostgreSQL as the production source of truth.
@@ -39,6 +39,7 @@ The backend follows the v5 principles:
 - Reservations can be booked by room type and assigned to actual rooms at check-in.
 - Payment gateway transactions are stubbed for later Razorpay/Stripe/UPI integration.
 - Import/export jobs, job execution tracking, API rate limits, consent enforcement, and AI provider abstraction are implemented.
+- Staff reporting hierarchy, ticket accept/reject flow, task-type SLAs, escalation rules/logs, fast-track routing, and hotel AI settings APIs are implemented.
 
 ## Quick Setup
 
@@ -70,6 +71,8 @@ Open:
 - `/api/v1/hotels/{hotel_id}/room-types`
 - `/api/v1/hotels/{hotel_id}/rooms`
 - `/api/v1/hotels/{hotel_id}/departments`
+- `/api/v1/hotels/{hotel_id}/departments/{department_id}/hierarchy`
+- `/api/v1/hotels/{hotel_id}/departments/{department_id}/task-slas`
 - `/api/v1/hotels/{hotel_id}/guests`
 - `/api/v1/hotels/{hotel_id}/reservations`
 - `/api/v1/hotels/{hotel_id}/reservations/{reservation_id}/guests`
@@ -81,6 +84,15 @@ Open:
 - `/api/v1/hotels/{hotel_id}/folios`
 - `/api/v1/hotels/{hotel_id}/tax-configs`
 - `/api/v1/hotels/{hotel_id}/tickets`
+- `/api/v1/hotels/{hotel_id}/tickets/{ticket_id}/accept`
+- `/api/v1/hotels/{hotel_id}/tickets/{ticket_id}/reject`
+- `/api/v1/hotels/{hotel_id}/tickets/{ticket_id}/complete`
+- `/api/v1/hotels/{hotel_id}/tickets/{ticket_id}/approve`
+- `/api/v1/hotels/{hotel_id}/tickets/{ticket_id}/reopen`
+- `/api/v1/hotels/{hotel_id}/tickets/{ticket_id}/acceptances`
+- `/api/v1/hotels/{hotel_id}/tickets/{ticket_id}/escalations`
+- `/api/v1/hotels/{hotel_id}/escalation-rules`
+- `/api/v1/hotels/{hotel_id}/routing-rules`
 - `/api/v1/hotels/{hotel_id}/housekeeping`
 - `/api/v1/hotels/{hotel_id}/maintenance`
 - `/api/v1/hotels/{hotel_id}/lost-found`
@@ -93,6 +105,7 @@ Open:
 - `/api/v1/hotels/{hotel_id}/imports`
 - `/api/v1/hotels/{hotel_id}/jobs`
 - `/api/v1/hotels/{hotel_id}/rate-limits`
+- `/api/v1/hotels/{hotel_id}/settings/ai`
 - `/api/v1/hotels/{hotel_id}/menu`
 - `/api/v1/hotels/{hotel_id}/bot-config`
 - `/api/v1/hotels/{hotel_id}/campaigns`
@@ -134,7 +147,8 @@ The shared v1 files are preserved in:
 - `docs/v4/architecture_v4_definitive.md`
 - `docs/v5/architecture_v5_final.md`
 - `docs/v5/backup_dr_plan.md`
+- `docs/v5.1/architecture_v5_1_upgrade.md`
 
 ## Migration Note
 
-Fresh development and test databases can be auto-created. Existing PostgreSQL databases need an Alembic migration for the v5 tables and new columns before running this code. Production should also add the PostgreSQL GiST exclusion constraint for overlapping `room_blocks`.
+Fresh development and test databases can be auto-created. Existing PostgreSQL databases need an Alembic migration for the v5.1 tables and new columns before running this code. Production should also add the PostgreSQL GiST exclusion constraint for overlapping `room_blocks`.

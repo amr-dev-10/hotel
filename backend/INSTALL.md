@@ -1,6 +1,6 @@
 # Arcadia Backend Setup
 
-The backend has been rebuilt from the versioned architecture documents in `docs/`, currently through v5.
+The backend has been rebuilt from the versioned architecture documents in `docs/`, currently through v5.1.
 Dependencies and local tooling are pinned so development can continue from a stable base.
 
 ## Library Versions
@@ -95,6 +95,8 @@ Open:
 - `/api/v1/hotels/{hotel_id}/room-types`
 - `/api/v1/hotels/{hotel_id}/rooms`
 - `/api/v1/hotels/{hotel_id}/departments`
+- `/api/v1/hotels/{hotel_id}/departments/{department_id}/hierarchy`
+- `/api/v1/hotels/{hotel_id}/departments/{department_id}/task-slas`
 - `/api/v1/hotels/{hotel_id}/guests`
 - `/api/v1/hotels/{hotel_id}/reservations`
 - `/api/v1/hotels/{hotel_id}/reservations/{reservation_id}`
@@ -111,6 +113,15 @@ Open:
 - `/api/v1/hotels/{hotel_id}/folios`
 - `/api/v1/hotels/{hotel_id}/tax-configs`
 - `/api/v1/hotels/{hotel_id}/tickets`
+- `/api/v1/hotels/{hotel_id}/tickets/{ticket_id}/accept`
+- `/api/v1/hotels/{hotel_id}/tickets/{ticket_id}/reject`
+- `/api/v1/hotels/{hotel_id}/tickets/{ticket_id}/complete`
+- `/api/v1/hotels/{hotel_id}/tickets/{ticket_id}/approve`
+- `/api/v1/hotels/{hotel_id}/tickets/{ticket_id}/reopen`
+- `/api/v1/hotels/{hotel_id}/tickets/{ticket_id}/acceptances`
+- `/api/v1/hotels/{hotel_id}/tickets/{ticket_id}/escalations`
+- `/api/v1/hotels/{hotel_id}/escalation-rules`
+- `/api/v1/hotels/{hotel_id}/routing-rules`
 - `/api/v1/hotels/{hotel_id}/housekeeping`
 - `/api/v1/hotels/{hotel_id}/maintenance`
 - `/api/v1/hotels/{hotel_id}/lost-found`
@@ -129,6 +140,7 @@ Open:
 - `/api/v1/hotels/{hotel_id}/imports`
 - `/api/v1/hotels/{hotel_id}/jobs`
 - `/api/v1/hotels/{hotel_id}/rate-limits`
+- `/api/v1/hotels/{hotel_id}/settings/ai`
 - `/api/v1/hotels/{hotel_id}/menu/categories`
 - `/api/v1/hotels/{hotel_id}/menu/items`
 - `/api/v1/hotels/{hotel_id}/bot-config`

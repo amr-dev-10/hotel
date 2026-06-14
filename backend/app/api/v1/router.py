@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.v1 import (
     analytics,
+    ai_settings,
     auth,
     availability,
     bot_config,
@@ -10,6 +11,7 @@ from app.api.v1 import (
     feedback,
     folios,
     guests,
+    hierarchy,
     housekeeping,
     hotels,
     inventory,
@@ -27,12 +29,15 @@ from app.api.v1 import (
     roles,
     room_types,
     rooms,
+    routing_rules,
     saas,
     shifts,
+    task_slas,
     tickets,
     users,
     whatsapp_accounts,
     workflows,
+    escalation_rules,
 )
 
 api_router = APIRouter()
@@ -47,6 +52,16 @@ api_router.include_router(
     tags=["room-types"],
 )
 api_router.include_router(rooms.router, prefix="/hotels/{hotel_id}/rooms", tags=["rooms"])
+api_router.include_router(
+    task_slas.router,
+    prefix="/hotels/{hotel_id}/departments/{department_id}/task-slas",
+    tags=["task-slas"],
+)
+api_router.include_router(
+    hierarchy.router,
+    prefix="/hotels/{hotel_id}/departments",
+    tags=["hierarchy"],
+)
 api_router.include_router(
     departments.router,
     prefix="/hotels/{hotel_id}/departments",
@@ -79,6 +94,16 @@ api_router.include_router(
     tags=["tax-configs"],
 )
 api_router.include_router(tickets.router, prefix="/hotels/{hotel_id}/tickets", tags=["tickets"])
+api_router.include_router(
+    escalation_rules.router,
+    prefix="/hotels/{hotel_id}/escalation-rules",
+    tags=["escalation-rules"],
+)
+api_router.include_router(
+    routing_rules.router,
+    prefix="/hotels/{hotel_id}/routing-rules",
+    tags=["routing-rules"],
+)
 api_router.include_router(
     housekeeping.router,
     prefix="/hotels/{hotel_id}/housekeeping",
@@ -144,6 +169,11 @@ api_router.include_router(
     platform.router,
     prefix="/hotels/{hotel_id}",
     tags=["platform"],
+)
+api_router.include_router(
+    ai_settings.router,
+    prefix="/hotels/{hotel_id}/settings/ai",
+    tags=["ai-settings"],
 )
 api_router.include_router(
     knowledge.router,

@@ -2,6 +2,7 @@ from app.models.availability import RoomBlock
 from app.models.bot_config import BotConfig
 from app.models.campaign import Campaign, CampaignDelivery
 from app.models.department import Department
+from app.models.escalation import EscalationLog, EscalationRule
 from app.models.feedback import Feedback
 from app.models.folio import FolioItem, GuestFolio, Payment, PaymentTransaction, Refund, TaxConfig
 from app.models.guest import Guest, GuestConsent
@@ -47,10 +48,13 @@ from app.models.rate_plan import RatePlan, RatePlanPeriod
 from app.models.rbac import Permission, PermissionGroup, Role, role_permissions, user_roles
 from app.models.reservation import Reservation, ReservationGuest, ReservationRoomType, StayRecord
 from app.models.restaurant import RestaurantOrder, RestaurantOrderItem, RestaurantTable
+from app.models.routing_rule import RoutingRule
 from app.models.room import Room, RoomType
 from app.models.saas import Feature, PlanFeature, UsageLimit
 from app.models.staff import EmployeeShift
 from app.models.ticket import ChatMessage, Ticket, TicketEvent, ticket_menu_items
+from app.models.task_type_sla import TaskTypeSLA
+from app.models.ticket_acceptance import TicketAcceptance
 from app.models.user import FCMToken, User, UserSession
 from app.models.whatsapp import (
     ConversationWindow,
@@ -77,6 +81,8 @@ __all__ = [
     "Department",
     "DepartmentConfig",
     "EmployeeShift",
+    "EscalationLog",
+    "EscalationRule",
     "FCMToken",
     "Feature",
     "Feedback",
@@ -129,12 +135,15 @@ __all__ = [
     "Room",
     "RoomBlock",
     "RoomType",
+    "RoutingRule",
     "ServiceForm",
     "ServiceFormField",
     "StayRecord",
     "Subscription",
     "TaxConfig",
+    "TaskTypeSLA",
     "Ticket",
+    "TicketAcceptance",
     "TicketEvent",
     "UsageLimit",
     "User",

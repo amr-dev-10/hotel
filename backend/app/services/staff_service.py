@@ -86,3 +86,45 @@ class ShiftService:
             return None
         staff.sort(key=lambda user: self.tickets.count_open_for_user(hotel_id, user.id))
         return staff[0]
+
+
+class StaffService:
+    def __init__(self, db: Session) -> None:
+        self.db = db
+        self.users = UserRepository(db)
+        self.tickets = TicketRepository(db)
+
+    def find_available(
+        self,
+        hotel_id: str,
+        department_id: str | None = None,
+        staff_level: str | None = "attendant",
+        exclude_users: list[str] | set[str] | None = None,
+    ) -> User | None:
+        excluded = set(exclude_users or [])
+        if department_id:
+            candidates = list(self.users.list_for_department(hotel_id, department_id))
+        else:
+            candidates = list(self.users.list_active_for_hotel(hotel_id))
+        if staff_level:
+            candidates = [user for user in candidates if user.staff_level == staff_level]
+        candidates = [
+            user
+            for user in candidates
+            if user.id not in excluded and user.is_active and user.deleted_at is None
+        ]
+        on_duty = [user for user in candidates if user.is_on_duty]
+        if on_duty:
+            candidates = on_duty
+        candidates.sort(key=lambda user: self.tickets.count_open_for_user(hotel_id, user.id))
+        return candidates[0] if candidates else None
+
+    def find_by_level(
+        self,
+        hotel_id: str,
+        staff_level: str | None,
+        department_id: str | None = None,
+    ) -> User | None:
+        if not staff_level:
+            return None
+        return self.users.find_by_staff_level(hotel_id, staff_level, department_id)

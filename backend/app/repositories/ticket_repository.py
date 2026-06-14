@@ -22,6 +22,23 @@ class TicketRepository(BaseRepository[Ticket]):
             )
         ).scalars().all()
 
+    def list_unresolved(self, hotel_id: str | None = None) -> Sequence[Ticket]:
+        terminal = (
+            "Completed",
+            "Cancelled",
+            "approved",
+            "cancelled",
+            "closed",
+            "resolved",
+        )
+        statement = select(Ticket).where(
+            Ticket.stage.not_in(terminal),
+            Ticket.deleted_at.is_(None),
+        )
+        if hotel_id:
+            statement = statement.where(Ticket.hotel_id == hotel_id)
+        return self.db.execute(statement.order_by(Ticket.created_at)).scalars().all()
+
     def count_open_for_user(self, hotel_id: str, user_id: str) -> int:
         return self.db.execute(
             select(func.count()).select_from(Ticket).where(
