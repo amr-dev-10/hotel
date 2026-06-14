@@ -56,6 +56,39 @@ Open:
 - API health: `http://localhost:8000/health`
 - API docs/testing UI: `http://localhost:8000/docs`
 
+## Frontend + Backend Demo Login
+
+Start the backend in WSL, then seed a local demo hotel:
+
+```bash
+cd /mnt/c/Users/Lenovo/Documents/Hotel\ Managment
+. .venv/bin/activate
+python scripts/seed_demo_data.py
+```
+
+Or, after restarting the backend with the latest code:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/hotels/demo-seed
+```
+
+If your local PostgreSQL database was created from an older code version and demo seeding fails with missing-column errors, reset the local development schema and seed in one step:
+
+```bash
+cd /mnt/c/Users/Lenovo/Documents/Hotel\ Managment
+. .venv/bin/activate
+python scripts/reset_dev_db_and_seed.py --yes
+```
+
+That reset command is destructive and should only be used for local development data.
+
+Use these credentials in the dashboard at `http://localhost:3000/login`:
+
+- Email: `owner@arcadia.demo`
+- Password: `DemoPass123!`
+
+The demo seed creates/reuses hotel slug `arcadia-demo`, resets the demo owner password, and inserts sample rooms, staff, guests, reservations, tickets, housekeeping tasks, and analytics snapshots. The endpoint is disabled when `ENVIRONMENT=production`.
+
 ## Current API
 
 - `GET /health`
