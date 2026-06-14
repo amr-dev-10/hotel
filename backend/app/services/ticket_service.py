@@ -8,10 +8,14 @@ from app.models.base import utcnow
 from app.models.ticket import Ticket
 from app.repositories.bot_config_repository import BotConfigRepository
 from app.repositories.department_repository import DepartmentRepository
+from app.repositories.knowledge_repository import DepartmentConfigRepository
 from app.repositories.ticket_repository import TicketRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.ticket import TicketCreate
+from app.schemas.ops import NotificationCreate
+from app.services.audit_service import AuditService
 from app.services.notification_service import NotificationService
+from app.services.ops_service import NotificationCenterService
 
 
 class TicketService:
@@ -21,7 +25,9 @@ class TicketService:
         self.departments = DepartmentRepository(db)
         self.users = UserRepository(db)
         self.bot_configs = BotConfigRepository(db)
+        self.department_configs = DepartmentConfigRepository(db)
         self.notifications = NotificationService()
+        self.audit = AuditService(db)
 
     def create_ticket(
         self,
@@ -81,6 +87,33 @@ class TicketService:
                 actor_id=actor_id,
             )
         if commit:
+            self.audit.log(
+                hotel_id,
+                "ticket.created",
+                "ticket",
+                ticket.id,
+                actor_id,
+                {"ticket_code": ticket.ticket_code, "source": ticket.source},
+            )
+            if assignee:
+                self.audit.log(
+                    hotel_id,
+                    "ticket.assigned",
+                    "ticket",
+                    ticket.id,
+                    actor_id,
+                    {"assigned_to": assignee.id},
+                )
+                NotificationCenterService(self.db).create(
+                    hotel_id,
+                    NotificationCreate(
+                        user_id=assignee.id,
+                        channel="fcm",
+                        title="New Ticket",
+                        message=ticket.item_description,
+                    ),
+                    commit=False,
+                )
             self.db.commit()
             self.db.refresh(ticket)
             self._publish_created(ticket, assignee_name=assignee.name if assignee else None)
@@ -107,6 +140,14 @@ class TicketService:
             {"stage": ticket.stage, "note": note},
             actor_id=actor_id,
         )
+        self.audit.log(
+            hotel_id,
+            "ticket.resolved" if ticket.stage == "Completed" else "ticket.stage_changed",
+            "ticket",
+            ticket.id,
+            actor_id,
+            {"stage": ticket.stage, "note": note},
+        )
         self.db.commit()
         self.db.refresh(ticket)
         self.notifications.publish_ticket_event(
@@ -121,6 +162,11 @@ class TicketService:
         return ticket
 
     def _sla_minutes(self, hotel_id: str, department_key: str) -> int:
+        department = self.departments.get_by_key(hotel_id, department_key)
+        if department:
+            department_config = self.department_configs.get_for_department(hotel_id, department.id)
+            if department_config:
+                return department_config.sla_minutes
         config = self.bot_configs.get_for_hotel(hotel_id)
         if config and config.sla_config:
             value = config.sla_config.get(department_key, config.sla_config.get("default"))

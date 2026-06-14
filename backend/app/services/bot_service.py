@@ -6,16 +6,26 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import bad_request
 from app.models.guest import Guest
+from app.models.base import utcnow
+from app.models.reservation import StayRecord
+from app.models.whatsapp import WhatsAppMessage
 from app.models.whatsapp_session import WhatsAppSession
 from app.repositories.bot_config_repository import BotConfigRepository
 from app.repositories.guest_repository import GuestRepository
 from app.repositories.hotel_repository import HotelRepository
 from app.repositories.room_repository import RoomRepository
 from app.repositories.ticket_repository import TicketRepository
+from app.repositories.whatsapp_repository import (
+    WhatsAppAccountRepository,
+    WhatsAppConversationRepository,
+)
 from app.repositories.whatsapp_session_repository import WhatsAppSessionRepository
+from app.schemas.reservation import ReservationCreate
 from app.schemas.ticket import TicketCreate
 from app.services.defaults import DEFAULT_BOT_MESSAGES, DEFAULT_MAIN_MENU, DEFAULT_SERVICES
+from app.services.knowledge_service import FAQService
 from app.services.gemini_service import GeminiService
+from app.services.reservation_service import ReservationService
 from app.services.ticket_service import TicketService
 
 
@@ -36,8 +46,12 @@ class BotService:
         self.rooms = RoomRepository(db)
         self.bot_configs = BotConfigRepository(db)
         self.ticket_repo = TicketRepository(db)
+        self.whatsapp_accounts = WhatsAppAccountRepository(db)
+        self.conversations = WhatsAppConversationRepository(db)
         self.gemini = GeminiService()
+        self.faqs = FAQService(db)
         self.ticket_service = TicketService(db)
+        self.reservations = ReservationService(db)
 
     def handle_message(self, message: IncomingWhatsAppMessage) -> dict[str, Any]:
         hotel = self._resolve_hotel(message.phone_number_id)
@@ -48,6 +62,13 @@ class BotService:
             hotel.id,
             message.from_phone,
             message.phone_number_id,
+        )
+        self._record_message(
+            hotel.id,
+            session,
+            direction="inbound",
+            message_type="interactive" if message.interactive_id else "text",
+            text=message.text or message.interactive_id,
         )
         config = self.bot_configs.get_for_hotel(hotel.id)
         services = config.services if config and config.services else DEFAULT_SERVICES
@@ -81,6 +102,15 @@ class BotService:
                 replies,
             )
 
+        self.db.commit()
+        for reply in replies:
+            self._record_message(
+                hotel.id,
+                session,
+                direction="outbound",
+                message_type=reply["kind"],
+                text=reply.get("text"),
+            )
         self.db.commit()
         return {
             "hotel_id": hotel.id,
@@ -117,6 +147,9 @@ class BotService:
 
     def _resolve_hotel(self, phone_number_id: str | None):
         if phone_number_id:
+            account = self.whatsapp_accounts.get_by_phone_number_id(phone_number_id)
+            if account:
+                return self.hotels.get(account.hotel_id)
             hotel = self.hotels.get_by_phone_number_id(phone_number_id)
             if hotel:
                 return hotel
@@ -191,25 +224,40 @@ class BotService:
             return
 
         guest_name = (session.pending_action or {}).get("guest_name", "Guest")
-        guest = Guest(
-            hotel_id=hotel_id,
-            room_id=room.id,
-            name=guest_name,
-            phone=session.phone,
-            whatsapp_phone=session.phone,
-            check_in_date=date.today(),
-            check_out_date=date.today() + timedelta(days=1),
-            status="checked_in",
+        reservation = self.reservations.create_reservation(
+            hotel_id,
+            ReservationCreate(
+                guest_name=guest_name,
+                phone=session.phone,
+                whatsapp_phone=session.phone,
+                room_id=room.id,
+                checkin_date=date.today(),
+                checkout_date=date.today() + timedelta(days=1),
+                source="walk_in",
+            ),
+            actor_id=None,
+            commit=False,
         )
-        self.db.add(guest)
-        self.db.flush()
+        guest = self.guests.get_for_hotel(hotel_id, reservation.guest_id)
+        if guest:
+            reservation.status = "checked_in"
+            guest.status = "checked_in"
+            room.status = "occupied"
+        self.db.add(
+            StayRecord(
+                hotel_id=hotel_id,
+                reservation_id=reservation.id,
+                room_id=room.id,
+                actual_checkin=utcnow(),
+            )
+        )
 
-        session.guest_id = guest.id
+        session.guest_id = reservation.guest_id
         session.room_id = room.id
         session.state = "active"
         session.pending_action = None
-        replies.append(self._text(f"Welcome, {guest.name}. You are all set."))
-        replies.append(self._main_menu(guest.name))
+        replies.append(self._text(f"Welcome, {guest_name}. You are all set."))
+        replies.append(self._main_menu(guest_name))
 
     def _handle_interactive(
         self,
@@ -271,6 +319,11 @@ class BotService:
     ) -> str | None:
         if self._is_greeting(text):
             replies.append(self._main_menu(self._guest_name(hotel_id, session)))
+            return None
+
+        faq_answer = self.faqs.answer(hotel_id, text)
+        if faq_answer:
+            replies.append(self._text(faq_answer))
             return None
 
         match = self.gemini.classify_free_text(
@@ -414,3 +467,24 @@ class BotService:
             "text": "Room Services",
             "payload": {"button_text": "Choose", "rows": rows},
         }
+
+    def _record_message(
+        self,
+        hotel_id: str,
+        session: WhatsAppSession,
+        direction: str,
+        message_type: str,
+        text: str | None,
+    ) -> None:
+        conversation = self.conversations.get_or_create(hotel_id, session.phone, session.guest_id)
+        self.db.add(
+            WhatsAppMessage(
+                hotel_id=hotel_id,
+                conversation_id=conversation.id,
+                direction=direction,
+                message_type=message_type,
+                message_text=text,
+                status="sent",
+                created_at=utcnow(),
+            )
+        )

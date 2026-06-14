@@ -7,6 +7,7 @@ from app.models.campaign import Campaign, CampaignDelivery
 from app.repositories.campaign_repository import CampaignRepository
 from app.repositories.guest_repository import GuestRepository
 from app.repositories.hotel_repository import HotelRepository
+from app.repositories.whatsapp_repository import WhatsAppAccountRepository
 from app.schemas.campaign import CampaignCreate
 from app.services.whatsapp_service import WhatsAppService
 
@@ -17,6 +18,7 @@ class CampaignService:
         self.campaigns = CampaignRepository(db)
         self.guests = GuestRepository(db)
         self.hotels = HotelRepository(db)
+        self.whatsapp_accounts = WhatsAppAccountRepository(db)
         self.whatsapp = WhatsAppService()
 
     def create_campaign(
@@ -42,6 +44,9 @@ class CampaignService:
         recipients = self._recipients(hotel_id, payload)
         sent_count = 0
         hotel = self.hotels.get(hotel_id)
+        account = None
+        if hotel and hotel.whatsapp_phone_number_id:
+            account = self.whatsapp_accounts.get_by_phone_number_id(hotel.whatsapp_phone_number_id)
         for guest in recipients:
             phone = guest.whatsapp_phone or guest.phone
             if not phone:
@@ -55,10 +60,11 @@ class CampaignService:
             )
             if campaign.status != "scheduled":
                 self.whatsapp.send_template(
-                    hotel.whatsapp_phone_number_id if hotel else None,
+                    account.phone_number_id if account else (hotel.whatsapp_phone_number_id if hotel else None),
                     phone,
                     payload.template_name,
                     self._template_params(guest.name, payload.params),
+                    access_token=account.access_token if account else None,
                 )
                 delivery.sent_at = datetime.now(UTC)
                 sent_count += 1

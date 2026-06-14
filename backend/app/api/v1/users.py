@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import ensure_hotel_access, get_current_user
+from app.api.dependencies import require_permission
 from app.core.database import get_db
 from app.core.exceptions import bad_request
 from app.core.responses import ok
@@ -17,9 +17,8 @@ router = APIRouter()
 def list_users(
     hotel_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("user.manage")),
 ) -> dict:
-    ensure_hotel_access(hotel_id, current_user)
     users = UserRepository(db).list_for_hotel(hotel_id)
     return ok([UserRead.model_validate(item).model_dump() for item in users])
 
@@ -29,9 +28,8 @@ def create_user(
     hotel_id: str,
     payload: UserCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("user.manage")),
 ) -> dict:
-    ensure_hotel_access(hotel_id, current_user)
     repo = UserRepository(db)
     if repo.get_by_hotel_email(hotel_id, payload.email):
         raise bad_request("User email already exists for this hotel")

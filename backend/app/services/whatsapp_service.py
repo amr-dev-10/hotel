@@ -10,7 +10,13 @@ class WhatsAppService:
     def verify_webhook_signature(self, raw_body: bytes, signature_header: str | None) -> bool:
         return verify_meta_signature(raw_body, signature_header, settings.whatsapp_app_secret)
 
-    def send_text(self, phone_number_id: str | None, to_phone: str, text: str) -> dict[str, Any]:
+    def send_text(
+        self,
+        phone_number_id: str | None,
+        to_phone: str,
+        text: str,
+        access_token: str | None = None,
+    ) -> dict[str, Any]:
         return self._send(
             phone_number_id,
             {
@@ -19,6 +25,7 @@ class WhatsAppService:
                 "type": "text",
                 "text": {"body": text},
             },
+            access_token=access_token,
         )
 
     def send_interactive_list(
@@ -29,6 +36,7 @@ class WhatsAppService:
         button_text: str,
         rows: list[dict[str, str]],
         section_title: str = "Options",
+        access_token: str | None = None,
     ) -> dict[str, Any]:
         return self._send(
             phone_number_id,
@@ -45,6 +53,7 @@ class WhatsAppService:
                     },
                 },
             },
+            access_token=access_token,
         )
 
     def send_template(
@@ -54,6 +63,7 @@ class WhatsAppService:
         template_name: str,
         params: list[str],
         language_code: str = "en",
+        access_token: str | None = None,
     ) -> dict[str, Any]:
         return self._send(
             phone_number_id,
@@ -74,10 +84,17 @@ class WhatsAppService:
                     ],
                 },
             },
+            access_token=access_token,
         )
 
-    def _send(self, phone_number_id: str | None, payload: dict[str, Any]) -> dict[str, Any]:
-        if settings.whatsapp_dry_run or not settings.whatsapp_access_token or not phone_number_id:
+    def _send(
+        self,
+        phone_number_id: str | None,
+        payload: dict[str, Any],
+        access_token: str | None = None,
+    ) -> dict[str, Any]:
+        token = access_token or settings.whatsapp_access_token
+        if settings.whatsapp_dry_run or not token or not phone_number_id:
             return {"dry_run": True, "payload": payload}
 
         url = (
@@ -87,7 +104,7 @@ class WhatsAppService:
         response = httpx.post(
             url,
             json=payload,
-            headers={"Authorization": f"Bearer {settings.whatsapp_access_token}"},
+            headers={"Authorization": f"Bearer {token}"},
             timeout=10,
         )
         response.raise_for_status()

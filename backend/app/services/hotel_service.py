@@ -1,11 +1,15 @@
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import bad_request
+from app.models.base import utcnow
 from app.models.bot_config import BotConfig
 from app.models.department import Department
 from app.models.hotel import Hotel
+from app.models.knowledge import BotVersion, DepartmentConfig, HotelLanguage
+from app.models.ops import Subscription
 from app.models.room import Room
 from app.models.user import User
+from app.models.whatsapp import WhatsAppAccount
 from app.repositories.hotel_repository import HotelRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.hotel import HotelBootstrapRequest
@@ -17,6 +21,7 @@ from app.services.defaults import (
     DEFAULT_SERVICES,
     DEFAULT_SLA_CONFIG,
 )
+from app.services.rbac_service import RBACService
 
 
 class HotelService:
@@ -65,6 +70,18 @@ class HotelService:
             self.db.add(department)
             self.db.flush()
             department_ids[department.key] = department.id
+            self.db.add(
+                DepartmentConfig(
+                    hotel_id=hotel.id,
+                    department_id=department.id,
+                    keywords=item["keywords"],
+                    sla_minutes=DEFAULT_SLA_CONFIG.get(
+                        item["key"],
+                        DEFAULT_SLA_CONFIG["default"],
+                    ),
+                    auto_assignment_enabled=True,
+                )
+            )
 
         owner.department_id = department_ids.get("front_office")
 
@@ -87,6 +104,40 @@ class HotelService:
                 sla_config=DEFAULT_SLA_CONFIG,
                 active_hours={"timezone": payload.timezone},
                 gemini_fallback_enabled=True,
+            )
+        )
+        self.db.add(
+            HotelLanguage(
+                hotel_id=hotel.id,
+                default_language="en",
+                supported_languages=["en"],
+            )
+        )
+        self.db.add(Subscription(hotel_id=hotel.id, plan="starter", status="active"))
+
+        if payload.whatsapp_phone_number_id:
+            self.db.add(
+                WhatsAppAccount(
+                    hotel_id=hotel.id,
+                    business_name=hotel.name,
+                    phone_number=payload.contact_phone,
+                    phone_number_id=payload.whatsapp_phone_number_id,
+                    status="active",
+                )
+            )
+        RBACService(self.db).seed_owner_role(hotel.id, owner)
+        self.db.add(
+            BotVersion(
+                hotel_id=hotel.id,
+                version=1,
+                config_json={
+                    "main_menu": DEFAULT_MAIN_MENU,
+                    "services": DEFAULT_SERVICES,
+                    "messages": DEFAULT_BOT_MESSAGES,
+                    "sla_config": DEFAULT_SLA_CONFIG,
+                },
+                published_by=owner.id,
+                created_at=utcnow(),
             )
         )
 

@@ -37,6 +37,13 @@ class Settings(BaseSettings):
     fcm_enabled: bool = False
     default_timezone: str = "UTC"
 
+    stripe_secret_key: str = ""
+    media_storage_backend: str = "local"
+    s3_bucket: str = ""
+    s3_region: str = ""
+    deepgram_api_key: str = ""
+    elevenlabs_api_key: str = ""
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def parse_cors_origins(cls, value: str | list[str]) -> list[str]:

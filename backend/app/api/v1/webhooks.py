@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.responses import ok
+from app.repositories.whatsapp_repository import WhatsAppAccountRepository
 from app.services.bot_service import BotService
 from app.services.whatsapp_service import WhatsAppService
 
@@ -39,6 +40,9 @@ async def receive_whatsapp_webhook(
     outbound: list[dict] = []
     processed = 0
     for incoming in bot.parse_webhook_payload(payload):
+        account = None
+        if incoming.phone_number_id:
+            account = WhatsAppAccountRepository(db).get_by_phone_number_id(incoming.phone_number_id)
         result = bot.handle_message(incoming)
         processed += 1
         for reply in result["replies"]:
@@ -46,14 +50,24 @@ async def receive_whatsapp_webhook(
                 {
                     "incoming": incoming.__dict__,
                     "reply": reply,
-                    "send_result": _send_reply(whatsapp, incoming, reply),
+                    "send_result": _send_reply(
+                        whatsapp,
+                        incoming,
+                        reply,
+                        access_token=account.access_token if account else None,
+                    ),
                 }
             )
 
     return ok({"processed": processed, "outbound": outbound})
 
 
-def _send_reply(whatsapp: WhatsAppService, incoming, reply: dict) -> dict:
+def _send_reply(
+    whatsapp: WhatsAppService,
+    incoming,
+    reply: dict,
+    access_token: str | None = None,
+) -> dict:
     if reply["kind"] == "interactive_list":
         payload = reply.get("payload") or {}
         return whatsapp.send_interactive_list(
@@ -62,9 +76,11 @@ def _send_reply(whatsapp: WhatsAppService, incoming, reply: dict) -> dict:
             reply.get("text") or "Choose an option",
             payload.get("button_text", "Open"),
             payload.get("rows", []),
+            access_token=access_token,
         )
     return whatsapp.send_text(
         incoming.phone_number_id,
         incoming.from_phone,
         reply.get("text") or "Please choose an option from the menu.",
+        access_token=access_token,
     )

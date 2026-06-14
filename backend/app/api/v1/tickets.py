@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import ensure_hotel_access, get_current_user
+from app.api.dependencies import require_permission
 from app.core.database import get_db
 from app.core.responses import ok
 from app.models.user import User
@@ -16,9 +16,8 @@ router = APIRouter()
 def list_tickets(
     hotel_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("ticket.view")),
 ) -> dict:
-    ensure_hotel_access(hotel_id, current_user)
     tickets = TicketRepository(db).list_for_hotel(hotel_id)
     return ok([TicketRead.model_validate(item).model_dump() for item in tickets])
 
@@ -28,9 +27,8 @@ def create_ticket(
     hotel_id: str,
     payload: TicketCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("ticket.create")),
 ) -> dict:
-    ensure_hotel_access(hotel_id, current_user)
     ticket = TicketService(db).create_ticket(hotel_id, payload, actor_id=current_user.id)
     return ok(TicketRead.model_validate(ticket).model_dump())
 
@@ -41,9 +39,8 @@ def update_ticket_stage(
     ticket_id: str,
     payload: TicketStageUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("ticket.close")),
 ) -> dict:
-    ensure_hotel_access(hotel_id, current_user)
     ticket = TicketService(db).update_stage(
         hotel_id,
         ticket_id,

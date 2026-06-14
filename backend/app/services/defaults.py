@@ -115,3 +115,27 @@ DEFAULT_SLA_CONFIG = {
     "food_beverage": 30,
     "default": 20,
 }
+
+DEFAULT_PERMISSIONS = [
+    ("ticket.view", "View tickets", "tickets"),
+    ("ticket.create", "Create tickets", "tickets"),
+    ("ticket.assign", "Assign tickets", "tickets"),
+    ("ticket.close", "Close tickets", "tickets"),
+    ("room.view", "View rooms", "rooms"),
+    ("room.update", "Update rooms", "rooms"),
+    ("guest.view", "View guests", "guests"),
+    ("guest.edit", "Create and edit guests", "guests"),
+    ("reservation.view", "View reservations", "reservations"),
+    ("reservation.manage", "Create and manage reservations", "reservations"),
+    ("campaign.create", "Create campaigns", "campaigns"),
+    ("campaign.send", "Send campaigns", "campaigns"),
+    ("menu.manage", "Manage menu", "menu"),
+    ("user.manage", "Manage users", "users"),
+    ("role.manage", "Manage roles and permissions", "roles"),
+    ("bot.manage", "Manage bot config and knowledge base", "bot"),
+    ("hotel.settings.manage", "Manage hotel settings", "hotels"),
+    ("media.manage", "Manage media files", "media"),
+    ("billing.view", "View billing", "billing"),
+]
+
+OWNER_ROLE_NAME = "Owner"

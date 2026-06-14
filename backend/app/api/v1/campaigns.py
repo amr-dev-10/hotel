@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import ensure_hotel_access, get_current_user
+from app.api.dependencies import require_permission
 from app.core.database import get_db
 from app.core.responses import ok
 from app.models.user import User
@@ -16,9 +16,8 @@ router = APIRouter()
 def list_campaigns(
     hotel_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("campaign.create")),
 ) -> dict:
-    ensure_hotel_access(hotel_id, current_user)
     campaigns = CampaignRepository(db).list_for_hotel(hotel_id)
     return ok([CampaignRead.model_validate(item).model_dump() for item in campaigns])
 
@@ -28,9 +27,8 @@ def create_campaign(
     hotel_id: str,
     payload: CampaignCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("campaign.send")),
 ) -> dict:
-    ensure_hotel_access(hotel_id, current_user)
     campaign = CampaignService(db).create_campaign(
         hotel_id,
         payload,

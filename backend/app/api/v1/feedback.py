@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import ensure_hotel_access, get_current_user
+from app.api.dependencies import require_permission
 from app.core.database import get_db
 from app.core.responses import ok
 from app.models.user import User
@@ -16,9 +16,8 @@ router = APIRouter()
 def list_feedback(
     hotel_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("guest.view")),
 ) -> dict:
-    ensure_hotel_access(hotel_id, current_user)
     feedback = FeedbackRepository(db).list_for_hotel(hotel_id)
     return ok([FeedbackRead.model_validate(item).model_dump() for item in feedback])
 
@@ -28,8 +27,7 @@ def create_feedback(
     hotel_id: str,
     payload: FeedbackCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("guest.edit")),
 ) -> dict:
-    ensure_hotel_access(hotel_id, current_user)
     feedback = FeedbackService(db).create_feedback(hotel_id, payload)
     return ok(FeedbackRead.model_validate(feedback).model_dump())

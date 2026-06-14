@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import ensure_hotel_access, get_current_user
+from app.api.dependencies import require_permission
 from app.core.database import get_db
 from app.core.responses import ok
 from app.models.bot_config import BotConfig
@@ -17,9 +17,8 @@ router = APIRouter()
 def get_bot_config(
     hotel_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("bot.manage")),
 ) -> dict:
-    ensure_hotel_access(hotel_id, current_user)
     repo = BotConfigRepository(db)
     config = repo.get_for_hotel(hotel_id)
     if not config:
@@ -41,9 +40,8 @@ def upsert_bot_config(
     hotel_id: str,
     payload: BotConfigUpsert,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("bot.manage")),
 ) -> dict:
-    ensure_hotel_access(hotel_id, current_user)
     repo = BotConfigRepository(db)
     config = repo.get_for_hotel(hotel_id)
     if not config:
