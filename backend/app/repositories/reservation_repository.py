@@ -1,3 +1,5 @@
+from collections.abc import Sequence
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -24,8 +26,39 @@ class StayRecordRepository(BaseRepository[StayRecord]):
 
     def get_for_reservation(self, hotel_id: str, reservation_id: str) -> StayRecord | None:
         return self.db.execute(
-            select(StayRecord).where(
+            select(StayRecord)
+            .where(
                 StayRecord.hotel_id == hotel_id,
                 StayRecord.reservation_id == reservation_id,
             )
+            .order_by(StayRecord.actual_checkin.desc().nullslast(), StayRecord.id.desc())
+            .limit(1)
         ).scalar_one_or_none()
+
+    def get_active_for_reservation(self, hotel_id: str, reservation_id: str) -> StayRecord | None:
+        return self.db.execute(
+            select(StayRecord)
+            .where(
+                StayRecord.hotel_id == hotel_id,
+                StayRecord.reservation_id == reservation_id,
+                StayRecord.actual_checkout.is_(None),
+            )
+            .order_by(StayRecord.actual_checkin.desc().nullslast(), StayRecord.id.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+
+    def list_for_reservation(self, hotel_id: str, reservation_id: str) -> Sequence[StayRecord]:
+        return self.db.execute(
+            select(StayRecord)
+            .where(
+                StayRecord.hotel_id == hotel_id,
+                StayRecord.reservation_id == reservation_id,
+            )
+            .order_by(StayRecord.actual_checkin)
+        ).scalars().all()
+
+    def list_active(self, hotel_id: str | None = None) -> Sequence[StayRecord]:
+        statement = select(StayRecord).where(StayRecord.actual_checkout.is_(None))
+        if hotel_id:
+            statement = statement.where(StayRecord.hotel_id == hotel_id)
+        return self.db.execute(statement).scalars().all()

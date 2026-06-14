@@ -1,18 +1,27 @@
 from fastapi import APIRouter
 
 from app.api.v1 import (
+    analytics,
     auth,
     bot_config,
     campaigns,
     departments,
     feedback,
+    folios,
     guests,
+    housekeeping,
     hotels,
     knowledge,
+    live_chat,
+    lost_found,
+    maintenance,
     menu,
     ops,
+    organizations,
+    rate_plans,
     reservations,
     roles,
+    room_types,
     rooms,
     tickets,
     users,
@@ -21,9 +30,15 @@ from app.api.v1 import (
 
 api_router = APIRouter()
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
+api_router.include_router(organizations.router, prefix="/orgs", tags=["organizations"])
 api_router.include_router(hotels.router, prefix="/hotels", tags=["hotels"])
 api_router.include_router(users.router, prefix="/hotels/{hotel_id}/users", tags=["users"])
 api_router.include_router(roles.router, prefix="/hotels/{hotel_id}/roles", tags=["roles"])
+api_router.include_router(
+    room_types.router,
+    prefix="/hotels/{hotel_id}/room-types",
+    tags=["room-types"],
+)
 api_router.include_router(rooms.router, prefix="/hotels/{hotel_id}/rooms", tags=["rooms"])
 api_router.include_router(
     departments.router,
@@ -36,7 +51,37 @@ api_router.include_router(
     prefix="/hotels/{hotel_id}/reservations",
     tags=["reservations"],
 )
+api_router.include_router(
+    rate_plans.router,
+    prefix="/hotels/{hotel_id}/rate-plans",
+    tags=["rate-plans"],
+)
+api_router.include_router(
+    folios.router,
+    prefix="/hotels/{hotel_id}/folios",
+    tags=["folios"],
+)
+api_router.include_router(
+    folios.tax_router,
+    prefix="/hotels/{hotel_id}/tax-configs",
+    tags=["tax-configs"],
+)
 api_router.include_router(tickets.router, prefix="/hotels/{hotel_id}/tickets", tags=["tickets"])
+api_router.include_router(
+    housekeeping.router,
+    prefix="/hotels/{hotel_id}/housekeeping",
+    tags=["housekeeping"],
+)
+api_router.include_router(
+    maintenance.router,
+    prefix="/hotels/{hotel_id}/maintenance",
+    tags=["maintenance"],
+)
+api_router.include_router(
+    lost_found.router,
+    prefix="/hotels/{hotel_id}/lost-found",
+    tags=["lost-found"],
+)
 api_router.include_router(menu.router, prefix="/hotels/{hotel_id}/menu", tags=["menu"])
 api_router.include_router(
     bot_config.router,
@@ -54,6 +99,11 @@ api_router.include_router(
     tags=["whatsapp"],
 )
 api_router.include_router(
+    live_chat.router,
+    prefix="/hotels/{hotel_id}/live-chat",
+    tags=["live-chat"],
+)
+api_router.include_router(
     knowledge.router,
     prefix="/hotels/{hotel_id}/knowledge",
     tags=["knowledge"],
@@ -67,6 +117,11 @@ api_router.include_router(
     ops.router,
     prefix="/hotels/{hotel_id}",
     tags=["operations"],
+)
+api_router.include_router(
+    analytics.router,
+    prefix="/hotels/{hotel_id}/analytics",
+    tags=["analytics"],
 )
 api_router.include_router(
     feedback.router,

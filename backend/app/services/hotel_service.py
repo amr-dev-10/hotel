@@ -7,7 +7,8 @@ from app.models.department import Department
 from app.models.hotel import Hotel
 from app.models.knowledge import BotVersion, DepartmentConfig, HotelLanguage
 from app.models.ops import Subscription
-from app.models.room import Room
+from app.models.rate_plan import RatePlan
+from app.models.room import Room, RoomType
 from app.models.user import User
 from app.models.whatsapp import WhatsAppAccount
 from app.repositories.hotel_repository import HotelRepository
@@ -85,10 +86,36 @@ class HotelService:
 
         owner.department_id = department_ids.get("front_office")
 
+        default_room_type = RoomType(
+            hotel_id=hotel.id,
+            name="Standard",
+            description="Default standard room type.",
+            max_occupancy=2,
+            base_price=0,
+            amenities=["WiFi"],
+            is_active=True,
+            sort_order=10,
+        )
+        self.db.add(default_room_type)
+        self.db.flush()
+        self.db.add(
+            RatePlan(
+                hotel_id=hotel.id,
+                name="Room Only",
+                description="Default room-only rate plan.",
+                room_type_id=default_room_type.id,
+                base_price=default_room_type.base_price,
+                includes=["wifi"],
+                is_default=True,
+                is_active=True,
+            )
+        )
+
         for room_number in payload.seed_rooms:
             self.db.add(
                 Room(
                     hotel_id=hotel.id,
+                    room_type_id=default_room_type.id,
                     room_number=room_number,
                     room_type="standard",
                     status="available",

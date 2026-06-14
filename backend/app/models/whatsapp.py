@@ -1,6 +1,7 @@
 from datetime import datetime
+from decimal import Decimal
 
-from sqlalchemy import DateTime, ForeignKey, JSON, String, Text, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, Integer, JSON, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -22,6 +23,37 @@ class WhatsAppAccount(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     access_token_encrypted: Mapped[str | None] = mapped_column(Text)
     webhook_verify_token: Mapped[str | None] = mapped_column(String(180))
     status: Mapped[str] = mapped_column(String(40), default="active")
+    token_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class WhatsAppAccountHealth(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "whatsapp_account_health"
+
+    hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
+    whatsapp_account_id: Mapped[str] = mapped_column(ForeignKey("whatsapp_accounts.id"), index=True)
+    last_message_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_message_received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_webhook_received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    token_status: Mapped[str] = mapped_column(String(40), default="valid")
+    webhook_status: Mapped[str] = mapped_column(String(40), default="active")
+    error_count_24h: Mapped[int] = mapped_column(Integer, default=0)
+    last_error_message: Mapped[str | None] = mapped_column(Text)
+    checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class WhatsAppUsage(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "whatsapp_usage"
+    __table_args__ = (UniqueConstraint("hotel_id", "year_month", name="uq_whatsapp_usage_month"),)
+
+    hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
+    year_month: Mapped[str] = mapped_column(String(7), index=True)
+    messages_sent: Mapped[int] = mapped_column(Integer, default=0)
+    messages_received: Mapped[int] = mapped_column(Integer, default=0)
+    template_sent: Mapped[int] = mapped_column(Integer, default=0)
+    media_sent: Mapped[int] = mapped_column(Integer, default=0)
+    api_calls: Mapped[int] = mapped_column(Integer, default=0)
+    estimated_cost: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=0)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class WhatsAppTemplate(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -68,3 +100,16 @@ class WhatsAppMessage(UUIDPrimaryKeyMixin, Base):
     meta_message_id: Mapped[str | None] = mapped_column(String(120))
     status: Mapped[str] = mapped_column(String(40), default="sent")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class LiveChatSession(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "live_chat_sessions"
+
+    hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
+    guest_id: Mapped[str | None] = mapped_column(ForeignKey("guests.id"))
+    guest_phone: Mapped[str] = mapped_column(String(40), index=True)
+    assigned_staff_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
+    status: Mapped[str] = mapped_column(String(40), default="waiting", index=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ended_by: Mapped[str | None] = mapped_column(String(40))

@@ -10,6 +10,7 @@ class LoginRequest(BaseModel):
 
 class TokenResponse(BaseModel):
     access_token: str
+    refresh_token: str | None = None
     token_type: str = "bearer"
     expires_in_minutes: int
 
@@ -23,3 +24,12 @@ class CurrentUserRead(ORMModel):
     job_role: str | None = None
     is_hotel_owner: bool
     is_on_duty: bool
+
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str = Field(min_length=20)
+    device_info: str | None = None
+
+
+class LogoutRequest(BaseModel):
+    refresh_token: str | None = None

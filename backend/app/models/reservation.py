@@ -17,6 +17,7 @@ class Reservation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     reservation_no: Mapped[str] = mapped_column(String(80), index=True)
     guest_id: Mapped[str] = mapped_column(ForeignKey("guests.id"), index=True)
     room_id: Mapped[str | None] = mapped_column(ForeignKey("rooms.id"))
+    rate_plan_id: Mapped[str | None] = mapped_column(ForeignKey("rate_plans.id"))
     status: Mapped[str] = mapped_column(String(40), default="confirmed", index=True)
     checkin_date: Mapped[date] = mapped_column(Date)
     checkout_date: Mapped[date] = mapped_column(Date)

@@ -10,6 +10,8 @@ from app.models.knowledge import (
     DepartmentConfig,
     HotelFAQ,
     HotelLanguage,
+    KnowledgeDocument,
+    KnowledgeEmbedding,
     ServiceForm,
     ServiceFormField,
 )
@@ -19,9 +21,18 @@ from app.repositories.knowledge_repository import (
     DepartmentConfigRepository,
     FAQRepository,
     HotelLanguageRepository,
+    KnowledgeDocumentRepository,
+    KnowledgeEmbeddingRepository,
     ServiceFormRepository,
 )
-from app.schemas.knowledge import DepartmentConfigUpsert, FAQCreate, HotelLanguageUpsert, ServiceFormCreate
+from app.schemas.knowledge import (
+    DepartmentConfigUpsert,
+    FAQCreate,
+    HotelLanguageUpsert,
+    KnowledgeDocumentCreate,
+    KnowledgeDocumentUpdate,
+    ServiceFormCreate,
+)
 from app.services.audit_service import AuditService
 
 
@@ -192,3 +203,104 @@ class ServiceFormService:
         self.db.commit()
         self.db.refresh(form)
         return form
+
+
+class KnowledgeDocumentService:
+    def __init__(self, db: Session) -> None:
+        self.db = db
+        self.documents = KnowledgeDocumentRepository(db)
+        self.embeddings = KnowledgeEmbeddingRepository(db)
+
+    def create(
+        self,
+        hotel_id: str,
+        payload: KnowledgeDocumentCreate,
+        actor_id: str | None,
+    ) -> KnowledgeDocument:
+        document = KnowledgeDocument(hotel_id=hotel_id, **payload.model_dump())
+        self.db.add(document)
+        self.db.flush()
+        self._rebuild_embeddings(document)
+        AuditService(self.db).log(hotel_id, "knowledge.created", "knowledge_document", document.id, actor_id)
+        self.db.commit()
+        self.db.refresh(document)
+        return document
+
+    def update(
+        self,
+        hotel_id: str,
+        document_id: str,
+        payload: KnowledgeDocumentUpdate,
+        actor_id: str | None,
+    ) -> KnowledgeDocument:
+        document = self.documents.get_for_hotel(hotel_id, document_id)
+        if not document:
+            raise not_found("Knowledge document not found")
+        data = payload.model_dump(exclude_unset=True)
+        content_changed = "content" in data
+        for key, value in data.items():
+            setattr(document, key, value)
+        if content_changed:
+            for embedding in self.embeddings.list_for_document(document.id):
+                self.db.delete(embedding)
+            self.db.flush()
+            self._rebuild_embeddings(document)
+        AuditService(self.db).log(hotel_id, "knowledge.updated", "knowledge_document", document.id, actor_id)
+        self.db.commit()
+        self.db.refresh(document)
+        return document
+
+    def delete(self, hotel_id: str, document_id: str, actor_id: str | None) -> None:
+        document = self.documents.get_for_hotel(hotel_id, document_id)
+        if not document:
+            raise not_found("Knowledge document not found")
+        document.is_active = False
+        AuditService(self.db).log(hotel_id, "knowledge.deleted", "knowledge_document", document.id, actor_id)
+        self.db.commit()
+
+    def answer(self, hotel_id: str, text: str) -> str | None:
+        query_words = self._words(text)
+        if not query_words:
+            return None
+        best_score = 0
+        best_chunk = None
+        active_document_ids = {document.id for document in self.documents.list_active(hotel_id)}
+        for embedding in self.embeddings.list_for_hotel(hotel_id):
+            if embedding.document_id not in active_document_ids:
+                continue
+            score = len(query_words & self._words(embedding.chunk_text))
+            if score > best_score:
+                best_score = score
+                best_chunk = embedding.chunk_text
+        if best_score == 0 or not best_chunk:
+            return None
+        return best_chunk.strip()
+
+    def _rebuild_embeddings(self, document: KnowledgeDocument) -> None:
+        for index, chunk in enumerate(self._chunks(document.content)):
+            self.db.add(
+                KnowledgeEmbedding(
+                    hotel_id=document.hotel_id,
+                    document_id=document.id,
+                    chunk_index=index,
+                    chunk_text=chunk,
+                    embedding=self._simple_embedding(chunk),
+                )
+            )
+
+    def _chunks(self, text: str, size: int = 800) -> list[str]:
+        normalized = " ".join(text.split())
+        if not normalized:
+            return []
+        return [normalized[index : index + size] for index in range(0, len(normalized), size)]
+
+    def _words(self, text: str) -> set[str]:
+        return {
+            word.strip(".,!?;:()[]{}").lower()
+            for word in text.split()
+            if len(word.strip(".,!?;:()[]{}")) > 2
+        }
+
+    def _simple_embedding(self, text: str) -> list[float]:
+        words = sorted(self._words(text))[:32]
+        return [float((sum(ord(char) for char in word) % 997) / 997) for word in words]

@@ -1,4 +1,10 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from sqlalchemy.orm import Session
+
+from app.core.database import SessionLocal
+from app.core.security import decode_access_token
+from app.repositories.user_repository import UserRepository
+from app.services.rbac_service import RBACService
 
 router = APIRouter()
 
@@ -22,6 +28,108 @@ class ConnectionManager:
 
 
 manager = ConnectionManager()
+
+
+async def _authenticate_websocket(
+    websocket: WebSocket,
+    db: Session,
+    permission_code: str | None = None,
+) -> tuple[str, str] | None:
+    token = websocket.query_params.get("token")
+    if not token:
+        try:
+            data = await websocket.receive_json()
+        except Exception:
+            data = {}
+        token = data.get("token")
+    if not token:
+        await websocket.close(code=4001, reason="Missing token")
+        return None
+    try:
+        payload = decode_access_token(token)
+    except Exception:
+        await websocket.close(code=4001, reason="Invalid token")
+        return None
+    user_id = payload.get("sub")
+    hotel_id = payload.get("hotel_id")
+    user = UserRepository(db).get(user_id) if user_id else None
+    if not user or not hotel_id or user.hotel_id != hotel_id:
+        await websocket.close(code=4001, reason="Invalid token scope")
+        return None
+    if permission_code:
+        try:
+            RBACService(db).require(user, permission_code)
+        except Exception:
+            await websocket.close(code=4003, reason="Forbidden")
+            return None
+    return hotel_id, user.id
+
+
+@router.websocket("/ws/tickets")
+async def ticket_updates_v3(websocket: WebSocket) -> None:
+    await websocket.accept()
+    db = SessionLocal()
+    auth = await _authenticate_websocket(websocket, db, "ticket.view")
+    if not auth:
+        db.close()
+        return
+    hotel_id, _ = auth
+    channel = f"hotel:{hotel_id}:tickets"
+    manager.active.setdefault(channel, []).append(websocket)
+    try:
+        await websocket.send_json({"event": "connected", "topic": "tickets"})
+        while True:
+            data = await websocket.receive_json()
+            await manager.broadcast(channel, data)
+    except WebSocketDisconnect:
+        manager.disconnect(channel, websocket)
+    finally:
+        db.close()
+
+
+@router.websocket("/ws/chat")
+async def chat_updates_v3(websocket: WebSocket) -> None:
+    await websocket.accept()
+    db = SessionLocal()
+    auth = await _authenticate_websocket(websocket, db, "ticket.view")
+    if not auth:
+        db.close()
+        return
+    hotel_id, _ = auth
+    topic = websocket.query_params.get("topic") or "live"
+    channel = f"hotel:{hotel_id}:chat:{topic}"
+    manager.active.setdefault(channel, []).append(websocket)
+    try:
+        await websocket.send_json({"event": "connected", "topic": "chat", "channel": topic})
+        while True:
+            data = await websocket.receive_json()
+            await manager.broadcast(channel, data)
+    except WebSocketDisconnect:
+        manager.disconnect(channel, websocket)
+    finally:
+        db.close()
+
+
+@router.websocket("/ws/notifications")
+async def notifications_v3(websocket: WebSocket) -> None:
+    await websocket.accept()
+    db = SessionLocal()
+    auth = await _authenticate_websocket(websocket, db)
+    if not auth:
+        db.close()
+        return
+    hotel_id, user_id = auth
+    channel = f"hotel:{hotel_id}:user:{user_id}:notifications"
+    manager.active.setdefault(channel, []).append(websocket)
+    try:
+        await websocket.send_json({"event": "connected", "topic": "notifications"})
+        while True:
+            data = await websocket.receive_json()
+            await manager.broadcast(channel, data)
+    except WebSocketDisconnect:
+        manager.disconnect(channel, websocket)
+    finally:
+        db.close()
 
 
 @router.websocket("/ws/{hotel_id}/tickets")

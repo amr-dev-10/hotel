@@ -4,7 +4,7 @@ from app.core.config import settings
 def encrypt_secret(value: str | None) -> str | None:
     if not value:
         return value
-    key = getattr(settings, "encryption_key", "")
+    key = getattr(settings, "vault_master_key", "") or getattr(settings, "encryption_key", "")
     if not key:
         return value
     try:
@@ -18,7 +18,7 @@ def encrypt_secret(value: str | None) -> str | None:
 def decrypt_secret(value: str | None) -> str | None:
     if not value:
         return value
-    key = getattr(settings, "encryption_key", "")
+    key = getattr(settings, "vault_master_key", "") or getattr(settings, "encryption_key", "")
     if not key:
         return value
     try:

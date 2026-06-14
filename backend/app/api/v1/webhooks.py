@@ -7,6 +7,7 @@ from app.core.encryption import decrypt_secret
 from app.core.responses import ok
 from app.repositories.whatsapp_repository import WhatsAppAccountRepository
 from app.services.bot_service import BotService
+from app.services.whatsapp_ops_service import WhatsAppHealthService, WhatsAppUsageService
 from app.services.whatsapp_service import WhatsAppService
 
 router = APIRouter(tags=["webhooks"])
@@ -44,25 +45,34 @@ async def receive_whatsapp_webhook(
         account = None
         if incoming.phone_number_id:
             account = WhatsAppAccountRepository(db).get_by_phone_number_id(incoming.phone_number_id)
+            if account:
+                WhatsAppHealthService(db).record_webhook(account.hotel_id, account.id, commit=False)
+                WhatsAppUsageService(db).increment(account.hotel_id, "messages_received", commit=False)
         result = bot.handle_message(incoming)
         processed += 1
         for reply in result["replies"]:
+            send_result = _send_reply(
+                whatsapp,
+                incoming,
+                reply,
+                access_token=(
+                    account.access_token or decrypt_secret(account.access_token_encrypted)
+                    if account
+                    else None
+                ),
+            )
+            if account:
+                WhatsAppHealthService(db).record_sent(account.hotel_id, account.id, commit=False)
+                WhatsAppUsageService(db).increment(account.hotel_id, "messages_sent", commit=False)
+                WhatsAppUsageService(db).increment(account.hotel_id, "api_calls", commit=False)
             outbound.append(
                 {
                     "incoming": incoming.__dict__,
                     "reply": reply,
-                    "send_result": _send_reply(
-                        whatsapp,
-                        incoming,
-                        reply,
-                        access_token=(
-                            account.access_token or decrypt_secret(account.access_token_encrypted)
-                            if account
-                            else None
-                        ),
-                    ),
+                    "send_result": send_result,
                 }
             )
+    db.commit()
 
     return ok({"processed": processed, "outbound": outbound})
 

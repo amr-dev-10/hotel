@@ -10,6 +10,7 @@ class ReservationCreate(BaseModel):
     phone: str | None = None
     whatsapp_phone: str | None = None
     room_id: str | None = None
+    rate_plan_id: str | None = None
     checkin_date: date
     checkout_date: date
     source: str = "walk_in"
@@ -18,6 +19,7 @@ class ReservationCreate(BaseModel):
 
 class ReservationUpdate(BaseModel):
     room_id: str | None = None
+    rate_plan_id: str | None = None
     status: str | None = None
     checkin_date: date | None = None
     checkout_date: date | None = None
@@ -31,11 +33,17 @@ class ReservationRead(ORMModel):
     reservation_no: str
     guest_id: str
     room_id: str | None = None
+    rate_plan_id: str | None = None
     status: str
     checkin_date: date
     checkout_date: date
     source: str
     notes: str | None = None
+
+
+class RoomChangeRequest(BaseModel):
+    new_room_id: str
+    reason: str | None = None
 
 
 class StayRecordRead(ORMModel):

@@ -14,6 +14,7 @@ class WhatsAppAccountCreate(BaseModel):
     access_token_encrypted: str | None = None
     webhook_verify_token: str | None = None
     status: str = "active"
+    token_expires_at: datetime | None = None
 
 
 class WhatsAppAccountRead(ORMModel):
@@ -25,6 +26,7 @@ class WhatsAppAccountRead(ORMModel):
     waba_id: str | None = None
     webhook_verify_token: str | None = None
     status: str
+    token_expires_at: datetime | None = None
 
 
 class WhatsAppTemplateCreate(BaseModel):
@@ -68,3 +70,46 @@ class WhatsAppMessageRead(ORMModel):
     meta_message_id: str | None = None
     status: str
     created_at: datetime
+
+
+class WhatsAppHealthRead(ORMModel):
+    id: str
+    hotel_id: str
+    whatsapp_account_id: str
+    last_message_sent_at: datetime | None = None
+    last_message_received_at: datetime | None = None
+    last_webhook_received_at: datetime | None = None
+    token_status: str
+    webhook_status: str
+    error_count_24h: int
+    last_error_message: str | None = None
+    checked_at: datetime | None = None
+
+
+class WhatsAppUsageRead(ORMModel):
+    id: str
+    hotel_id: str
+    year_month: str
+    messages_sent: int
+    messages_received: int
+    template_sent: int
+    media_sent: int
+    api_calls: int
+    estimated_cost: float
+    updated_at: datetime
+
+
+class LiveChatSessionRead(ORMModel):
+    id: str
+    hotel_id: str
+    guest_id: str | None = None
+    guest_phone: str
+    assigned_staff_id: str | None = None
+    status: str
+    started_at: datetime
+    ended_at: datetime | None = None
+    ended_by: str | None = None
+
+
+class LiveChatSendRequest(BaseModel):
+    message: str = Field(min_length=1)

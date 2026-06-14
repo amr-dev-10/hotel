@@ -1,6 +1,6 @@
 # Arcadia Backend Setup
 
-The backend has been rebuilt from the versioned architecture documents in `docs/`, currently through v2.1.
+The backend has been rebuilt from the versioned architecture documents in `docs/`, currently through v3.
 Dependencies and local tooling are pinned so development can continue from a stable base.
 
 ## Library Versions
@@ -47,7 +47,7 @@ python -m pip install -r backend\requirements.txt
 Copy-Item backend\.env.example backend\.env
 ```
 
-Edit `backend\.env` and set real values for `JWT_SECRET`, WhatsApp, Gemini, and Firebase when those integrations are ready. Set `WHATSAPP_APP_SECRET` to enable HMAC verification for incoming Meta webhook POST requests.
+Edit `backend\.env` and set real values for `JWT_SECRET`, `ENCRYPTION_KEY` or `VAULT_MASTER_KEY`, WhatsApp, Gemini, and Firebase when those integrations are ready. Set `WHATSAPP_APP_SECRET` to enable HMAC verification for incoming Meta webhook POST requests.
 
 ## Start PostgreSQL And Redis
 
@@ -84,10 +84,15 @@ Open:
 - `GET /health`
 - `POST /api/v1/hotels/bootstrap`
 - `POST /api/v1/auth/login`
+- `POST /api/v1/auth/refresh`
+- `POST /api/v1/auth/logout`
+- `POST /api/v1/auth/logout-all`
 - `GET /api/v1/auth/me`
+- `/api/v1/orgs`
 - `/api/v1/hotels/{hotel_id}/users`
 - `/api/v1/hotels/{hotel_id}/roles`
 - `/api/v1/hotels/{hotel_id}/users/{user_id}/roles`
+- `/api/v1/hotels/{hotel_id}/room-types`
 - `/api/v1/hotels/{hotel_id}/rooms`
 - `/api/v1/hotels/{hotel_id}/departments`
 - `/api/v1/hotels/{hotel_id}/guests`
@@ -95,7 +100,15 @@ Open:
 - `/api/v1/hotels/{hotel_id}/reservations/{reservation_id}`
 - `/api/v1/hotels/{hotel_id}/reservations/{reservation_id}/checkin`
 - `/api/v1/hotels/{hotel_id}/reservations/{reservation_id}/checkout`
+- `/api/v1/hotels/{hotel_id}/reservations/{reservation_id}/change-room`
+- `/api/v1/hotels/{hotel_id}/reservations/{reservation_id}/stays`
+- `/api/v1/hotels/{hotel_id}/rate-plans`
+- `/api/v1/hotels/{hotel_id}/folios`
+- `/api/v1/hotels/{hotel_id}/tax-configs`
 - `/api/v1/hotels/{hotel_id}/tickets`
+- `/api/v1/hotels/{hotel_id}/housekeeping`
+- `/api/v1/hotels/{hotel_id}/maintenance`
+- `/api/v1/hotels/{hotel_id}/lost-found`
 - `/api/v1/hotels/{hotel_id}/menu/categories`
 - `/api/v1/hotels/{hotel_id}/menu/items`
 - `/api/v1/hotels/{hotel_id}/bot-config`
@@ -106,6 +119,9 @@ Open:
 - `/api/v1/hotels/{hotel_id}/whatsapp/templates`
 - `/api/v1/hotels/{hotel_id}/whatsapp/templates/sync`
 - `/api/v1/hotels/{hotel_id}/whatsapp/conversations`
+- `/api/v1/hotels/{hotel_id}/whatsapp/health`
+- `/api/v1/hotels/{hotel_id}/whatsapp/usage`
+- `/api/v1/hotels/{hotel_id}/live-chat/sessions`
 - `/api/v1/hotels/{hotel_id}/faqs`
 - `/api/v1/hotels/{hotel_id}/knowledge/faqs`
 - `/api/v1/hotels/{hotel_id}/bot-config/versions`
@@ -124,7 +140,11 @@ Open:
 - `/api/v1/hotels/{hotel_id}/billing/invoices`
 - `/api/v1/hotels/{hotel_id}/subscription`
 - `/api/v1/hotels/{hotel_id}/invoices`
+- `/api/v1/hotels/{hotel_id}/analytics`
 - `GET /webhook/whatsapp`
 - `POST /webhook/whatsapp`
+- `/ws/tickets`
+- `/ws/chat`
+- `/ws/notifications`
 - `/ws/{hotel_id}/tickets`
 - `/ws/{hotel_id}/chat/{ticket_id}`

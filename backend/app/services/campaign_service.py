@@ -10,6 +10,7 @@ from app.repositories.guest_repository import GuestRepository
 from app.repositories.hotel_repository import HotelRepository
 from app.repositories.whatsapp_repository import WhatsAppAccountRepository
 from app.schemas.campaign import CampaignCreate
+from app.services.whatsapp_ops_service import WhatsAppUsageService
 from app.services.whatsapp_service import WhatsAppService
 
 
@@ -72,6 +73,9 @@ class CampaignService:
                         else None
                     ),
                 )
+                WhatsAppUsageService(self.db).increment(hotel_id, "template_sent", commit=False)
+                WhatsAppUsageService(self.db).increment(hotel_id, "messages_sent", commit=False)
+                WhatsAppUsageService(self.db).increment(hotel_id, "api_calls", commit=False)
                 delivery.sent_at = datetime.now(UTC)
                 sent_count += 1
             self.db.add(delivery)
@@ -114,6 +118,9 @@ class CampaignService:
                         else None
                     ),
                 )
+                WhatsAppUsageService(self.db).increment(hotel_id, "template_sent", commit=False)
+                WhatsAppUsageService(self.db).increment(hotel_id, "messages_sent", commit=False)
+                WhatsAppUsageService(self.db).increment(hotel_id, "api_calls", commit=False)
                 delivery.status = "sent"
                 delivery.sent_at = datetime.now(UTC)
                 sent_count += 1

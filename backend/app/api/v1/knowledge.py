@@ -10,6 +10,7 @@ from app.repositories.knowledge_repository import (
     DepartmentConfigRepository,
     FAQRepository,
     HotelLanguageRepository,
+    KnowledgeDocumentRepository,
     ServiceFormRepository,
 )
 from app.schemas.knowledge import (
@@ -21,6 +22,9 @@ from app.schemas.knowledge import (
     FAQUpdate,
     HotelLanguageRead,
     HotelLanguageUpsert,
+    KnowledgeDocumentCreate,
+    KnowledgeDocumentRead,
+    KnowledgeDocumentUpdate,
     ServiceFormCreate,
     ServiceFormRead,
     ServiceFormUpdate,
@@ -30,10 +34,55 @@ from app.services.knowledge_service import (
     DepartmentConfigService,
     FAQService,
     HotelLanguageService,
+    KnowledgeDocumentService,
     ServiceFormService,
 )
 
 router = APIRouter()
+
+
+@router.get("")
+def list_knowledge_documents(
+    hotel_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("bot.view")),
+) -> dict:
+    documents = KnowledgeDocumentRepository(db).list_for_hotel(hotel_id)
+    return ok([KnowledgeDocumentRead.model_validate(item).model_dump() for item in documents])
+
+
+@router.post("")
+def create_knowledge_document(
+    hotel_id: str,
+    payload: KnowledgeDocumentCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("bot.manage")),
+) -> dict:
+    document = KnowledgeDocumentService(db).create(hotel_id, payload, current_user.id)
+    return ok(KnowledgeDocumentRead.model_validate(document).model_dump())
+
+
+@router.put("/{document_id}")
+def update_knowledge_document(
+    hotel_id: str,
+    document_id: str,
+    payload: KnowledgeDocumentUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("bot.manage")),
+) -> dict:
+    document = KnowledgeDocumentService(db).update(hotel_id, document_id, payload, current_user.id)
+    return ok(KnowledgeDocumentRead.model_validate(document).model_dump())
+
+
+@router.delete("/{document_id}")
+def delete_knowledge_document(
+    hotel_id: str,
+    document_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("bot.manage")),
+) -> dict:
+    KnowledgeDocumentService(db).delete(hotel_id, document_id, current_user.id)
+    return ok({"deleted": True, "document_id": document_id})
 
 
 @router.get("/faqs")

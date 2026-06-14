@@ -5,9 +5,17 @@ from app.schemas.common import ORMModel
 
 class PermissionRead(ORMModel):
     id: str
+    group_id: str | None = None
     code: str
     name: str
     module: str
+
+
+class PermissionGroupRead(ORMModel):
+    id: str
+    name: str
+    module: str
+    sort_order: int
 
 
 class RoleCreate(BaseModel):

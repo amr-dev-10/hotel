@@ -11,7 +11,6 @@ class Guest(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "guests"
 
     hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
-    room_id: Mapped[str | None] = mapped_column(ForeignKey("rooms.id"))
     name: Mapped[str] = mapped_column(String(255))
     phone: Mapped[str | None] = mapped_column(String(40), index=True)
     whatsapp_phone: Mapped[str | None] = mapped_column(String(40), index=True)

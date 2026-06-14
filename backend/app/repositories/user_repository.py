@@ -1,9 +1,10 @@
 from collections.abc import Sequence
+from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.user import User
+from app.models.user import User, UserSession
 from app.repositories.base import BaseRepository
 
 
@@ -49,3 +50,25 @@ class UserRepository(BaseRepository[User]):
         if department_id:
             statement = statement.where(User.department_id == department_id)
         return self.db.execute(statement.order_by(User.updated_at)).scalars().first()
+
+
+class UserSessionRepository(BaseRepository[UserSession]):
+    def __init__(self, db: Session) -> None:
+        super().__init__(db, UserSession)
+
+    def active_for_user(self, user_id: str) -> Sequence[UserSession]:
+        return self.db.execute(
+            select(UserSession).where(
+                UserSession.user_id == user_id,
+                UserSession.revoked_at.is_(None),
+            )
+        ).scalars().all()
+
+    def active_candidates(self, user_id: str, now: datetime) -> Sequence[UserSession]:
+        return self.db.execute(
+            select(UserSession).where(
+                UserSession.user_id == user_id,
+                UserSession.revoked_at.is_(None),
+                UserSession.expires_at > now,
+            )
+        ).scalars().all()

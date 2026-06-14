@@ -14,11 +14,14 @@ from app.schemas.whatsapp_account import (
     WhatsAppAccountCreate,
     WhatsAppAccountRead,
     WhatsAppConversationRead,
+    WhatsAppHealthRead,
     WhatsAppMessageRead,
     WhatsAppTemplateCreate,
     WhatsAppTemplateRead,
+    WhatsAppUsageRead,
 )
 from app.services.whatsapp_account_service import WhatsAppAccountService, WhatsAppTemplateService
+from app.services.whatsapp_ops_service import WhatsAppHealthService, WhatsAppUsageService
 
 router = APIRouter()
 
@@ -121,3 +124,27 @@ def list_conversations(
 ) -> dict:
     conversations = WhatsAppConversationRepository(db).list_for_hotel(hotel_id)
     return ok([WhatsAppConversationRead.model_validate(item).model_dump() for item in conversations])
+
+
+@router.get("/health")
+def whatsapp_health(
+    hotel_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("hotel.settings.manage")),
+) -> dict:
+    accounts = WhatsAppAccountRepository(db).list_for_hotel(hotel_id)
+    service = WhatsAppHealthService(db)
+    health_rows = [service.check_account(hotel_id, account.id) for account in accounts]
+    return ok([WhatsAppHealthRead.model_validate(item).model_dump() for item in health_rows])
+
+
+@router.get("/usage")
+def whatsapp_usage(
+    hotel_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("hotel.billing.view")),
+) -> dict:
+    usage = WhatsAppUsageService(db).get_or_create(hotel_id)
+    db.commit()
+    db.refresh(usage)
+    return ok(WhatsAppUsageRead.model_validate(usage).model_dump())

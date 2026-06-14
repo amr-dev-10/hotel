@@ -3,28 +3,49 @@ from collections.abc import Iterable
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import bad_request, forbidden, not_found
-from app.models.rbac import Permission, Role
+from app.models.rbac import Permission, PermissionGroup, Role
 from app.models.user import User
-from app.repositories.rbac_repository import PermissionRepository, RoleRepository
+from app.repositories.rbac_repository import PermissionGroupRepository, PermissionRepository, RoleRepository
 from app.services.audit_service import AuditService
-from app.services.defaults import DEFAULT_PERMISSIONS, OWNER_ROLE_NAME
+from app.services.defaults import DEFAULT_PERMISSIONS, OWNER_ROLE_NAME, PERMISSION_GROUPS
 
 
 class RBACService:
     def __init__(self, db: Session) -> None:
         self.db = db
+        self.permission_groups = PermissionGroupRepository(db)
         self.permissions = PermissionRepository(db)
         self.roles = RoleRepository(db)
 
     def seed_permissions(self) -> list[Permission]:
+        self.seed_permission_groups()
         created: list[Permission] = []
         for code, name, module in DEFAULT_PERMISSIONS:
+            group = self.permission_groups.get_by_module(module)
             permission = self.permissions.get_by_code(code)
             if not permission:
-                permission = Permission(code=code, name=name, module=module)
+                permission = Permission(
+                    code=code,
+                    name=name,
+                    module=module,
+                    group_id=group.id if group else None,
+                )
                 self.db.add(permission)
                 self.db.flush()
                 created.append(permission)
+            elif group and permission.group_id != group.id:
+                permission.group_id = group.id
+        return created
+
+    def seed_permission_groups(self) -> list[PermissionGroup]:
+        created: list[PermissionGroup] = []
+        for index, (module, name) in enumerate(PERMISSION_GROUPS.items(), start=1):
+            group = self.permission_groups.get_by_module(module)
+            if not group:
+                group = PermissionGroup(name=name, module=module, sort_order=index * 10)
+                self.db.add(group)
+                self.db.flush()
+                created.append(group)
         return created
 
     def seed_owner_role(self, hotel_id: str, owner: User) -> Role:
@@ -63,6 +84,8 @@ class RBACService:
                 "room.update",
                 "reservation.view",
                 "reservation.manage",
+                "folio.view",
+                "folio.manage",
             ],
         )
         self._ensure_system_role(

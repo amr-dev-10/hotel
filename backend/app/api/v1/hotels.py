@@ -22,6 +22,7 @@ def bootstrap_hotel(payload: HotelBootstrapRequest, db: Session = Depends(get_db
             "hotel": HotelRead.model_validate(result["hotel"]).model_dump(),
             "owner": CurrentUserRead.model_validate(result["owner"]).model_dump(),
             "access_token": result["access_token"],
+            "refresh_token": result.get("refresh_token"),
             "token_type": result["token_type"],
         }
     )

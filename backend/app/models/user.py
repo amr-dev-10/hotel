@@ -32,3 +32,15 @@ class FCMToken(UUIDPrimaryKeyMixin, Base):
     token: Mapped[str] = mapped_column(String(500), index=True)
     platform: Mapped[str] = mapped_column(String(40), default="android")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class UserSession(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "user_sessions"
+
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    refresh_token_hash: Mapped[str] = mapped_column(String(255), index=True)
+    device_info: Mapped[str | None] = mapped_column(String(255))
+    ip_address: Mapped[str | None] = mapped_column(String(80))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

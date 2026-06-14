@@ -1,0 +1,109 @@
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+
+from app.api.dependencies import require_permission
+from app.core.database import get_db
+from app.core.responses import ok
+from app.models.user import User
+from app.repositories.folio_repository import FolioItemRepository, FolioRepository, TaxConfigRepository
+from app.schemas.folio import (
+    FolioItemCreate,
+    FolioItemRead,
+    FolioRead,
+    PaymentCreate,
+    PaymentRead,
+    RefundCreate,
+    RefundRead,
+    TaxConfigCreate,
+    TaxConfigRead,
+)
+from app.services.folio_service import FolioService
+
+router = APIRouter()
+
+
+@router.get("")
+def list_folios(
+    hotel_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("guest.view")),
+) -> dict:
+    folios = FolioRepository(db).list_for_hotel(hotel_id)
+    return ok([FolioRead.model_validate(item).model_dump() for item in folios])
+
+
+@router.get("/{folio_id}")
+def get_folio(
+    hotel_id: str,
+    folio_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("guest.view")),
+) -> dict:
+    folio = FolioRepository(db).get_for_hotel(hotel_id, folio_id)
+    items = FolioItemRepository(db).list_for_folio(hotel_id, folio_id) if folio else []
+    return ok(
+        {
+            "folio": FolioRead.model_validate(folio).model_dump() if folio else None,
+            "items": [FolioItemRead.model_validate(item).model_dump() for item in items],
+        }
+    )
+
+
+@router.post("/{folio_id}/items")
+def add_folio_item(
+    hotel_id: str,
+    folio_id: str,
+    payload: FolioItemCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("guest.edit")),
+) -> dict:
+    item = FolioService(db).add_item(hotel_id, folio_id, payload, current_user.id)
+    return ok(FolioItemRead.model_validate(item).model_dump())
+
+
+@router.post("/{folio_id}/payments")
+def add_payment(
+    hotel_id: str,
+    folio_id: str,
+    payload: PaymentCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("guest.edit")),
+) -> dict:
+    payment = FolioService(db).add_payment(hotel_id, folio_id, payload, current_user.id)
+    return ok(PaymentRead.model_validate(payment).model_dump())
+
+
+@router.post("/{folio_id}/refunds")
+def add_refund(
+    hotel_id: str,
+    folio_id: str,
+    payload: RefundCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("hotel.settings.manage")),
+) -> dict:
+    refund = FolioService(db).add_refund(hotel_id, folio_id, payload, current_user.id)
+    return ok(RefundRead.model_validate(refund).model_dump())
+
+
+tax_router = APIRouter()
+
+
+@tax_router.get("")
+def list_tax_configs(
+    hotel_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("hotel.settings.manage")),
+) -> dict:
+    taxes = TaxConfigRepository(db).list_for_hotel(hotel_id)
+    return ok([TaxConfigRead.model_validate(item).model_dump() for item in taxes])
+
+
+@tax_router.post("")
+def create_tax_config(
+    hotel_id: str,
+    payload: TaxConfigCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("hotel.settings.manage")),
+) -> dict:
+    tax = FolioService(db).create_tax_config(hotel_id, payload, current_user.id)
+    return ok(TaxConfigRead.model_validate(tax).model_dump())

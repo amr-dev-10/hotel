@@ -86,6 +86,16 @@ class TicketService:
                 {"assigned_to": assignee.id, "assigned_to_name": assignee.name},
                 actor_id=actor_id,
             )
+        if department.key == "engineering":
+            from app.services.pms_service import MaintenanceService
+
+            MaintenanceService(self.db).create_from_ticket(ticket, commit=False)
+            self.tickets.add_event(
+                ticket,
+                "maintenance_order_created",
+                {"department_key": department.key},
+                actor_id=actor_id,
+            )
         if commit:
             self.audit.log(
                 hotel_id,

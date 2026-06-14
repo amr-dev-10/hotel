@@ -5,10 +5,13 @@ from sqlalchemy.orm import Session
 
 from app.models.base import utcnow
 from app.models.whatsapp import (
+    LiveChatSession,
     WhatsAppAccount,
+    WhatsAppAccountHealth,
     WhatsAppConversation,
     WhatsAppMessage,
     WhatsAppTemplate,
+    WhatsAppUsage,
 )
 from app.repositories.base import BaseRepository
 
@@ -25,10 +28,45 @@ class WhatsAppAccountRepository(BaseRepository[WhatsAppAccount]):
             )
         ).scalar_one_or_none()
 
+    def list_active(self) -> Sequence[WhatsAppAccount]:
+        return self.db.execute(
+            select(WhatsAppAccount).where(WhatsAppAccount.status == "active")
+        ).scalars().all()
+
 
 class WhatsAppTemplateRepository(BaseRepository[WhatsAppTemplate]):
     def __init__(self, db: Session) -> None:
         super().__init__(db, WhatsAppTemplate)
+
+
+class WhatsAppHealthRepository(BaseRepository[WhatsAppAccountHealth]):
+    def __init__(self, db: Session) -> None:
+        super().__init__(db, WhatsAppAccountHealth)
+
+    def get_for_account(
+        self,
+        hotel_id: str,
+        account_id: str,
+    ) -> WhatsAppAccountHealth | None:
+        return self.db.execute(
+            select(WhatsAppAccountHealth).where(
+                WhatsAppAccountHealth.hotel_id == hotel_id,
+                WhatsAppAccountHealth.whatsapp_account_id == account_id,
+            )
+        ).scalar_one_or_none()
+
+
+class WhatsAppUsageRepository(BaseRepository[WhatsAppUsage]):
+    def __init__(self, db: Session) -> None:
+        super().__init__(db, WhatsAppUsage)
+
+    def get_for_month(self, hotel_id: str, year_month: str) -> WhatsAppUsage | None:
+        return self.db.execute(
+            select(WhatsAppUsage).where(
+                WhatsAppUsage.hotel_id == hotel_id,
+                WhatsAppUsage.year_month == year_month,
+            )
+        ).scalar_one_or_none()
 
 
 class WhatsAppConversationRepository(BaseRepository[WhatsAppConversation]):
@@ -72,3 +110,19 @@ class WhatsAppConversationRepository(BaseRepository[WhatsAppConversation]):
             )
             .order_by(WhatsAppMessage.created_at)
         ).scalars().all()
+
+
+class LiveChatSessionRepository(BaseRepository[LiveChatSession]):
+    def __init__(self, db: Session) -> None:
+        super().__init__(db, LiveChatSession)
+
+    def get_active_for_guest(self, hotel_id: str, guest_phone: str) -> LiveChatSession | None:
+        return self.db.execute(
+            select(LiveChatSession)
+            .where(
+                LiveChatSession.hotel_id == hotel_id,
+                LiveChatSession.guest_phone == guest_phone,
+                LiveChatSession.status.in_(("waiting", "active")),
+            )
+            .order_by(LiveChatSession.started_at.desc())
+        ).scalars().first()

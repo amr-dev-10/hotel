@@ -8,6 +8,8 @@ from app.models.knowledge import (
     DepartmentConfig,
     HotelFAQ,
     HotelLanguage,
+    KnowledgeDocument,
+    KnowledgeEmbedding,
     ServiceForm,
     ServiceFormField,
 )
@@ -84,4 +86,42 @@ class ServiceFormRepository(BaseRepository[ServiceForm]):
             select(ServiceFormField)
             .where(ServiceFormField.service_form_id == service_form_id)
             .order_by(ServiceFormField.sort_order)
+        ).scalars().all()
+
+
+class KnowledgeDocumentRepository(BaseRepository[KnowledgeDocument]):
+    def __init__(self, db: Session) -> None:
+        super().__init__(db, KnowledgeDocument)
+
+    def list_active(self, hotel_id: str) -> Sequence[KnowledgeDocument]:
+        return self.db.execute(
+            select(KnowledgeDocument).where(
+                KnowledgeDocument.hotel_id == hotel_id,
+                KnowledgeDocument.is_active.is_(True),
+            )
+        ).scalars().all()
+
+
+class KnowledgeEmbeddingRepository(BaseRepository[KnowledgeEmbedding]):
+    def __init__(self, db: Session) -> None:
+        super().__init__(db, KnowledgeEmbedding)
+
+    def list_for_hotel(
+        self,
+        hotel_id: str,
+        limit: int = 500,
+        cursor: str | None = None,
+    ) -> Sequence[KnowledgeEmbedding]:
+        statement = select(KnowledgeEmbedding).where(KnowledgeEmbedding.hotel_id == hotel_id)
+        if cursor:
+            statement = statement.where(KnowledgeEmbedding.id > cursor)
+        return self.db.execute(
+            statement.order_by(KnowledgeEmbedding.document_id, KnowledgeEmbedding.chunk_index).limit(limit)
+        ).scalars().all()
+
+    def list_for_document(self, document_id: str) -> Sequence[KnowledgeEmbedding]:
+        return self.db.execute(
+            select(KnowledgeEmbedding)
+            .where(KnowledgeEmbedding.document_id == document_id)
+            .order_by(KnowledgeEmbedding.chunk_index)
         ).scalars().all()

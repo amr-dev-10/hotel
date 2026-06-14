@@ -5,8 +5,15 @@ from app.api.dependencies import require_permission
 from app.core.database import get_db
 from app.core.responses import ok
 from app.models.user import User
-from app.repositories.rbac_repository import PermissionRepository, RoleRepository
-from app.schemas.rbac import PermissionRead, RoleCreate, RoleRead, RoleUpdate, UserRoleAssign
+from app.repositories.rbac_repository import PermissionGroupRepository, PermissionRepository, RoleRepository
+from app.schemas.rbac import (
+    PermissionGroupRead,
+    PermissionRead,
+    RoleCreate,
+    RoleRead,
+    RoleUpdate,
+    UserRoleAssign,
+)
 from app.services.rbac_service import RBACService
 
 router = APIRouter()
@@ -20,6 +27,17 @@ def list_permissions(
 ) -> dict:
     permissions = PermissionRepository(db).list_all()
     return ok([PermissionRead.model_validate(item).model_dump() for item in permissions])
+
+
+@router.get("/permission-groups")
+def list_permission_groups(
+    hotel_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("role.view")),
+) -> dict:
+    RBACService(db).seed_permissions()
+    groups = PermissionGroupRepository(db).list_all()
+    return ok([PermissionGroupRead.model_validate(item).model_dump() for item in groups])
 
 
 @router.get("")

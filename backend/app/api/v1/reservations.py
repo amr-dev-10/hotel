@@ -6,8 +6,14 @@ from app.core.database import get_db
 from app.core.exceptions import not_found
 from app.core.responses import ok
 from app.models.user import User
-from app.repositories.reservation_repository import ReservationRepository
-from app.schemas.reservation import ReservationCreate, ReservationRead, ReservationUpdate
+from app.repositories.reservation_repository import ReservationRepository, StayRecordRepository
+from app.schemas.reservation import (
+    ReservationCreate,
+    ReservationRead,
+    ReservationUpdate,
+    RoomChangeRequest,
+    StayRecordRead,
+)
 from app.services.reservation_service import ReservationService
 
 router = APIRouter()
@@ -110,3 +116,31 @@ def checkout_alias(
 ) -> dict:
     reservation = ReservationService(db).check_out(hotel_id, reservation_id, current_user.id)
     return ok(ReservationRead.model_validate(reservation).model_dump())
+
+
+@router.post("/{reservation_id}/change-room")
+def change_room(
+    hotel_id: str,
+    reservation_id: str,
+    payload: RoomChangeRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("guest.edit")),
+) -> dict:
+    reservation = ReservationService(db).change_room(
+        hotel_id,
+        reservation_id,
+        payload,
+        current_user.id,
+    )
+    return ok(ReservationRead.model_validate(reservation).model_dump())
+
+
+@router.get("/{reservation_id}/stays")
+def list_stay_records(
+    hotel_id: str,
+    reservation_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("guest.view")),
+) -> dict:
+    stays = StayRecordRepository(db).list_for_reservation(hotel_id, reservation_id)
+    return ok([StayRecordRead.model_validate(item).model_dump() for item in stays])

@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, ForeignKey, String, Table, Text, UniqueConstraint
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Table, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -29,9 +29,19 @@ class Role(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     is_system_role: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
+class PermissionGroup(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "permission_groups"
+    __table_args__ = (UniqueConstraint("module", "name", name="uq_permission_groups_module_name"),)
+
+    name: Mapped[str] = mapped_column(String(120))
+    module: Mapped[str] = mapped_column(String(80), index=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+
 class Permission(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "permissions"
 
+    group_id: Mapped[str | None] = mapped_column(ForeignKey("permission_groups.id"))
     code: Mapped[str] = mapped_column(String(120), unique=True, index=True)
     name: Mapped[str] = mapped_column(String(160))
     module: Mapped[str] = mapped_column(String(80), index=True)

@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 
 from app.core.encryption import encrypt_secret
+from app.core.vault import Vault
 from app.core.exceptions import bad_request
 from app.models.whatsapp import WhatsAppAccount, WhatsAppTemplate
 from app.repositories.whatsapp_repository import WhatsAppAccountRepository, WhatsAppTemplateRepository
@@ -27,6 +28,13 @@ class WhatsAppAccountService:
         account = WhatsAppAccount(hotel_id=hotel_id, **data)
         self.db.add(account)
         self.db.flush()
+        if payload.access_token:
+            Vault(self.db).store(
+                hotel_id,
+                f"whatsapp_token:{account.phone_number_id}",
+                payload.access_token,
+                commit=False,
+            )
         AuditService(self.db).log(
             hotel_id,
             "whatsapp.account.created",
@@ -53,6 +61,13 @@ class WhatsAppAccountService:
             data["access_token_encrypted"] = encrypt_secret(data["access_token"])
         for key, value in data.items():
             setattr(account, key, value)
+        if payload.access_token:
+            Vault(self.db).store(
+                hotel_id,
+                f"whatsapp_token:{account.phone_number_id}",
+                payload.access_token,
+                commit=False,
+            )
         AuditService(self.db).log(
             hotel_id,
             "whatsapp.account.updated",

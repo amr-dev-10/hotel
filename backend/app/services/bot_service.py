@@ -2,12 +2,13 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import bad_request
 from app.models.guest import Guest
 from app.models.base import utcnow
-from app.models.reservation import StayRecord
+from app.models.reservation import Reservation, StayRecord
 from app.models.whatsapp import WhatsAppMessage
 from app.models.whatsapp_session import WhatsAppSession
 from app.repositories.bot_config_repository import BotConfigRepository
@@ -16,6 +17,7 @@ from app.repositories.hotel_repository import HotelRepository
 from app.repositories.room_repository import RoomRepository
 from app.repositories.ticket_repository import TicketRepository
 from app.repositories.knowledge_repository import ServiceFormRepository
+from app.repositories.reservation_repository import ReservationRepository, StayRecordRepository
 from app.repositories.whatsapp_repository import (
     WhatsAppAccountRepository,
     WhatsAppConversationRepository,
@@ -24,8 +26,10 @@ from app.repositories.whatsapp_session_repository import WhatsAppSessionReposito
 from app.schemas.reservation import ReservationCreate
 from app.schemas.ticket import TicketCreate
 from app.services.defaults import DEFAULT_BOT_MESSAGES, DEFAULT_MAIN_MENU, DEFAULT_SERVICES
-from app.services.knowledge_service import FAQService
+from app.services.knowledge_service import FAQService, KnowledgeDocumentService
+from app.services.whatsapp_ops_service import LiveChatService
 from app.services.gemini_service import GeminiService
+from app.services.folio_service import FolioService
 from app.services.reservation_service import ReservationService
 from app.services.ticket_service import TicketService
 
@@ -48,10 +52,13 @@ class BotService:
         self.bot_configs = BotConfigRepository(db)
         self.ticket_repo = TicketRepository(db)
         self.service_forms = ServiceFormRepository(db)
+        self.reservation_repo = ReservationRepository(db)
+        self.stay_records = StayRecordRepository(db)
         self.whatsapp_accounts = WhatsAppAccountRepository(db)
         self.conversations = WhatsAppConversationRepository(db)
         self.gemini = GeminiService()
         self.faqs = FAQService(db)
+        self.knowledge_documents = KnowledgeDocumentService(db)
         self.ticket_service = TicketService(db)
         self.reservations = ReservationService(db)
 
@@ -93,6 +100,8 @@ class BotService:
             self._capture_name(session, message.text or "", messages, replies)
         elif session.state == "awaiting_room":
             self._capture_room(hotel.id, session, message.text or "", messages, replies)
+        elif session.state == "live_chat":
+            self._handle_live_chat_text(hotel.id, session, message.text or "", replies)
         elif session.state == "awaiting_form_field":
             ticket_id = self._handle_form_field(hotel.id, session, message.text or "", replies)
         elif session.state == "awaiting_free_text":
@@ -170,7 +179,7 @@ class BotService:
         guest = self.guests.find_active_by_phone(hotel_id, session.phone)
         if guest:
             session.guest_id = guest.id
-            session.room_id = guest.room_id
+            session.room_id = self._current_room_id_for_guest(hotel_id, guest.id)
             session.state = "active"
             replies.append(self._text(messages.get("active_welcome", "Welcome, {guest_name}.").format(guest_name=guest.name)))
             replies.append(self._main_menu(guest.name))
@@ -255,6 +264,7 @@ class BotService:
                 actual_checkin=utcnow(),
             )
         )
+        FolioService(self.db).ensure_for_reservation(hotel_id, reservation.id, actor_id=None, commit=False)
 
         session.guest_id = reservation.guest_id
         session.room_id = room.id
@@ -278,16 +288,16 @@ class BotService:
             replies.append(self._text("Food ordering is ready. Please type what you would like, or ask for the menu."))
             return None
         if interactive_id == "main_manager":
-            return self._create_service_ticket(
+            chat = LiveChatService(self.db).start(
                 hotel_id,
-                session,
-                {
-                    "department_key": "front_office",
-                    "item": "Talk to Manager",
-                    "priority": 2,
-                },
-                replies,
+                session.phone,
+                session.guest_id,
+                commit=False,
             )
+            session.state = "live_chat"
+            session.pending_action = {"live_chat_session_id": chat.id}
+            replies.append(self._text("I have notified our team. Please type your message here and staff will reply shortly."))
+            return chat.id
         if interactive_id == "my_requests":
             self._send_my_requests(hotel_id, session, replies)
             return None
@@ -356,6 +366,11 @@ class BotService:
             replies.append(self._text(faq_answer))
             return None
 
+        rag_answer = self.knowledge_documents.answer(hotel_id, text)
+        if rag_answer:
+            replies.append(self._text(rag_answer))
+            return None
+
         match = self.gemini.classify_free_text(
             text,
             services=services,
@@ -383,6 +398,17 @@ class BotService:
 
         replies.append(self._main_menu(self._guest_name(hotel_id, session)))
         return None
+
+    def _handle_live_chat_text(
+        self,
+        hotel_id: str,
+        session: WhatsAppSession,
+        text: str,
+        replies: list[dict[str, Any]],
+    ) -> None:
+        chat = LiveChatService(self.db).start(hotel_id, session.phone, session.guest_id, commit=False)
+        session.pending_action = {"live_chat_session_id": chat.id}
+        replies.append(self._text("Your message has been passed to staff. They will reply here shortly."))
 
     def _create_free_text_ticket(
         self,
@@ -515,6 +541,21 @@ class BotService:
             if guest:
                 return guest.name
         return "Guest"
+
+    def _current_room_id_for_guest(self, hotel_id: str, guest_id: str) -> str | None:
+        reservation = self.db.execute(
+            select(Reservation)
+            .where(
+                Reservation.hotel_id == hotel_id,
+                Reservation.guest_id == guest_id,
+                Reservation.status == "checked_in",
+            )
+            .order_by(Reservation.updated_at.desc())
+        ).scalars().first()
+        if not reservation:
+            return None
+        stay = self.stay_records.get_active_for_reservation(hotel_id, reservation.id)
+        return stay.room_id if stay else reservation.room_id
 
     def _is_greeting(self, text: str) -> bool:
         return text.strip().lower() in {"hi", "hello", "hey", "menu", "start"}

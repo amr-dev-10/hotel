@@ -78,3 +78,102 @@ class MediaFile(UUIDPrimaryKeyMixin, Base):
     storage_provider: Mapped[str] = mapped_column(String(80), default="local")
     uploaded_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class HotelSecret(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "hotel_secrets"
+    __table_args__ = (UniqueConstraint("hotel_id", "secret_type", name="uq_hotel_secret_type"),)
+
+    hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
+    secret_type: Mapped[str] = mapped_column(String(120), index=True)
+    encrypted_value: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utcnow,
+        onupdate=utcnow,
+    )
+
+
+class AnalyticsSnapshot(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "analytics_snapshots"
+    __table_args__ = (UniqueConstraint("hotel_id", "snapshot_date", name="uq_analytics_hotel_date"),)
+
+    hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
+    snapshot_date: Mapped[date] = mapped_column(Date, index=True)
+    occupancy_rate: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=0)
+    total_rooms: Mapped[int] = mapped_column(Integer, default=0)
+    occupied_rooms: Mapped[int] = mapped_column(Integer, default=0)
+    total_reservations: Mapped[int] = mapped_column(Integer, default=0)
+    new_checkins: Mapped[int] = mapped_column(Integer, default=0)
+    checkouts: Mapped[int] = mapped_column(Integer, default=0)
+    ticket_count: Mapped[int] = mapped_column(Integer, default=0)
+    avg_resolution_minutes: Mapped[Decimal] = mapped_column(Numeric(8, 2), default=0)
+    guest_satisfaction_avg: Mapped[Decimal] = mapped_column(Numeric(3, 2), default=0)
+    revenue_room: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    revenue_food: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    revenue_other: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    revenue_total: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    whatsapp_messages: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class HousekeepingSchedule(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "housekeeping_schedules"
+
+    hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
+    room_id: Mapped[str] = mapped_column(ForeignKey("rooms.id"), index=True)
+    assigned_to: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
+    task_type: Mapped[str] = mapped_column(String(60), default="daily_clean", index=True)
+    scheduled_date: Mapped[date] = mapped_column(Date, index=True)
+    scheduled_time: Mapped[str | None] = mapped_column(String(20))
+    status: Mapped[str] = mapped_column(String(40), default="pending", index=True)
+    priority: Mapped[int] = mapped_column(Integer, default=2)
+    notes: Mapped[str | None] = mapped_column(Text)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class HousekeepingChecklist(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "housekeeping_checklists"
+    __table_args__ = (UniqueConstraint("hotel_id", "task_type", name="uq_housekeeping_checklist_task"),)
+
+    hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
+    task_type: Mapped[str] = mapped_column(String(60), index=True)
+    items: Mapped[list[str]] = mapped_column(JSON, default=list)
+
+
+class MaintenanceOrder(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "maintenance_orders"
+
+    hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
+    room_id: Mapped[str | None] = mapped_column(ForeignKey("rooms.id"), index=True)
+    ticket_id: Mapped[str | None] = mapped_column(ForeignKey("tickets.id"), index=True)
+    reported_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
+    assigned_to: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
+    category: Mapped[str] = mapped_column(String(80), default="other")
+    description: Mapped[str] = mapped_column(Text)
+    priority: Mapped[str] = mapped_column(String(40), default="medium")
+    status: Mapped[str] = mapped_column(String(40), default="reported", index=True)
+    scheduled_date: Mapped[date | None] = mapped_column(Date)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    parts_used: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    total_cost: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class LostFoundItem(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "lost_found_items"
+
+    hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
+    type: Mapped[str] = mapped_column(String(40), default="found", index=True)
+    item_description: Mapped[str] = mapped_column(String(255))
+    found_location: Mapped[str | None] = mapped_column(String(180))
+    found_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
+    guest_id: Mapped[str | None] = mapped_column(ForeignKey("guests.id"))
+    photo_url: Mapped[str | None] = mapped_column(String(800))
+    status: Mapped[str] = mapped_column(String(40), default="unclaimed", index=True)
+    found_date: Mapped[date | None] = mapped_column(Date)
+    claimed_date: Mapped[date | None] = mapped_column(Date)
+    notes: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

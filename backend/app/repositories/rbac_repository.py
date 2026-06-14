@@ -3,8 +3,23 @@ from collections.abc import Sequence
 from sqlalchemy import delete, insert, select
 from sqlalchemy.orm import Session
 
-from app.models.rbac import Permission, Role, role_permissions, user_roles
+from app.models.rbac import Permission, PermissionGroup, Role, role_permissions, user_roles
 from app.repositories.base import BaseRepository
+
+
+class PermissionGroupRepository(BaseRepository[PermissionGroup]):
+    def __init__(self, db: Session) -> None:
+        super().__init__(db, PermissionGroup)
+
+    def get_by_module(self, module: str) -> PermissionGroup | None:
+        return self.db.execute(
+            select(PermissionGroup).where(PermissionGroup.module == module)
+        ).scalar_one_or_none()
+
+    def list_all(self) -> Sequence[PermissionGroup]:
+        return self.db.execute(
+            select(PermissionGroup).order_by(PermissionGroup.sort_order, PermissionGroup.module)
+        ).scalars().all()
 
 
 class PermissionRepository(BaseRepository[Permission]):

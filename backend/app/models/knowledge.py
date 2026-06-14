@@ -73,3 +73,25 @@ class ServiceFormField(UUIDPrimaryKeyMixin, Base):
     required: Mapped[bool] = mapped_column(Boolean, default=False)
     options: Mapped[list[dict]] = mapped_column(JSON, default=list)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class KnowledgeDocument(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "knowledge_documents"
+
+    hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
+    title: Mapped[str] = mapped_column(String(255))
+    content: Mapped[str] = mapped_column(Text)
+    category: Mapped[str | None] = mapped_column(String(80), index=True)
+    file_url: Mapped[str | None] = mapped_column(String(800))
+    language: Mapped[str] = mapped_column(String(20), default="en")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class KnowledgeEmbedding(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "knowledge_embeddings"
+
+    hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
+    document_id: Mapped[str] = mapped_column(ForeignKey("knowledge_documents.id"), index=True)
+    chunk_index: Mapped[int] = mapped_column(Integer)
+    chunk_text: Mapped[str] = mapped_column(Text)
+    embedding: Mapped[list[float]] = mapped_column(JSON, default=list)

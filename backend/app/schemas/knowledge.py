@@ -88,3 +88,40 @@ class ServiceFormRead(ORMModel):
     service_name: str
     service_id: str | None = None
     is_active: bool
+
+
+class KnowledgeDocumentCreate(BaseModel):
+    title: str = Field(min_length=2, max_length=255)
+    content: str = Field(min_length=2)
+    category: str | None = None
+    file_url: str | None = None
+    language: str = "en"
+    is_active: bool = True
+
+
+class KnowledgeDocumentUpdate(BaseModel):
+    title: str | None = None
+    content: str | None = None
+    category: str | None = None
+    file_url: str | None = None
+    language: str | None = None
+    is_active: bool | None = None
+
+
+class KnowledgeDocumentRead(ORMModel):
+    id: str
+    hotel_id: str
+    title: str
+    content: str
+    category: str | None = None
+    file_url: str | None = None
+    language: str
+    is_active: bool
+
+
+class KnowledgeEmbeddingRead(ORMModel):
+    id: str
+    hotel_id: str
+    document_id: str
+    chunk_index: int
+    chunk_text: str

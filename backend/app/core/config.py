@@ -22,7 +22,9 @@ class Settings(BaseSettings):
     jwt_secret: str = "change-this-secret-before-production"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 720
+    refresh_token_expire_days: int = 30
     encryption_key: str = ""
+    vault_master_key: str = ""
 
     redis_url: str = "redis://localhost:6379/0"
     celery_broker_url: str = "redis://localhost:6379/1"

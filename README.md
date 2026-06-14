@@ -1,8 +1,8 @@
 # Arcadia Hotel Platform Backend
 
-FastAPI backend for the Arcadia hotel management platform, currently upgraded through the v2.1 extended architecture shared in `docs/v2.1/`.
+FastAPI backend for the Arcadia hotel management platform, currently upgraded through the v3 final architecture shared in `docs/v3/`.
 
-The backend follows the v2.1 principles:
+The backend follows the v3 principles:
 
 - Modular monolith first.
 - PostgreSQL as the production source of truth.
@@ -19,6 +19,13 @@ The backend follows the v2.1 principles:
 - Bot config version snapshots and rollback.
 - Dynamic service-form collection inside WhatsApp conversations.
 - Campaign send/stat endpoints and richer delivery counters.
+- Room types and stay records as the source of truth for room history.
+- Guest folios, folio items, payments, refunds, tax configs, and rate plans.
+- Refresh-token sessions and encrypted hotel secrets vault.
+- JWT-secured topic WebSockets at `/ws/tickets`, `/ws/chat`, and `/ws/notifications`.
+- WhatsApp health monitoring, monthly usage tracking, and live-chat handoff.
+- Knowledge documents with chunk search before AI fallback.
+- Multi-hotel organizations, analytics snapshots, housekeeping, maintenance, and lost-and-found.
 
 ## Quick Setup
 
@@ -40,19 +47,35 @@ Open:
 - `GET /health`
 - `POST /api/v1/hotels/bootstrap`
 - `POST /api/v1/auth/login`
+- `POST /api/v1/auth/refresh`
+- `POST /api/v1/auth/logout`
+- `POST /api/v1/auth/logout-all`
+- `/api/v1/orgs`
 - `/api/v1/hotels/{hotel_id}/users`
 - `/api/v1/hotels/{hotel_id}/roles`
 - `/api/v1/hotels/{hotel_id}/users/{user_id}/roles`
+- `/api/v1/hotels/{hotel_id}/room-types`
 - `/api/v1/hotels/{hotel_id}/rooms`
 - `/api/v1/hotels/{hotel_id}/departments`
 - `/api/v1/hotels/{hotel_id}/guests`
 - `/api/v1/hotels/{hotel_id}/reservations`
+- `/api/v1/hotels/{hotel_id}/reservations/{reservation_id}/change-room`
+- `/api/v1/hotels/{hotel_id}/reservations/{reservation_id}/stays`
+- `/api/v1/hotels/{hotel_id}/rate-plans`
+- `/api/v1/hotels/{hotel_id}/folios`
+- `/api/v1/hotels/{hotel_id}/tax-configs`
 - `/api/v1/hotels/{hotel_id}/tickets`
+- `/api/v1/hotels/{hotel_id}/housekeeping`
+- `/api/v1/hotels/{hotel_id}/maintenance`
+- `/api/v1/hotels/{hotel_id}/lost-found`
 - `/api/v1/hotels/{hotel_id}/menu`
 - `/api/v1/hotels/{hotel_id}/bot-config`
 - `/api/v1/hotels/{hotel_id}/campaigns`
 - `/api/v1/hotels/{hotel_id}/feedback`
 - `/api/v1/hotels/{hotel_id}/whatsapp`
+- `/api/v1/hotels/{hotel_id}/whatsapp/health`
+- `/api/v1/hotels/{hotel_id}/whatsapp/usage`
+- `/api/v1/hotels/{hotel_id}/live-chat`
 - `/api/v1/hotels/{hotel_id}/faqs`
 - `/api/v1/hotels/{hotel_id}/service-forms`
 - `/api/v1/hotels/{hotel_id}/knowledge`
@@ -62,8 +85,12 @@ Open:
 - `/api/v1/hotels/{hotel_id}/billing`
 - `/api/v1/hotels/{hotel_id}/subscription`
 - `/api/v1/hotels/{hotel_id}/invoices`
+- `/api/v1/hotels/{hotel_id}/analytics`
 - `GET /webhook/whatsapp`
 - `POST /webhook/whatsapp`
+- `/ws/tickets`
+- `/ws/chat`
+- `/ws/notifications`
 - `/ws/{hotel_id}/tickets`
 - `/ws/{hotel_id}/chat/{ticket_id}`
 
@@ -75,3 +102,4 @@ The shared v1 files are preserved in:
 - `docs/v1/whatsapp_guest_flows_v1.md`
 - `docs/v2/arcadia_architecture_v2.md`
 - `docs/v2.1/architecture_v2_extended.md`
+- `docs/v3/architecture_v3_final.md`
