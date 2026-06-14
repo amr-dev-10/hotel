@@ -57,6 +57,28 @@ class ServiceFormRepository(BaseRepository[ServiceForm]):
     def __init__(self, db: Session) -> None:
         super().__init__(db, ServiceForm)
 
+    def find_for_service(
+        self,
+        hotel_id: str,
+        service_id: str | None,
+        service_name: str | None,
+    ) -> ServiceForm | None:
+        statement = select(ServiceForm).where(
+            ServiceForm.hotel_id == hotel_id,
+            ServiceForm.is_active.is_(True),
+        )
+        if service_id:
+            found = self.db.execute(
+                statement.where(ServiceForm.service_id == service_id)
+            ).scalar_one_or_none()
+            if found:
+                return found
+        if service_name:
+            return self.db.execute(
+                statement.where(ServiceForm.service_name == service_name)
+            ).scalar_one_or_none()
+        return None
+
     def fields_for_form(self, service_form_id: str) -> Sequence[ServiceFormField]:
         return self.db.execute(
             select(ServiceFormField)

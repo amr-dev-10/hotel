@@ -14,6 +14,7 @@ class Hotel(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     timezone: Mapped[str] = mapped_column(String(80), default="UTC")
     contact_email: Mapped[str | None] = mapped_column(String(255))
     contact_phone: Mapped[str | None] = mapped_column(String(40))
+    logo_url: Mapped[str | None] = mapped_column(String(500))
     whatsapp_phone_number_id: Mapped[str | None] = mapped_column(
         String(80),
         unique=True,

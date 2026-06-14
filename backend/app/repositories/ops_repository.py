@@ -34,6 +34,11 @@ class SubscriptionRepository(BaseRepository[Subscription]):
     def __init__(self, db: Session) -> None:
         super().__init__(db, Subscription)
 
+    def get_by_hotel(self, hotel_id: str) -> Subscription | None:
+        return self.db.execute(
+            select(Subscription).where(Subscription.hotel_id == hotel_id)
+        ).scalar_one_or_none()
+
 
 class InvoiceRepository(BaseRepository[Invoice]):
     def __init__(self, db: Session) -> None:

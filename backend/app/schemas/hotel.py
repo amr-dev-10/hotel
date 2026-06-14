@@ -34,6 +34,7 @@ class HotelRead(ORMModel):
     timezone: str
     contact_email: str | None = None
     contact_phone: str | None = None
+    logo_url: str | None = None
     whatsapp_phone_number_id: str | None = None
     subscription_tier: str
     status: str

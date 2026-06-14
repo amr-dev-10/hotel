@@ -16,3 +16,4 @@ class BotConfig(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     sla_config: Mapped[dict] = mapped_column(JSON, default=dict)
     active_hours: Mapped[dict] = mapped_column(JSON, default=dict)
     gemini_fallback_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    active_version: Mapped[int] = mapped_column(default=1)

@@ -10,7 +10,9 @@ from app.models.reservation import Reservation, StayRecord
 from app.repositories.guest_repository import GuestRepository
 from app.repositories.reservation_repository import ReservationRepository, StayRecordRepository
 from app.repositories.room_repository import RoomRepository
+from app.repositories.whatsapp_session_repository import WhatsAppSessionRepository
 from app.schemas.reservation import ReservationCreate
+from app.schemas.reservation import ReservationUpdate
 from app.services.audit_service import AuditService
 
 
@@ -21,6 +23,7 @@ class ReservationService:
         self.stays = StayRecordRepository(db)
         self.guests = GuestRepository(db)
         self.rooms = RoomRepository(db)
+        self.sessions = WhatsAppSessionRepository(db)
         self.audit = AuditService(db)
 
     def create_reservation(
@@ -57,6 +60,7 @@ class ReservationService:
             checkin_date=payload.checkin_date,
             checkout_date=payload.checkout_date,
             source=payload.source,
+            notes=payload.notes,
         )
         self.db.add(reservation)
         self.db.flush()
@@ -71,6 +75,39 @@ class ReservationService:
         if commit:
             self.db.commit()
             self.db.refresh(reservation)
+        return reservation
+
+    def update_reservation(
+        self,
+        hotel_id: str,
+        reservation_id: str,
+        payload: ReservationUpdate,
+        actor_id: str | None = None,
+    ) -> Reservation:
+        reservation = self.reservations.get_for_hotel(hotel_id, reservation_id)
+        if not reservation:
+            raise not_found("Reservation not found")
+        old_payload = {
+            "room_id": reservation.room_id,
+            "status": reservation.status,
+            "checkin_date": str(reservation.checkin_date),
+            "checkout_date": str(reservation.checkout_date),
+            "source": reservation.source,
+            "notes": reservation.notes,
+        }
+        for key, value in payload.model_dump(exclude_unset=True).items():
+            setattr(reservation, key, value)
+        self.audit.log(
+            hotel_id,
+            "reservation.updated",
+            "reservation",
+            reservation.id,
+            actor_id,
+            old_payload=old_payload,
+            new_payload=payload.model_dump(exclude_unset=True),
+        )
+        self.db.commit()
+        self.db.refresh(reservation)
         return reservation
 
     def check_in(
@@ -103,6 +140,15 @@ class ReservationService:
             self.db.add(stay)
         else:
             stay.actual_checkin = stay.actual_checkin or utcnow()
+        if guest.whatsapp_phone or guest.phone:
+            session = self.sessions.get_or_create(
+                hotel_id,
+                guest.whatsapp_phone or guest.phone,
+                None,
+            )
+            session.guest_id = guest.id
+            session.room_id = reservation.room_id
+            session.state = "active"
         self.audit.log(hotel_id, "reservation.checked_in", "reservation", reservation.id, actor_id)
         self.db.commit()
         self.db.refresh(reservation)
@@ -129,6 +175,11 @@ class ReservationService:
         stay = self.stays.get_for_reservation(hotel_id, reservation.id)
         if stay:
             stay.actual_checkout = utcnow()
+        if guest and (guest.whatsapp_phone or guest.phone):
+            session = self.sessions.get_by_phone(hotel_id, guest.whatsapp_phone or guest.phone)
+            if session:
+                session.state = "expired"
+                session.expires_at = utcnow()
         self.audit.log(hotel_id, "reservation.checked_out", "reservation", reservation.id, actor_id)
         self.db.commit()
         self.db.refresh(reservation)

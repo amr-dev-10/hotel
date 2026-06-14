@@ -29,19 +29,73 @@ class RBACService:
 
     def seed_owner_role(self, hotel_id: str, owner: User) -> Role:
         self.seed_permissions()
-        role = self.roles.get_by_name(hotel_id, OWNER_ROLE_NAME)
+        all_permissions = self.permissions.list_all()
+        role = self._ensure_system_role(
+            hotel_id,
+            OWNER_ROLE_NAME,
+            "System owner role with every permission.",
+            [permission.code for permission in all_permissions],
+        )
+        self.roles.assign_user_roles(owner.id, [role.id])
+        self._ensure_system_role(
+            hotel_id,
+            "Manager",
+            "Hotel manager role for daily operations.",
+            [
+                code
+                for code, _, _ in DEFAULT_PERMISSIONS
+                if not code.startswith("hotel.billing") and code != "role.manage"
+            ],
+        )
+        self._ensure_system_role(
+            hotel_id,
+            "Receptionist",
+            "Front desk role for guests, rooms, and tickets.",
+            [
+                "ticket.view",
+                "ticket.create",
+                "ticket.assign",
+                "guest.view",
+                "guest.create",
+                "guest.edit",
+                "guest.checkout",
+                "room.view",
+                "room.update",
+                "reservation.view",
+                "reservation.manage",
+            ],
+        )
+        self._ensure_system_role(
+            hotel_id,
+            "Staff",
+            "Operational staff role for assigned tickets.",
+            ["ticket.view", "ticket.create"],
+        )
+        return role
+
+    def _ensure_system_role(
+        self,
+        hotel_id: str,
+        name: str,
+        description: str,
+        permission_codes: Iterable[str],
+    ) -> Role:
+        role = self.roles.get_by_name(hotel_id, name)
         if not role:
             role = Role(
                 hotel_id=hotel_id,
-                name=OWNER_ROLE_NAME,
-                description="System owner role with every permission.",
+                name=name,
+                description=description,
                 is_system_role=True,
             )
             self.db.add(role)
             self.db.flush()
-        all_permissions = self.permissions.list_all()
-        self.roles.set_permissions(role.id, [permission.id for permission in all_permissions])
-        self.roles.assign_user_roles(owner.id, [role.id])
+        permissions = []
+        for code in permission_codes:
+            permission = self.permissions.get_by_code(code)
+            if permission:
+                permissions.append(permission)
+        self.roles.set_permissions(role.id, [permission.id for permission in permissions])
         return role
 
     def create_role(
@@ -104,6 +158,58 @@ class RBACService:
             actor_id,
             {"role_ids": role_ids},
         )
+        self.db.commit()
+
+    def update_role(
+        self,
+        hotel_id: str,
+        role_id: str,
+        name: str | None,
+        description: str | None,
+        permission_codes: Iterable[str] | None,
+        actor_id: str | None,
+    ) -> Role:
+        role = self.roles.get_for_hotel(hotel_id, role_id)
+        if not role:
+            raise not_found("Role not found")
+        old_payload = {
+            "name": role.name,
+            "description": role.description,
+        }
+        if name is not None:
+            role.name = name
+        if description is not None:
+            role.description = description
+        if permission_codes is not None:
+            self.set_role_permissions(role, permission_codes)
+        AuditService(self.db).log(
+            hotel_id,
+            "role.updated",
+            "role",
+            role.id,
+            actor_id,
+            old_payload=old_payload,
+            new_payload={"name": role.name, "description": role.description},
+        )
+        self.db.commit()
+        self.db.refresh(role)
+        return role
+
+    def delete_role(self, hotel_id: str, role_id: str, actor_id: str | None) -> None:
+        role = self.roles.get_for_hotel(hotel_id, role_id)
+        if not role:
+            raise not_found("Role not found")
+        if role.is_system_role:
+            raise bad_request("System roles cannot be deleted")
+        AuditService(self.db).log(
+            hotel_id,
+            "role.deleted",
+            "role",
+            role.id,
+            actor_id,
+            {"name": role.name},
+        )
+        self.db.delete(role)
         self.db.commit()
 
     def permission_codes_for_user(self, user: User) -> set[str]:

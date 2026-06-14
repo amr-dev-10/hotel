@@ -20,6 +20,7 @@ class WhatsAppSession(UUIDPrimaryKeyMixin, Base):
     state: Mapped[str] = mapped_column(String(50), default="new", index=True)
     cart: Mapped[list[dict]] = mapped_column(JSON, default=list)
     pending_action: Mapped[dict | None] = mapped_column(JSON)
+    form_responses: Mapped[dict] = mapped_column(JSON, default=dict)
     whatsapp_phone_number_id: Mapped[str | None] = mapped_column(String(80), index=True)
     last_active_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

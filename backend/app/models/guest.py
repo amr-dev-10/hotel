@@ -15,6 +15,7 @@ class Guest(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(255))
     phone: Mapped[str | None] = mapped_column(String(40), index=True)
     whatsapp_phone: Mapped[str | None] = mapped_column(String(40), index=True)
+    email: Mapped[str | None] = mapped_column(String(255), index=True)
     check_in_date: Mapped[date | None] = mapped_column(Date)
     check_out_date: Mapped[date | None] = mapped_column(Date)
     status: Mapped[str] = mapped_column(String(40), default="checked_in")

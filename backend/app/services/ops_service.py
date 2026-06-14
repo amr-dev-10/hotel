@@ -4,6 +4,7 @@ from app.models.base import utcnow
 from app.models.ops import Invoice, MediaFile, Notification, Subscription
 from app.repositories.ops_repository import InvoiceRepository, MediaFileRepository, NotificationRepository, SubscriptionRepository
 from app.schemas.ops import InvoiceCreate, MediaFileCreate, NotificationCreate
+from app.schemas.ops import SubscriptionUpgrade
 
 
 class NotificationCenterService:
@@ -19,12 +20,25 @@ class NotificationCenterService:
             title=payload.title,
             message=payload.message,
             status="pending",
+            metadata_json=payload.metadata,
             created_at=utcnow(),
         )
         self.db.add(notification)
         if commit:
             self.db.commit()
             self.db.refresh(notification)
+        return notification
+
+    def mark_read(self, hotel_id: str, notification_id: str, user_id: str) -> Notification:
+        notification = self.notifications.get_for_hotel(hotel_id, notification_id)
+        if not notification or notification.user_id not in {None, user_id}:
+            from app.core.exceptions import not_found
+
+            raise not_found("Notification not found")
+        notification.status = "read"
+        notification.read_at = utcnow()
+        self.db.commit()
+        self.db.refresh(notification)
         return notification
 
 
@@ -43,6 +57,9 @@ class MediaService:
             hotel_id=hotel_id,
             file_url=payload.file_url,
             file_type=payload.file_type,
+            file_name=payload.file_name,
+            file_size_bytes=payload.file_size_bytes,
+            storage_provider=payload.storage_provider,
             uploaded_by=uploaded_by,
             created_at=utcnow(),
         )
@@ -59,7 +76,7 @@ class BillingService:
         self.invoices = InvoiceRepository(db)
 
     def get_or_create_subscription(self, hotel_id: str) -> Subscription:
-        subscription = self.subscriptions.get(hotel_id)
+        subscription = self.subscriptions.get_by_hotel(hotel_id)
         if not subscription:
             subscription = Subscription(hotel_id=hotel_id, plan="starter", status="active")
             self.db.add(subscription)
@@ -67,15 +84,26 @@ class BillingService:
             self.db.refresh(subscription)
         return subscription
 
+    def upgrade_subscription(self, hotel_id: str, payload: SubscriptionUpgrade) -> Subscription:
+        subscription = self.get_or_create_subscription(hotel_id)
+        subscription.plan = payload.plan
+        subscription.billing_cycle = payload.billing_cycle
+        subscription.status = "active"
+        self.db.commit()
+        self.db.refresh(subscription)
+        return subscription
+
     def create_invoice(self, hotel_id: str, payload: InvoiceCreate) -> Invoice:
         subscription = self.get_or_create_subscription(hotel_id)
         invoice = Invoice(
             hotel_id=hotel_id,
-            subscription_id=subscription.hotel_id,
+            subscription_id=subscription.id,
             amount=payload.amount,
             currency=payload.currency,
             stripe_invoice_id=payload.stripe_invoice_id,
             status=payload.status,
+            payment_method=payload.payment_method,
+            due_date=payload.due_date,
             created_at=utcnow(),
         )
         self.db.add(invoice)

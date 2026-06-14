@@ -11,6 +11,7 @@ class WhatsAppAccountCreate(BaseModel):
     phone_number_id: str = Field(min_length=2, max_length=80)
     waba_id: str | None = None
     access_token: str | None = None
+    access_token_encrypted: str | None = None
     webhook_verify_token: str | None = None
     status: str = "active"
 
@@ -32,6 +33,8 @@ class WhatsAppTemplateCreate(BaseModel):
     language: str = "en"
     status: str = "pending"
     meta_template_id: str | None = None
+    header_params: list[dict] = Field(default_factory=list)
+    body_params: list[dict] = Field(default_factory=list)
 
 
 class WhatsAppTemplateRead(ORMModel):
@@ -42,6 +45,8 @@ class WhatsAppTemplateRead(ORMModel):
     language: str
     status: str
     meta_template_id: str | None = None
+    header_params: list[dict]
+    body_params: list[dict]
 
 
 class WhatsAppConversationRead(ORMModel):
@@ -49,6 +54,8 @@ class WhatsAppConversationRead(ORMModel):
     hotel_id: str
     guest_id: str | None = None
     phone: str
+    status: str
+    last_message_at: datetime | None = None
 
 
 class WhatsAppMessageRead(ORMModel):

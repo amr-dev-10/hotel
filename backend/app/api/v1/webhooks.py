@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.encryption import decrypt_secret
 from app.core.responses import ok
 from app.repositories.whatsapp_repository import WhatsAppAccountRepository
 from app.services.bot_service import BotService
@@ -54,7 +55,11 @@ async def receive_whatsapp_webhook(
                         whatsapp,
                         incoming,
                         reply,
-                        access_token=account.access_token if account else None,
+                        access_token=(
+                            account.access_token or decrypt_secret(account.access_token_encrypted)
+                            if account
+                            else None
+                        ),
                     ),
                 }
             )

@@ -7,7 +7,18 @@ class FAQCreate(BaseModel):
     question: str = Field(min_length=2, max_length=255)
     answer: str = Field(min_length=2)
     category: str | None = None
+    language: str = "en"
     is_active: bool = True
+    sort_order: int = 0
+
+
+class FAQUpdate(BaseModel):
+    question: str | None = None
+    answer: str | None = None
+    category: str | None = None
+    language: str | None = None
+    is_active: bool | None = None
+    sort_order: int | None = None
 
 
 class FAQRead(ORMModel):
@@ -16,7 +27,9 @@ class FAQRead(ORMModel):
     question: str
     answer: str
     category: str | None = None
+    language: str
     is_active: bool
+    sort_order: int
 
 
 class BotVersionRead(ORMModel):
@@ -43,6 +56,7 @@ class DepartmentConfigUpsert(BaseModel):
     keywords: list[str] = Field(default_factory=list)
     sla_minutes: int = 20
     auto_assignment_enabled: bool = True
+    assignment_strategy: str = "round_robin"
 
 
 class DepartmentConfigRead(ORMModel):
@@ -52,15 +66,25 @@ class DepartmentConfigRead(ORMModel):
     keywords: list[str]
     sla_minutes: int
     auto_assignment_enabled: bool
+    assignment_strategy: str
 
 
 class ServiceFormCreate(BaseModel):
     service_name: str = Field(min_length=2, max_length=160)
+    service_id: str | None = None
     fields: list[dict] = Field(default_factory=list)
+
+
+class ServiceFormUpdate(BaseModel):
+    service_name: str | None = None
+    service_id: str | None = None
+    is_active: bool | None = None
+    fields: list[dict] | None = None
 
 
 class ServiceFormRead(ORMModel):
     id: str
     hotel_id: str
     service_name: str
+    service_id: str | None = None
     is_active: bool

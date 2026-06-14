@@ -3,10 +3,11 @@ from sqlalchemy.orm import Session
 
 from app.api.dependencies import require_permission
 from app.core.database import get_db
+from app.core.exceptions import not_found
 from app.core.responses import ok
 from app.models.user import User
 from app.repositories.reservation_repository import ReservationRepository
-from app.schemas.reservation import ReservationCreate, ReservationRead
+from app.schemas.reservation import ReservationCreate, ReservationRead, ReservationUpdate
 from app.services.reservation_service import ReservationService
 
 router = APIRouter()
@@ -16,7 +17,7 @@ router = APIRouter()
 def list_reservations(
     hotel_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("reservation.view")),
+    current_user: User = Depends(require_permission("guest.view")),
 ) -> dict:
     reservations = ReservationRepository(db).list_for_hotel(hotel_id)
     return ok([ReservationRead.model_validate(item).model_dump() for item in reservations])
@@ -27,10 +28,40 @@ def create_reservation(
     hotel_id: str,
     payload: ReservationCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("reservation.manage")),
+    current_user: User = Depends(require_permission("guest.create")),
 ) -> dict:
     reservation = ReservationService(db).create_reservation(
         hotel_id,
+        payload,
+        actor_id=current_user.id,
+    )
+    return ok(ReservationRead.model_validate(reservation).model_dump())
+
+
+@router.get("/{reservation_id}")
+def get_reservation(
+    hotel_id: str,
+    reservation_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("guest.view")),
+) -> dict:
+    reservation = ReservationRepository(db).get_for_hotel(hotel_id, reservation_id)
+    if not reservation:
+        raise not_found("Reservation not found")
+    return ok(ReservationRead.model_validate(reservation).model_dump())
+
+
+@router.put("/{reservation_id}")
+def update_reservation(
+    hotel_id: str,
+    reservation_id: str,
+    payload: ReservationUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("guest.edit")),
+) -> dict:
+    reservation = ReservationService(db).update_reservation(
+        hotel_id,
+        reservation_id,
         payload,
         actor_id=current_user.id,
     )
@@ -42,7 +73,18 @@ def check_in(
     hotel_id: str,
     reservation_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("reservation.manage")),
+    current_user: User = Depends(require_permission("guest.create")),
+) -> dict:
+    reservation = ReservationService(db).check_in(hotel_id, reservation_id, current_user.id)
+    return ok(ReservationRead.model_validate(reservation).model_dump())
+
+
+@router.post("/{reservation_id}/checkin")
+def checkin_alias(
+    hotel_id: str,
+    reservation_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("guest.create")),
 ) -> dict:
     reservation = ReservationService(db).check_in(hotel_id, reservation_id, current_user.id)
     return ok(ReservationRead.model_validate(reservation).model_dump())
@@ -53,7 +95,18 @@ def check_out(
     hotel_id: str,
     reservation_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("reservation.manage")),
+    current_user: User = Depends(require_permission("guest.checkout")),
+) -> dict:
+    reservation = ReservationService(db).check_out(hotel_id, reservation_id, current_user.id)
+    return ok(ReservationRead.model_validate(reservation).model_dump())
+
+
+@router.post("/{reservation_id}/checkout")
+def checkout_alias(
+    hotel_id: str,
+    reservation_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("guest.checkout")),
 ) -> dict:
     reservation = ReservationService(db).check_out(hotel_id, reservation_id, current_user.id)
     return ok(ReservationRead.model_validate(reservation).model_dump())

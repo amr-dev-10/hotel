@@ -3,6 +3,7 @@ from collections.abc import Sequence
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.models.base import utcnow
 from app.models.whatsapp import (
     WhatsAppAccount,
     WhatsAppConversation,
@@ -48,8 +49,16 @@ class WhatsAppConversationRepository(BaseRepository[WhatsAppConversation]):
         if conversation:
             if guest_id and not conversation.guest_id:
                 conversation.guest_id = guest_id
+            conversation.last_message_at = utcnow()
             return conversation
-        conversation = WhatsAppConversation(hotel_id=hotel_id, phone=phone, guest_id=guest_id)
+        conversation = WhatsAppConversation(
+            hotel_id=hotel_id,
+            phone=phone,
+            guest_id=guest_id,
+            status="open",
+            started_at=utcnow(),
+            last_message_at=utcnow(),
+        )
         self.db.add(conversation)
         self.db.flush()
         return conversation

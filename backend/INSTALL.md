@@ -1,6 +1,6 @@
 # Arcadia Backend Setup
 
-The backend has been rebuilt from the versioned architecture documents in `docs/`, currently through v2.
+The backend has been rebuilt from the versioned architecture documents in `docs/`, currently through v2.1.
 Dependencies and local tooling are pinned so development can continue from a stable base.
 
 ## Library Versions
@@ -87,10 +87,14 @@ Open:
 - `GET /api/v1/auth/me`
 - `/api/v1/hotels/{hotel_id}/users`
 - `/api/v1/hotels/{hotel_id}/roles`
+- `/api/v1/hotels/{hotel_id}/users/{user_id}/roles`
 - `/api/v1/hotels/{hotel_id}/rooms`
 - `/api/v1/hotels/{hotel_id}/departments`
 - `/api/v1/hotels/{hotel_id}/guests`
 - `/api/v1/hotels/{hotel_id}/reservations`
+- `/api/v1/hotels/{hotel_id}/reservations/{reservation_id}`
+- `/api/v1/hotels/{hotel_id}/reservations/{reservation_id}/checkin`
+- `/api/v1/hotels/{hotel_id}/reservations/{reservation_id}/checkout`
 - `/api/v1/hotels/{hotel_id}/tickets`
 - `/api/v1/hotels/{hotel_id}/menu/categories`
 - `/api/v1/hotels/{hotel_id}/menu/items`
@@ -98,18 +102,28 @@ Open:
 - `/api/v1/hotels/{hotel_id}/campaigns`
 - `/api/v1/hotels/{hotel_id}/feedback`
 - `/api/v1/hotels/{hotel_id}/whatsapp/accounts`
+- `/api/v1/hotels/{hotel_id}/whatsapp/account`
 - `/api/v1/hotels/{hotel_id}/whatsapp/templates`
+- `/api/v1/hotels/{hotel_id}/whatsapp/templates/sync`
 - `/api/v1/hotels/{hotel_id}/whatsapp/conversations`
+- `/api/v1/hotels/{hotel_id}/faqs`
 - `/api/v1/hotels/{hotel_id}/knowledge/faqs`
+- `/api/v1/hotels/{hotel_id}/bot-config/versions`
+- `/api/v1/hotels/{hotel_id}/bot-config/rollback`
 - `/api/v1/hotels/{hotel_id}/knowledge/bot-versions`
 - `/api/v1/hotels/{hotel_id}/knowledge/languages`
 - `/api/v1/hotels/{hotel_id}/knowledge/department-configs`
 - `/api/v1/hotels/{hotel_id}/knowledge/service-forms`
+- `/api/v1/hotels/{hotel_id}/service-forms`
 - `/api/v1/hotels/{hotel_id}/audit-logs`
 - `/api/v1/hotels/{hotel_id}/notifications`
+- `/api/v1/hotels/{hotel_id}/notifications/me`
 - `/api/v1/hotels/{hotel_id}/media`
+- `/api/v1/hotels/{hotel_id}/media/upload`
 - `/api/v1/hotels/{hotel_id}/billing/subscription`
 - `/api/v1/hotels/{hotel_id}/billing/invoices`
+- `/api/v1/hotels/{hotel_id}/subscription`
+- `/api/v1/hotels/{hotel_id}/invoices`
 - `GET /webhook/whatsapp`
 - `POST /webhook/whatsapp`
 - `/ws/{hotel_id}/tickets`

@@ -10,6 +10,7 @@ class GuestCreate(BaseModel):
     room_id: str | None = None
     phone: str | None = None
     whatsapp_phone: str | None = None
+    email: str | None = None
     check_in_date: date | None = None
     check_out_date: date | None = None
     status: str = "checked_in"
@@ -22,6 +23,7 @@ class GuestRead(ORMModel):
     name: str
     phone: str | None = None
     whatsapp_phone: str | None = None
+    email: str | None = None
     check_in_date: date | None = None
     check_out_date: date | None = None
     status: str

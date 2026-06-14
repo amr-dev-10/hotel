@@ -1,8 +1,8 @@
 # Arcadia Hotel Platform Backend
 
-FastAPI backend for the Arcadia hotel management platform, currently upgraded through the v2 architecture shared in `docs/v2/`.
+FastAPI backend for the Arcadia hotel management platform, currently upgraded through the v2.1 extended architecture shared in `docs/v2.1/`.
 
-The backend follows the v2 principles:
+The backend follows the v2.1 principles:
 
 - Modular monolith first.
 - PostgreSQL as the production source of truth.
@@ -15,6 +15,10 @@ The backend follows the v2 principles:
 - Per-hotel WhatsApp accounts and persisted conversation history.
 - FAQ knowledge base before AI fallback.
 - Audit logs, notification center, media tracking, and billing tables.
+- Seeded system roles and expanded permission map.
+- Bot config version snapshots and rollback.
+- Dynamic service-form collection inside WhatsApp conversations.
+- Campaign send/stat endpoints and richer delivery counters.
 
 ## Quick Setup
 
@@ -38,6 +42,7 @@ Open:
 - `POST /api/v1/auth/login`
 - `/api/v1/hotels/{hotel_id}/users`
 - `/api/v1/hotels/{hotel_id}/roles`
+- `/api/v1/hotels/{hotel_id}/users/{user_id}/roles`
 - `/api/v1/hotels/{hotel_id}/rooms`
 - `/api/v1/hotels/{hotel_id}/departments`
 - `/api/v1/hotels/{hotel_id}/guests`
@@ -48,11 +53,15 @@ Open:
 - `/api/v1/hotels/{hotel_id}/campaigns`
 - `/api/v1/hotels/{hotel_id}/feedback`
 - `/api/v1/hotels/{hotel_id}/whatsapp`
+- `/api/v1/hotels/{hotel_id}/faqs`
+- `/api/v1/hotels/{hotel_id}/service-forms`
 - `/api/v1/hotels/{hotel_id}/knowledge`
 - `/api/v1/hotels/{hotel_id}/audit-logs`
 - `/api/v1/hotels/{hotel_id}/notifications`
 - `/api/v1/hotels/{hotel_id}/media`
 - `/api/v1/hotels/{hotel_id}/billing`
+- `/api/v1/hotels/{hotel_id}/subscription`
+- `/api/v1/hotels/{hotel_id}/invoices`
 - `GET /webhook/whatsapp`
 - `POST /webhook/whatsapp`
 - `/ws/{hotel_id}/tickets`
@@ -65,3 +74,4 @@ The shared v1 files are preserved in:
 - `docs/v1/my_architecture_design_v1.md`
 - `docs/v1/whatsapp_guest_flows_v1.md`
 - `docs/v2/arcadia_architecture_v2.md`
+- `docs/v2.1/architecture_v2_extended.md`

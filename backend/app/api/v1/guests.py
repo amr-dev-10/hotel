@@ -27,7 +27,7 @@ def create_guest(
     hotel_id: str,
     payload: GuestCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("guest.edit")),
+    current_user: User = Depends(require_permission("guest.create")),
 ) -> dict:
     guest = Guest(hotel_id=hotel_id, **payload.model_dump())
     GuestRepository(db).add(guest)

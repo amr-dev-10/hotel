@@ -59,6 +59,11 @@ api_router.include_router(
     tags=["knowledge"],
 )
 api_router.include_router(
+    knowledge.router,
+    prefix="/hotels/{hotel_id}",
+    tags=["knowledge"],
+)
+api_router.include_router(
     ops.router,
     prefix="/hotels/{hotel_id}",
     tags=["operations"],

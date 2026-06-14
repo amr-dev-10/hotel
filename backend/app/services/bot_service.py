@@ -15,6 +15,7 @@ from app.repositories.guest_repository import GuestRepository
 from app.repositories.hotel_repository import HotelRepository
 from app.repositories.room_repository import RoomRepository
 from app.repositories.ticket_repository import TicketRepository
+from app.repositories.knowledge_repository import ServiceFormRepository
 from app.repositories.whatsapp_repository import (
     WhatsAppAccountRepository,
     WhatsAppConversationRepository,
@@ -46,6 +47,7 @@ class BotService:
         self.rooms = RoomRepository(db)
         self.bot_configs = BotConfigRepository(db)
         self.ticket_repo = TicketRepository(db)
+        self.service_forms = ServiceFormRepository(db)
         self.whatsapp_accounts = WhatsAppAccountRepository(db)
         self.conversations = WhatsAppConversationRepository(db)
         self.gemini = GeminiService()
@@ -91,6 +93,8 @@ class BotService:
             self._capture_name(session, message.text or "", messages, replies)
         elif session.state == "awaiting_room":
             self._capture_room(hotel.id, session, message.text or "", messages, replies)
+        elif session.state == "awaiting_form_field":
+            ticket_id = self._handle_form_field(hotel.id, session, message.text or "", replies)
         elif session.state == "awaiting_free_text":
             ticket_id = self._create_free_text_ticket(hotel.id, session, message.text or "", replies)
         else:
@@ -304,6 +308,32 @@ class BotService:
 
         service = self._service_by_id(services, interactive_id)
         if service:
+            form = self.service_forms.find_for_service(
+                hotel_id,
+                service.get("id"),
+                service.get("item") or service.get("title"),
+            )
+            if form:
+                fields = [
+                    {
+                        "field_name": field.field_name,
+                        "label": field.label or field.field_name,
+                        "field_type": field.field_type,
+                        "required": field.required,
+                    }
+                    for field in self.service_forms.fields_for_form(form.id)
+                ]
+                if fields:
+                    session.state = "awaiting_form_field"
+                    session.form_responses = {}
+                    session.pending_action = {
+                        "service": service,
+                        "form_id": form.id,
+                        "fields": fields,
+                        "field_index": 0,
+                    }
+                    replies.append(self._text(self._field_prompt(fields[0])))
+                    return None
             return self._create_service_ticket(hotel_id, session, service, replies)
 
         replies.append(self._main_menu(self._guest_name(hotel_id, session)))
@@ -373,6 +403,48 @@ class BotService:
             replies,
         )
 
+    def _handle_form_field(
+        self,
+        hotel_id: str,
+        session: WhatsAppSession,
+        text: str,
+        replies: list[dict[str, Any]],
+    ) -> str | None:
+        pending = session.pending_action or {}
+        fields = pending.get("fields") or []
+        field_index = int(pending.get("field_index") or 0)
+        if field_index >= len(fields):
+            session.state = "active"
+            return self._create_service_ticket(
+                hotel_id,
+                session,
+                pending.get("service") or {},
+                replies,
+            )
+
+        current_field = fields[field_index]
+        clean_value = text.strip()
+        if current_field.get("required") and not clean_value:
+            replies.append(self._text(f"{current_field.get('label')} is required."))
+            return None
+
+        responses = dict(session.form_responses or {})
+        responses[current_field["field_name"]] = clean_value
+        session.form_responses = responses
+        field_index += 1
+        updated_pending = dict(pending)
+        updated_pending["field_index"] = field_index
+        session.pending_action = updated_pending
+
+        if field_index < len(fields):
+            replies.append(self._text(self._field_prompt(fields[field_index])))
+            return None
+
+        service = pending.get("service") or {}
+        session.state = "active"
+        session.pending_action = None
+        return self._create_service_ticket(hotel_id, session, service, replies)
+
     def _create_service_ticket(
         self,
         hotel_id: str,
@@ -380,19 +452,25 @@ class BotService:
         service: dict[str, Any],
         replies: list[dict[str, Any]],
     ) -> str:
+        form_responses = session.form_responses or {}
+        description = service.get("item") or service.get("title") or "Guest request"
+        if form_responses:
+            details = ", ".join(f"{key}: {value}" for key, value in form_responses.items())
+            description = f"{description} ({details})"
         ticket = self.ticket_service.create_ticket(
             hotel_id,
             TicketCreate(
                 guest_id=session.guest_id,
                 room_id=session.room_id,
                 department_key=service.get("department_key"),
-                item_description=service.get("item") or service.get("title") or "Guest request",
+                item_description=description,
                 source="whatsapp",
                 type="Ticket",
                 priority=int(service.get("priority") or 2),
             ),
             commit=True,
         )
+        session.form_responses = {}
         replies.append(
             self._text(
                 "Your request has been raised.\n"
@@ -467,6 +545,9 @@ class BotService:
             "text": "Room Services",
             "payload": {"button_text": "Choose", "rows": rows},
         }
+
+    def _field_prompt(self, field: dict[str, Any]) -> str:
+        return f"{field.get('label') or field.get('field_name')}?"
 
     def _record_message(
         self,

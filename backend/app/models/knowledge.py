@@ -14,7 +14,9 @@ class HotelFAQ(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     question: Mapped[str] = mapped_column(String(255))
     answer: Mapped[str] = mapped_column(Text)
     category: Mapped[str | None] = mapped_column(String(80), index=True)
+    language: Mapped[str] = mapped_column(String(20), default="en")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
 
 
 class BotVersion(UUIDPrimaryKeyMixin, Base):
@@ -47,6 +49,7 @@ class DepartmentConfig(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     keywords: Mapped[list[str]] = mapped_column(JSON, default=list)
     sla_minutes: Mapped[int] = mapped_column(Integer, default=20)
     auto_assignment_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    assignment_strategy: Mapped[str] = mapped_column(String(50), default="round_robin")
 
 
 class ServiceForm(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -55,6 +58,7 @@ class ServiceForm(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
     service_name: Mapped[str] = mapped_column(String(160))
+    service_id: Mapped[str | None] = mapped_column(String(120), index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
@@ -65,5 +69,7 @@ class ServiceFormField(UUIDPrimaryKeyMixin, Base):
     service_form_id: Mapped[str] = mapped_column(ForeignKey("service_forms.id"), index=True)
     field_name: Mapped[str] = mapped_column(String(160))
     field_type: Mapped[str] = mapped_column(String(40), default="text")
+    label: Mapped[str | None] = mapped_column(String(180))
     required: Mapped[bool] = mapped_column(Boolean, default=False)
+    options: Mapped[list[dict]] = mapped_column(JSON, default=list)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)

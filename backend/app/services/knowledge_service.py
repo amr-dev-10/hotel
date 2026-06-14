@@ -3,6 +3,8 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.core.exceptions import not_found
+from app.models.bot_config import BotConfig
 from app.models.knowledge import (
     BotVersion,
     DepartmentConfig,
@@ -83,6 +85,44 @@ class BotVersionService:
         self.db.refresh(version)
         return version
 
+    def rollback(self, hotel_id: str, version_number: int, actor_id: str | None) -> BotConfig:
+        target = None
+        for version in self.versions.list_for_hotel(hotel_id, limit=500):
+            if version.version == version_number:
+                target = version
+                break
+        if not target:
+            raise not_found("Bot version not found")
+
+        config = self.configs.get_for_hotel(hotel_id)
+        if not config:
+            config = BotConfig(
+                hotel_id=hotel_id,
+                main_menu=[],
+                services=[],
+                messages={},
+                sla_config={},
+                active_hours={},
+                gemini_fallback_enabled=True,
+            )
+            self.db.add(config)
+            self.db.flush()
+
+        for key, value in target.config_json.items():
+            setattr(config, key, value)
+        config.active_version = target.version
+        AuditService(self.db).log(
+            hotel_id,
+            "bot.config.rollback",
+            "bot_config",
+            config.id,
+            actor_id,
+            {"version": target.version},
+        )
+        self.db.commit()
+        self.db.refresh(config)
+        return config
+
 
 class HotelLanguageService:
     def __init__(self, db: Session) -> None:
@@ -116,6 +156,7 @@ class DepartmentConfigService:
             config.keywords = payload.keywords
             config.sla_minutes = payload.sla_minutes
             config.auto_assignment_enabled = payload.auto_assignment_enabled
+            config.assignment_strategy = payload.assignment_strategy
         self.db.commit()
         self.db.refresh(config)
         return config
@@ -126,7 +167,12 @@ class ServiceFormService:
         self.db = db
 
     def create(self, hotel_id: str, payload: ServiceFormCreate, actor_id: str | None) -> ServiceForm:
-        form = ServiceForm(hotel_id=hotel_id, service_name=payload.service_name, is_active=True)
+        form = ServiceForm(
+            hotel_id=hotel_id,
+            service_name=payload.service_name,
+            service_id=payload.service_id,
+            is_active=True,
+        )
         self.db.add(form)
         self.db.flush()
         for index, field in enumerate(payload.fields):
@@ -136,7 +182,9 @@ class ServiceFormService:
                     service_form_id=form.id,
                     field_name=field["field_name"],
                     field_type=field.get("field_type", "text"),
-                    required=bool(field.get("required", False)),
+                    label=field.get("label") or field["field_name"],
+                    required=bool(field.get("required", field.get("is_required", False))),
+                    options=field.get("options", []),
                     sort_order=int(field.get("sort_order", index)),
                 )
             )

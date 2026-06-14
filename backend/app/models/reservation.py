@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, ForeignKey, String, UniqueConstraint
+from sqlalchemy import Date, DateTime, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -21,6 +21,7 @@ class Reservation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     checkin_date: Mapped[date] = mapped_column(Date)
     checkout_date: Mapped[date] = mapped_column(Date)
     source: Mapped[str] = mapped_column(String(40), default="walk_in")
+    notes: Mapped[str | None] = mapped_column(Text)
 
 
 class StayRecord(UUIDPrimaryKeyMixin, Base):
@@ -31,3 +32,4 @@ class StayRecord(UUIDPrimaryKeyMixin, Base):
     room_id: Mapped[str | None] = mapped_column(ForeignKey("rooms.id"))
     actual_checkin: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     actual_checkout: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    notes: Mapped[str | None] = mapped_column(Text)

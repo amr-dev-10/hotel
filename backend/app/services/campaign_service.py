@@ -4,6 +4,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.models.campaign import Campaign, CampaignDelivery
+from app.core.encryption import decrypt_secret
 from app.repositories.campaign_repository import CampaignRepository
 from app.repositories.guest_repository import GuestRepository
 from app.repositories.hotel_repository import HotelRepository
@@ -32,6 +33,7 @@ class CampaignService:
             name=payload.name,
             template_name=payload.template_name,
             target_type=payload.target_type,
+            target_filter=payload.target_filter,
             target_guest_id=payload.target_guest_id,
             params=payload.params,
             scheduled_at=payload.scheduled_at,
@@ -64,7 +66,11 @@ class CampaignService:
                     phone,
                     payload.template_name,
                     self._template_params(guest.name, payload.params),
-                    access_token=account.access_token if account else None,
+                    access_token=(
+                        account.access_token or decrypt_secret(account.access_token_encrypted)
+                        if account
+                        else None
+                    ),
                 )
                 delivery.sent_at = datetime.now(UTC)
                 sent_count += 1
@@ -76,6 +82,66 @@ class CampaignService:
         self.db.commit()
         self.db.refresh(campaign)
         return campaign
+
+    def send_campaign(self, hotel_id: str, campaign_id: str) -> Campaign:
+        campaign = self.campaigns.get_for_hotel(hotel_id, campaign_id)
+        if not campaign:
+            from app.core.exceptions import not_found
+
+            raise not_found("Campaign not found")
+        if campaign.status == "sent":
+            return campaign
+
+        hotel = self.hotels.get(hotel_id)
+        account = None
+        if hotel and hotel.whatsapp_phone_number_id:
+            account = self.whatsapp_accounts.get_by_phone_number_id(hotel.whatsapp_phone_number_id)
+        deliveries = self.campaigns.list_deliveries(campaign.id)
+        sent_count = campaign.sent_count
+        failed_count = campaign.failed_count
+        for delivery in deliveries:
+            if delivery.status == "sent":
+                continue
+            try:
+                self.whatsapp.send_template(
+                    account.phone_number_id if account else (hotel.whatsapp_phone_number_id if hotel else None),
+                    delivery.phone,
+                    campaign.template_name,
+                    [str(value) for _, value in sorted(campaign.params.items())],
+                    access_token=(
+                        account.access_token or decrypt_secret(account.access_token_encrypted)
+                        if account
+                        else None
+                    ),
+                )
+                delivery.status = "sent"
+                delivery.sent_at = datetime.now(UTC)
+                sent_count += 1
+            except Exception as exc:
+                delivery.status = "failed"
+                delivery.error_detail = str(exc)
+                failed_count += 1
+        campaign.sent_count = sent_count
+        campaign.failed_count = failed_count
+        campaign.status = "sent"
+        self.db.commit()
+        self.db.refresh(campaign)
+        return campaign
+
+    def stats(self, hotel_id: str, campaign_id: str) -> dict[str, int | str]:
+        campaign = self.campaigns.get_for_hotel(hotel_id, campaign_id)
+        if not campaign:
+            from app.core.exceptions import not_found
+
+            raise not_found("Campaign not found")
+        return {
+            "campaign_id": campaign.id,
+            "status": campaign.status,
+            "sent_count": campaign.sent_count,
+            "delivered_count": campaign.delivered_count,
+            "read_count": campaign.read_count,
+            "failed_count": campaign.failed_count,
+        }
 
     def _recipients(self, hotel_id: str, payload: CampaignCreate) -> list[Any]:
         if payload.target_type == "specific" and payload.target_guest_id:

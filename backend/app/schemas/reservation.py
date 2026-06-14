@@ -13,6 +13,16 @@ class ReservationCreate(BaseModel):
     checkin_date: date
     checkout_date: date
     source: str = "walk_in"
+    notes: str | None = None
+
+
+class ReservationUpdate(BaseModel):
+    room_id: str | None = None
+    status: str | None = None
+    checkin_date: date | None = None
+    checkout_date: date | None = None
+    source: str | None = None
+    notes: str | None = None
 
 
 class ReservationRead(ORMModel):
@@ -25,6 +35,7 @@ class ReservationRead(ORMModel):
     checkin_date: date
     checkout_date: date
     source: str
+    notes: str | None = None
 
 
 class StayRecordRead(ORMModel):
@@ -34,3 +45,4 @@ class StayRecordRead(ORMModel):
     room_id: str | None = None
     actual_checkin: datetime | None = None
     actual_checkout: datetime | None = None
+    notes: str | None = None

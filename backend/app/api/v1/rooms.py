@@ -27,7 +27,7 @@ def create_room(
     hotel_id: str,
     payload: RoomCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("room.update")),
+    current_user: User = Depends(require_permission("room.create")),
 ) -> dict:
     room = Room(hotel_id=hotel_id, **payload.model_dump())
     RoomRepository(db).add(room)

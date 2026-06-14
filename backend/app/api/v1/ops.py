@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import require_permission
+from app.api.dependencies import ensure_hotel_access, get_current_user, require_permission
 from app.core.database import get_db
 from app.core.responses import ok
 from app.models.user import User
@@ -20,6 +20,7 @@ from app.schemas.ops import (
     NotificationCreate,
     NotificationRead,
     SubscriptionRead,
+    SubscriptionUpgrade,
 )
 from app.services.ops_service import BillingService, MediaService, NotificationCenterService
 
@@ -57,11 +58,38 @@ def create_notification(
     return ok(NotificationRead.model_validate(notification).model_dump())
 
 
+@router.get("/notifications/me")
+def my_notifications(
+    hotel_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    ensure_hotel_access(hotel_id, current_user)
+    notifications = NotificationRepository(db).list_for_user(hotel_id, current_user.id)
+    return ok([NotificationRead.model_validate(item).model_dump() for item in notifications])
+
+
+@router.put("/notifications/{notification_id}/read")
+def mark_notification_read(
+    hotel_id: str,
+    notification_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    ensure_hotel_access(hotel_id, current_user)
+    notification = NotificationCenterService(db).mark_read(
+        hotel_id,
+        notification_id,
+        current_user.id,
+    )
+    return ok(NotificationRead.model_validate(notification).model_dump())
+
+
 @router.get("/media")
 def list_media(
     hotel_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("media.manage")),
+    current_user: User = Depends(require_permission("media.upload")),
 ) -> dict:
     media = MediaFileRepository(db).list_for_hotel(hotel_id)
     return ok([MediaFileRead.model_validate(item).model_dump() for item in media])
@@ -72,10 +100,35 @@ def register_media(
     hotel_id: str,
     payload: MediaFileCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("media.manage")),
+    current_user: User = Depends(require_permission("media.upload")),
 ) -> dict:
     media = MediaService(db).register_file(hotel_id, payload, current_user.id)
     return ok(MediaFileRead.model_validate(media).model_dump())
+
+
+@router.post("/media/upload")
+def upload_media_alias(
+    hotel_id: str,
+    payload: MediaFileCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("media.upload")),
+) -> dict:
+    media = MediaService(db).register_file(hotel_id, payload, current_user.id)
+    return ok(MediaFileRead.model_validate(media).model_dump())
+
+
+@router.delete("/media/{media_id}")
+def delete_media(
+    hotel_id: str,
+    media_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("media.delete")),
+) -> dict:
+    media = MediaFileRepository(db).get_for_hotel(hotel_id, media_id)
+    if media:
+        db.delete(media)
+        db.commit()
+    return ok({"deleted": True, "media_id": media_id})
 
 
 @router.get("/billing/subscription")
@@ -88,11 +141,42 @@ def get_subscription(
     return ok(SubscriptionRead.model_validate(subscription).model_dump())
 
 
+@router.get("/subscription")
+def get_subscription_alias(
+    hotel_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("hotel.billing.view")),
+) -> dict:
+    subscription = BillingService(db).get_or_create_subscription(hotel_id)
+    return ok(SubscriptionRead.model_validate(subscription).model_dump())
+
+
+@router.post("/subscription/upgrade")
+def upgrade_subscription(
+    hotel_id: str,
+    payload: SubscriptionUpgrade,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("hotel.settings.manage")),
+) -> dict:
+    subscription = BillingService(db).upgrade_subscription(hotel_id, payload)
+    return ok(SubscriptionRead.model_validate(subscription).model_dump())
+
+
 @router.get("/billing/invoices")
 def list_invoices(
     hotel_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("billing.view")),
+) -> dict:
+    invoices = InvoiceRepository(db).list_for_hotel(hotel_id)
+    return ok([InvoiceRead.model_validate(item).model_dump() for item in invoices])
+
+
+@router.get("/invoices")
+def list_invoices_alias(
+    hotel_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("hotel.billing.view")),
 ) -> dict:
     invoices = InvoiceRepository(db).list_for_hotel(hotel_id)
     return ok([InvoiceRead.model_validate(item).model_dump() for item in invoices])

@@ -21,7 +21,7 @@ router = APIRouter()
 def list_categories(
     hotel_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("menu.manage")),
+    current_user: User = Depends(require_permission("menu.view")),
 ) -> dict:
     categories = MenuCategoryRepository(db).list_for_hotel(hotel_id)
     return ok([MenuCategoryRead.model_validate(item).model_dump() for item in categories])
@@ -32,7 +32,7 @@ def create_category(
     hotel_id: str,
     payload: MenuCategoryCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("menu.manage")),
+    current_user: User = Depends(require_permission("menu.view")),
 ) -> dict:
     category = MenuCategory(hotel_id=hotel_id, **payload.model_dump())
     MenuCategoryRepository(db).add(category)

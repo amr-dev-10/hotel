@@ -27,7 +27,7 @@ def create_feedback(
     hotel_id: str,
     payload: FeedbackCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("guest.edit")),
+    current_user: User = Depends(require_permission("guest.create")),
 ) -> dict:
     feedback = FeedbackService(db).create_feedback(hotel_id, payload)
     return ok(FeedbackRead.model_validate(feedback).model_dump())

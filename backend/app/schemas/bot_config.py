@@ -21,3 +21,4 @@ class BotConfigRead(ORMModel):
     sla_config: dict
     active_hours: dict
     gemini_fallback_enabled: bool
+    active_version: int
