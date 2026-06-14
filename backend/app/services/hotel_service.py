@@ -23,6 +23,7 @@ from app.services.defaults import (
     DEFAULT_SLA_CONFIG,
 )
 from app.services.rbac_service import RBACService
+from app.services.usage_service import FeatureService
 
 
 class HotelService:
@@ -152,6 +153,7 @@ class HotelService:
                     status="active",
                 )
             )
+        FeatureService(self.db).seed_defaults()
         RBACService(self.db).seed_owner_role(hotel.id, owner)
         self.db.add(
             BotVersion(

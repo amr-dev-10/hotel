@@ -66,6 +66,7 @@ class FolioService:
         folio_id: str,
         payload: FolioItemCreate,
         posted_by: str | None,
+        commit: bool = True,
     ) -> FolioItem:
         folio = self.folios.get_for_hotel(hotel_id, folio_id)
         if not folio:
@@ -96,8 +97,9 @@ class FolioService:
         self.db.flush()
         self._recalculate(folio)
         self.audit.log(hotel_id, "folio.item.added", "folio", folio.id, posted_by)
-        self.db.commit()
-        self.db.refresh(item)
+        if commit:
+            self.db.commit()
+            self.db.refresh(item)
         return item
 
     def add_payment(

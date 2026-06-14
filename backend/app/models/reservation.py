@@ -1,13 +1,13 @@
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
-from app.models.base import TimestampMixin, UUIDPrimaryKeyMixin
+from app.models.base import SoftDeleteMixin, TimestampMixin, UUIDPrimaryKeyMixin, utcnow
 
 
-class Reservation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+class Reservation(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     __tablename__ = "reservations"
     __table_args__ = (
         UniqueConstraint("hotel_id", "reservation_no", name="uq_reservations_hotel_no"),
@@ -23,6 +23,18 @@ class Reservation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     checkout_date: Mapped[date] = mapped_column(Date)
     source: Mapped[str] = mapped_column(String(40), default="walk_in")
     notes: Mapped[str | None] = mapped_column(Text)
+
+
+class ReservationGuest(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "reservation_guests"
+    __table_args__ = (UniqueConstraint("reservation_id", "guest_id", name="uq_reservation_guest"),)
+
+    hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
+    reservation_id: Mapped[str] = mapped_column(ForeignKey("reservations.id"), index=True)
+    guest_id: Mapped[str] = mapped_column(ForeignKey("guests.id"), index=True)
+    is_primary: Mapped[bool] = mapped_column(Boolean, default=False)
+    relationship: Mapped[str | None] = mapped_column(String(80))
+    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class StayRecord(UUIDPrimaryKeyMixin, Base):

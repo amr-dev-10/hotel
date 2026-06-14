@@ -9,6 +9,8 @@ from app.models.user import User
 from app.repositories.reservation_repository import ReservationRepository, StayRecordRepository
 from app.schemas.reservation import (
     ReservationCreate,
+    ReservationGuestNew,
+    ReservationGuestRead,
     ReservationRead,
     ReservationUpdate,
     RoomChangeRequest,
@@ -72,6 +74,29 @@ def update_reservation(
         actor_id=current_user.id,
     )
     return ok(ReservationRead.model_validate(reservation).model_dump())
+
+
+@router.get("/{reservation_id}/guests")
+def list_reservation_guests(
+    hotel_id: str,
+    reservation_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("guest.view")),
+) -> dict:
+    guests = ReservationService(db).list_guests(hotel_id, reservation_id)
+    return ok([ReservationGuestRead.model_validate(item).model_dump() for item in guests])
+
+
+@router.post("/{reservation_id}/guests")
+def add_reservation_guest(
+    hotel_id: str,
+    reservation_id: str,
+    payload: ReservationGuestNew,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("guest.edit")),
+) -> dict:
+    guest_link = ReservationService(db).add_guest(hotel_id, reservation_id, payload, current_user.id)
+    return ok(ReservationGuestRead.model_validate(guest_link).model_dump())
 
 
 @router.post("/{reservation_id}/check-in")

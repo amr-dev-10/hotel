@@ -42,6 +42,18 @@ class HousekeepingRead(ORMModel):
     completed_at: datetime | None = None
 
 
+class HousekeepingChecklistUpsert(BaseModel):
+    task_type: str = Field(min_length=2, max_length=60)
+    items: list[dict | str] = Field(default_factory=list)
+
+
+class HousekeepingChecklistRead(ORMModel):
+    id: str
+    hotel_id: str
+    task_type: str
+    items: list[dict | str]
+
+
 class MaintenanceCreate(BaseModel):
     room_id: str | None = None
     ticket_id: str | None = None

@@ -4,10 +4,10 @@ from sqlalchemy import Boolean, ForeignKey, Integer, Numeric, String, Text, Uniq
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
-from app.models.base import TimestampMixin, UUIDPrimaryKeyMixin
+from app.models.base import SoftDeleteMixin, TimestampMixin, UUIDPrimaryKeyMixin
 
 
-class MenuCategory(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+class MenuCategory(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     __tablename__ = "menu_categories"
     __table_args__ = (UniqueConstraint("hotel_id", "name", name="uq_menu_categories_hotel_name"),)
 
@@ -18,7 +18,7 @@ class MenuCategory(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
-class MenuItem(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+class MenuItem(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     __tablename__ = "menu_items"
 
     hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)

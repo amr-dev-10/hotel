@@ -5,8 +5,14 @@ from pydantic import BaseModel, Field
 from app.schemas.common import ORMModel
 
 
+class ReservationGuestCreate(BaseModel):
+    guest_id: str
+    is_primary: bool = False
+    relationship: str | None = None
+
+
 class ReservationCreate(BaseModel):
-    guest_name: str = Field(min_length=2, max_length=255)
+    guest_name: str | None = Field(default=None, min_length=2, max_length=255)
     phone: str | None = None
     whatsapp_phone: str | None = None
     room_id: str | None = None
@@ -15,6 +21,7 @@ class ReservationCreate(BaseModel):
     checkout_date: date
     source: str = "walk_in"
     notes: str | None = None
+    guests: list[ReservationGuestCreate] = Field(default_factory=list)
 
 
 class ReservationUpdate(BaseModel):
@@ -39,6 +46,25 @@ class ReservationRead(ORMModel):
     checkout_date: date
     source: str
     notes: str | None = None
+
+
+class ReservationGuestNew(BaseModel):
+    name: str = Field(min_length=2, max_length=255)
+    phone: str | None = None
+    whatsapp_phone: str | None = None
+    email: str | None = None
+    is_primary: bool = False
+    relationship: str | None = None
+
+
+class ReservationGuestRead(ORMModel):
+    id: str
+    hotel_id: str
+    reservation_id: str
+    guest_id: str
+    is_primary: bool
+    relationship: str | None = None
+    added_at: datetime
 
 
 class RoomChangeRequest(BaseModel):

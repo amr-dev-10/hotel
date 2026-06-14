@@ -7,6 +7,7 @@ from app.models.base import utcnow
 from app.models.ops import HousekeepingSchedule, LostFoundItem, MaintenanceOrder
 from app.models.ticket import Ticket
 from app.repositories.ops_repository import (
+    HousekeepingChecklistRepository,
     HousekeepingScheduleRepository,
     LostFoundRepository,
     MaintenanceOrderRepository,
@@ -27,6 +28,7 @@ class HousekeepingService:
     def __init__(self, db: Session) -> None:
         self.db = db
         self.schedules = HousekeepingScheduleRepository(db)
+        self.checklists = HousekeepingChecklistRepository(db)
         self.rooms = RoomRepository(db)
         self.audit = AuditService(db)
 
@@ -73,6 +75,7 @@ class HousekeepingService:
         task = self.schedules.get_for_hotel(hotel_id, task_id)
         if not task:
             raise not_found("Housekeeping task not found")
+        old_status = task.status
         for key, value in payload.model_dump(exclude_unset=True).items():
             setattr(task, key, value)
         if task.status == "in_progress" and not task.started_at:
@@ -82,6 +85,17 @@ class HousekeepingService:
             room = self.rooms.get_for_hotel(hotel_id, task.room_id)
             if room and room.status == "cleaning":
                 room.status = "available"
+        if old_status != "completed" and task.status == "completed":
+            checklist = self.checklists.get_for_task_type(hotel_id, task.task_type)
+            if checklist and checklist.items:
+                from app.services.inventory_service import InventoryService
+
+                InventoryService(self.db).issue_for_housekeeping(
+                    hotel_id,
+                    task.id,
+                    checklist.items,
+                    actor_id,
+                )
         self.audit.log(hotel_id, "housekeeping.updated", "housekeeping", task.id, actor_id)
         self.db.commit()
         self.db.refresh(task)

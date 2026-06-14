@@ -25,6 +25,7 @@ from app.schemas.knowledge import (
     KnowledgeDocumentCreate,
     KnowledgeDocumentRead,
     KnowledgeDocumentUpdate,
+    KnowledgeDocumentVersionRead,
     ServiceFormCreate,
     ServiceFormRead,
     ServiceFormUpdate,
@@ -72,6 +73,39 @@ def update_knowledge_document(
 ) -> dict:
     document = KnowledgeDocumentService(db).update(hotel_id, document_id, payload, current_user.id)
     return ok(KnowledgeDocumentRead.model_validate(document).model_dump())
+
+
+@router.get("/{document_id}/versions")
+def list_document_versions(
+    hotel_id: str,
+    document_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("bot.view")),
+) -> dict:
+    versions = KnowledgeDocumentService(db).versions_for_document(hotel_id, document_id)
+    return ok([KnowledgeDocumentVersionRead.model_validate(item).model_dump() for item in versions])
+
+
+@router.post("/{document_id}/rollback")
+def rollback_document(
+    hotel_id: str,
+    document_id: str,
+    version: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("bot.manage")),
+) -> dict:
+    document = KnowledgeDocumentService(db).rollback(hotel_id, document_id, version, current_user.id)
+    return ok(KnowledgeDocumentRead.model_validate(document).model_dump())
+
+
+@router.post("/embeddings/process")
+def process_embeddings(
+    hotel_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("bot.manage")),
+) -> dict:
+    processed = KnowledgeDocumentService(db).process_pending_embeddings(hotel_id)
+    return ok({"processed": len(processed), "document_ids": [item.id for item in processed]})
 
 
 @router.delete("/{document_id}")

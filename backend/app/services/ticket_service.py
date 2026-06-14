@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.exceptions import not_found
 from app.models.base import utcnow
 from app.models.ticket import Ticket
+from app.models.user import User
 from app.repositories.bot_config_repository import BotConfigRepository
 from app.repositories.department_repository import DepartmentRepository
 from app.repositories.knowledge_repository import DepartmentConfigRepository
@@ -16,6 +17,9 @@ from app.schemas.ops import NotificationCreate
 from app.services.audit_service import AuditService
 from app.services.notification_service import NotificationService
 from app.services.ops_service import NotificationCenterService
+from app.services.staff_service import ShiftService
+from app.services.usage_service import UsageService
+from app.services.workflow_service import WorkflowService
 
 
 class TicketService:
@@ -36,6 +40,7 @@ class TicketService:
         actor_id: str | None = None,
         commit: bool = True,
     ) -> Ticket:
+        UsageService(self.db).check_and_increment(hotel_id, "tickets", commit=False)
         department = None
         if payload.department_id:
             department = self.departments.get_for_hotel(hotel_id, payload.department_id)
@@ -49,10 +54,17 @@ class TicketService:
         assignee = None
         if payload.assigned_to:
             assignee = self.users.get_for_hotel(hotel_id, payload.assigned_to)
+        now = utcnow()
+        if not assignee:
+            assignee = ShiftService(self.db).find_available_staff(
+                hotel_id,
+                department.id,
+                now.date(),
+                now.time(),
+            )
         if not assignee:
             assignee = self.users.first_on_duty_for_department(hotel_id, department.id)
 
-        now = utcnow()
         ticket = Ticket(
             hotel_id=hotel_id,
             ticket_code=self._ticket_code(),
@@ -136,26 +148,39 @@ class TicketService:
         stage: str,
         note: str | None = None,
         actor_id: str | None = None,
+        actor: User | None = None,
     ) -> Ticket:
         ticket = self.tickets.get_for_hotel(hotel_id, ticket_id)
         if not ticket:
             raise not_found("Ticket not found")
-        ticket.stage = stage
-        if stage.lower() in {"completed", "resolved", "closed"}:
-            ticket.stage = "Completed"
-            ticket.resolved_at = utcnow()
-        self.tickets.add_event(
-            ticket,
-            "stage_changed",
-            {"stage": ticket.stage, "note": note},
-            actor_id=actor_id,
-        )
+        effective_actor_id = actor.id if actor else actor_id
+        workflow_ticket = WorkflowService(self.db).change_ticket_stage(ticket, stage, actor)
+        if workflow_ticket:
+            ticket = workflow_ticket
+            if note:
+                self.tickets.add_event(
+                    ticket,
+                    "stage_note",
+                    {"stage": ticket.stage, "note": note},
+                    actor_id=effective_actor_id,
+                )
+        else:
+            ticket.stage = stage
+            if stage.lower() in {"completed", "resolved", "closed"}:
+                ticket.stage = "Completed"
+                ticket.resolved_at = utcnow()
+            self.tickets.add_event(
+                ticket,
+                "stage_changed",
+                {"stage": ticket.stage, "note": note},
+                actor_id=effective_actor_id,
+            )
         self.audit.log(
             hotel_id,
             "ticket.resolved" if ticket.stage == "Completed" else "ticket.stage_changed",
             "ticket",
             ticket.id,
-            actor_id,
+            effective_actor_id,
             {"stage": ticket.stage, "note": note},
         )
         self.db.commit()

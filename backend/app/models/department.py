@@ -2,10 +2,10 @@ from sqlalchemy import Boolean, ForeignKey, Integer, JSON, String, Text, UniqueC
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
-from app.models.base import TimestampMixin, UUIDPrimaryKeyMixin
+from app.models.base import SoftDeleteMixin, TimestampMixin, UUIDPrimaryKeyMixin
 
 
-class Department(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+class Department(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     __tablename__ = "departments"
     __table_args__ = (UniqueConstraint("hotel_id", "key", name="uq_departments_hotel_key"),)
 

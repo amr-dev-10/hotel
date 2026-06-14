@@ -97,6 +97,8 @@ class KnowledgeDocumentCreate(BaseModel):
     file_url: str | None = None
     language: str = "en"
     is_active: bool = True
+    status: str = "ready"
+    change_note: str | None = None
 
 
 class KnowledgeDocumentUpdate(BaseModel):
@@ -106,6 +108,8 @@ class KnowledgeDocumentUpdate(BaseModel):
     file_url: str | None = None
     language: str | None = None
     is_active: bool | None = None
+    status: str | None = None
+    change_note: str | None = None
 
 
 class KnowledgeDocumentRead(ORMModel):
@@ -117,6 +121,19 @@ class KnowledgeDocumentRead(ORMModel):
     file_url: str | None = None
     language: str
     is_active: bool
+    status: str
+    current_version: int
+
+
+class KnowledgeDocumentVersionRead(ORMModel):
+    id: str
+    hotel_id: str
+    document_id: str
+    version_number: int
+    content: str
+    file_url: str | None = None
+    changed_by: str | None = None
+    change_note: str | None = None
 
 
 class KnowledgeEmbeddingRead(ORMModel):

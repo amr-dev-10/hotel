@@ -11,6 +11,7 @@ from app.api.v1 import (
     guests,
     housekeeping,
     hotels,
+    inventory,
     knowledge,
     live_chat,
     lost_found,
@@ -20,12 +21,16 @@ from app.api.v1 import (
     organizations,
     rate_plans,
     reservations,
+    restaurant,
     roles,
     room_types,
     rooms,
+    saas,
+    shifts,
     tickets,
     users,
     whatsapp_accounts,
+    workflows,
 )
 
 api_router = APIRouter()
@@ -81,6 +86,31 @@ api_router.include_router(
     lost_found.router,
     prefix="/hotels/{hotel_id}/lost-found",
     tags=["lost-found"],
+)
+api_router.include_router(
+    inventory.router,
+    prefix="/hotels/{hotel_id}/inventory",
+    tags=["inventory"],
+)
+api_router.include_router(
+    restaurant.router,
+    prefix="/hotels/{hotel_id}/restaurant",
+    tags=["restaurant"],
+)
+api_router.include_router(
+    shifts.router,
+    prefix="/hotels/{hotel_id}/shifts",
+    tags=["shifts"],
+)
+api_router.include_router(
+    workflows.router,
+    prefix="/hotels/{hotel_id}/workflows",
+    tags=["workflows"],
+)
+api_router.include_router(
+    saas.router,
+    prefix="/hotels/{hotel_id}/saas",
+    tags=["saas"],
 )
 api_router.include_router(menu.router, prefix="/hotels/{hotel_id}/menu", tags=["menu"])
 api_router.include_router(

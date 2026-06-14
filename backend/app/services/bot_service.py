@@ -27,7 +27,7 @@ from app.schemas.reservation import ReservationCreate
 from app.schemas.ticket import TicketCreate
 from app.services.defaults import DEFAULT_BOT_MESSAGES, DEFAULT_MAIN_MENU, DEFAULT_SERVICES
 from app.services.knowledge_service import FAQService, KnowledgeDocumentService
-from app.services.whatsapp_ops_service import LiveChatService
+from app.services.whatsapp_ops_service import ConversationWindowService, LiveChatService
 from app.services.gemini_service import GeminiService
 from app.services.folio_service import FolioService
 from app.services.reservation_service import ReservationService
@@ -609,4 +609,10 @@ class BotService:
                 status="sent",
                 created_at=utcnow(),
             )
+        )
+        ConversationWindowService(self.db).track_message(
+            hotel_id,
+            session.phone,
+            category="service",
+            commit=False,
         )

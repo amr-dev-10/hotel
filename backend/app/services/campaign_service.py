@@ -10,7 +10,8 @@ from app.repositories.guest_repository import GuestRepository
 from app.repositories.hotel_repository import HotelRepository
 from app.repositories.whatsapp_repository import WhatsAppAccountRepository
 from app.schemas.campaign import CampaignCreate
-from app.services.whatsapp_ops_service import WhatsAppUsageService
+from app.services.usage_service import UsageService
+from app.services.whatsapp_ops_service import ConversationWindowService, WhatsAppUsageService
 from app.services.whatsapp_service import WhatsAppService
 
 
@@ -45,6 +46,13 @@ class CampaignService:
         self.db.flush()
 
         recipients = self._recipients(hotel_id, payload)
+        if campaign.status != "scheduled":
+            UsageService(self.db).check_and_increment(
+                hotel_id,
+                "whatsapp_campaigns",
+                amount=max(1, len(recipients)),
+                commit=False,
+            )
         sent_count = 0
         hotel = self.hotels.get(hotel_id)
         account = None
@@ -76,6 +84,12 @@ class CampaignService:
                 WhatsAppUsageService(self.db).increment(hotel_id, "template_sent", commit=False)
                 WhatsAppUsageService(self.db).increment(hotel_id, "messages_sent", commit=False)
                 WhatsAppUsageService(self.db).increment(hotel_id, "api_calls", commit=False)
+                ConversationWindowService(self.db).track_message(
+                    hotel_id,
+                    phone,
+                    category="marketing",
+                    commit=False,
+                )
                 delivery.sent_at = datetime.now(UTC)
                 sent_count += 1
             self.db.add(delivery)
@@ -101,6 +115,13 @@ class CampaignService:
         if hotel and hotel.whatsapp_phone_number_id:
             account = self.whatsapp_accounts.get_by_phone_number_id(hotel.whatsapp_phone_number_id)
         deliveries = self.campaigns.list_deliveries(campaign.id)
+        pending_deliveries = [delivery for delivery in deliveries if delivery.status != "sent"]
+        UsageService(self.db).check_and_increment(
+            hotel_id,
+            "whatsapp_campaigns",
+            amount=max(1, len(pending_deliveries)),
+            commit=False,
+        )
         sent_count = campaign.sent_count
         failed_count = campaign.failed_count
         for delivery in deliveries:
@@ -121,6 +142,12 @@ class CampaignService:
                 WhatsAppUsageService(self.db).increment(hotel_id, "template_sent", commit=False)
                 WhatsAppUsageService(self.db).increment(hotel_id, "messages_sent", commit=False)
                 WhatsAppUsageService(self.db).increment(hotel_id, "api_calls", commit=False)
+                ConversationWindowService(self.db).track_message(
+                    hotel_id,
+                    delivery.phone,
+                    category="marketing",
+                    commit=False,
+                )
                 delivery.status = "sent"
                 delivery.sent_at = datetime.now(UTC)
                 sent_count += 1

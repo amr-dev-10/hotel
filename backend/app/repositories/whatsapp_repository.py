@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -6,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.models.base import utcnow
 from app.models.whatsapp import (
     LiveChatSession,
+    ConversationWindow,
     WhatsAppAccount,
     WhatsAppAccountHealth,
     WhatsAppConversation,
@@ -26,6 +28,11 @@ class WhatsAppAccountRepository(BaseRepository[WhatsAppAccount]):
                 WhatsAppAccount.phone_number_id == phone_number_id,
                 WhatsAppAccount.status == "active",
             )
+        ).scalar_one_or_none()
+
+    def get_any_by_phone_number_id(self, phone_number_id: str) -> WhatsAppAccount | None:
+        return self.db.execute(
+            select(WhatsAppAccount).where(WhatsAppAccount.phone_number_id == phone_number_id)
         ).scalar_one_or_none()
 
     def list_active(self) -> Sequence[WhatsAppAccount]:
@@ -126,3 +133,40 @@ class LiveChatSessionRepository(BaseRepository[LiveChatSession]):
             )
             .order_by(LiveChatSession.started_at.desc())
         ).scalars().first()
+
+
+class ConversationWindowRepository(BaseRepository[ConversationWindow]):
+    def __init__(self, db: Session) -> None:
+        super().__init__(db, ConversationWindow)
+
+    def get_open(
+        self,
+        hotel_id: str,
+        guest_phone: str,
+        category: str,
+        now,
+    ) -> ConversationWindow | None:
+        return self.db.execute(
+            select(ConversationWindow)
+            .where(
+                ConversationWindow.hotel_id == hotel_id,
+                ConversationWindow.guest_phone == guest_phone,
+                ConversationWindow.category == category,
+                ConversationWindow.closes_at > now,
+            )
+            .order_by(ConversationWindow.opened_at.desc())
+        ).scalars().first()
+
+    def list_for_month(self, hotel_id: str, year_month: str) -> Sequence[ConversationWindow]:
+        start = datetime.strptime(f"{year_month}-01", "%Y-%m-%d").replace(tzinfo=UTC)
+        if start.month == 12:
+            end = start.replace(year=start.year + 1, month=1)
+        else:
+            end = start.replace(month=start.month + 1)
+        return self.db.execute(
+            select(ConversationWindow).where(
+                ConversationWindow.hotel_id == hotel_id,
+                ConversationWindow.opened_at >= start,
+                ConversationWindow.opened_at < end,
+            )
+        ).scalars().all()

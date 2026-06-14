@@ -19,6 +19,17 @@ class FolioRepository(BaseRepository[GuestFolio]):
             )
         ).scalar_one_or_none()
 
+    def get_open_for_guest(self, hotel_id: str, guest_id: str) -> GuestFolio | None:
+        return self.db.execute(
+            select(GuestFolio)
+            .where(
+                GuestFolio.hotel_id == hotel_id,
+                GuestFolio.guest_id == guest_id,
+                GuestFolio.status.in_(("open", "closed")),
+            )
+            .order_by(GuestFolio.created_at.desc())
+        ).scalars().first()
+
 
 class FolioItemRepository(BaseRepository[FolioItem]):
     def __init__(self, db: Session) -> None:

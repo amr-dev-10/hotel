@@ -6,22 +6,31 @@ from app.core.database import get_db
 from app.core.responses import ok
 from app.models.user import User
 from app.repositories.whatsapp_repository import (
+    ConversationWindowRepository,
     WhatsAppAccountRepository,
     WhatsAppConversationRepository,
     WhatsAppTemplateRepository,
 )
 from app.schemas.whatsapp_account import (
+    ConversationWindowRead,
     WhatsAppAccountCreate,
     WhatsAppAccountRead,
     WhatsAppConversationRead,
     WhatsAppHealthRead,
     WhatsAppMessageRead,
+    WhatsAppOnboardingStart,
+    WhatsAppOnboardingVerify,
     WhatsAppTemplateCreate,
     WhatsAppTemplateRead,
+    WhatsAppTestMessageRequest,
     WhatsAppUsageRead,
 )
 from app.services.whatsapp_account_service import WhatsAppAccountService, WhatsAppTemplateService
-from app.services.whatsapp_ops_service import WhatsAppHealthService, WhatsAppUsageService
+from app.services.whatsapp_ops_service import (
+    ConversationWindowService,
+    WhatsAppHealthService,
+    WhatsAppUsageService,
+)
 
 router = APIRouter()
 
@@ -73,6 +82,47 @@ def upsert_account(
     else:
         account = service.create_account(hotel_id, payload, current_user.id)
     return ok(WhatsAppAccountRead.model_validate(account).model_dump())
+
+
+@router.post("/onboarding/start")
+def start_onboarding(
+    hotel_id: str,
+    payload: WhatsAppOnboardingStart,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("hotel.settings.manage")),
+) -> dict:
+    account = WhatsAppAccountService(db).start_onboarding(hotel_id, payload, current_user.id)
+    return ok(WhatsAppAccountRead.model_validate(account).model_dump())
+
+
+@router.post("/accounts/{account_id}/onboarding/verify")
+def verify_onboarding(
+    hotel_id: str,
+    account_id: str,
+    payload: WhatsAppOnboardingVerify,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("hotel.settings.manage")),
+) -> dict:
+    account = WhatsAppAccountService(db).verify_onboarding(hotel_id, account_id, payload, current_user.id)
+    return ok(WhatsAppAccountRead.model_validate(account).model_dump())
+
+
+@router.post("/accounts/{account_id}/test-message")
+def send_test_message(
+    hotel_id: str,
+    account_id: str,
+    payload: WhatsAppTestMessageRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("hotel.settings.manage")),
+) -> dict:
+    result = WhatsAppAccountService(db).send_test_message(hotel_id, account_id, payload, current_user.id)
+    account = result["account"]
+    return ok(
+        {
+            "account": WhatsAppAccountRead.model_validate(account).model_dump(),
+            "send_result": result["send_result"],
+        }
+    )
 
 
 @router.get("/templates")
@@ -148,3 +198,24 @@ def whatsapp_usage(
     db.commit()
     db.refresh(usage)
     return ok(WhatsAppUsageRead.model_validate(usage).model_dump())
+
+
+@router.get("/conversation-windows")
+def list_conversation_windows(
+    hotel_id: str,
+    year_month: str | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("hotel.billing.view")),
+) -> dict:
+    windows = ConversationWindowService(db).list_for_month(hotel_id, year_month)
+    return ok([ConversationWindowRead.model_validate(item).model_dump() for item in windows])
+
+
+@router.get("/conversation-windows/summary")
+def conversation_window_summary(
+    hotel_id: str,
+    year_month: str | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("hotel.billing.view")),
+) -> dict:
+    return ok(ConversationWindowService(db).summary(hotel_id, year_month))

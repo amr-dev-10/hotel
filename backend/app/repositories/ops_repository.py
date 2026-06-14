@@ -88,6 +88,14 @@ class HousekeepingChecklistRepository(BaseRepository[HousekeepingChecklist]):
     def __init__(self, db: Session) -> None:
         super().__init__(db, HousekeepingChecklist)
 
+    def get_for_task_type(self, hotel_id: str, task_type: str) -> HousekeepingChecklist | None:
+        return self.db.execute(
+            select(HousekeepingChecklist).where(
+                HousekeepingChecklist.hotel_id == hotel_id,
+                HousekeepingChecklist.task_type == task_type,
+            )
+        ).scalar_one_or_none()
+
 
 class MaintenanceOrderRepository(BaseRepository[MaintenanceOrder]):
     def __init__(self, db: Session) -> None:

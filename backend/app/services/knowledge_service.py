@@ -4,6 +4,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import not_found
+from app.models.base import utcnow
 from app.models.bot_config import BotConfig
 from app.models.knowledge import (
     BotVersion,
@@ -11,6 +12,7 @@ from app.models.knowledge import (
     HotelFAQ,
     HotelLanguage,
     KnowledgeDocument,
+    KnowledgeDocumentVersion,
     KnowledgeEmbedding,
     ServiceForm,
     ServiceFormField,
@@ -22,6 +24,7 @@ from app.repositories.knowledge_repository import (
     FAQRepository,
     HotelLanguageRepository,
     KnowledgeDocumentRepository,
+    KnowledgeDocumentVersionRepository,
     KnowledgeEmbeddingRepository,
     ServiceFormRepository,
 )
@@ -209,6 +212,7 @@ class KnowledgeDocumentService:
     def __init__(self, db: Session) -> None:
         self.db = db
         self.documents = KnowledgeDocumentRepository(db)
+        self.versions = KnowledgeDocumentVersionRepository(db)
         self.embeddings = KnowledgeEmbeddingRepository(db)
 
     def create(
@@ -217,10 +221,13 @@ class KnowledgeDocumentService:
         payload: KnowledgeDocumentCreate,
         actor_id: str | None,
     ) -> KnowledgeDocument:
-        document = KnowledgeDocument(hotel_id=hotel_id, **payload.model_dump())
+        data = payload.model_dump(exclude={"change_note"})
+        document = KnowledgeDocument(hotel_id=hotel_id, **data)
         self.db.add(document)
         self.db.flush()
-        self._rebuild_embeddings(document)
+        self._snapshot_version(document, 1, actor_id, payload.change_note or "Initial version")
+        self._queue_embeddings(document)
+        self.process_document_embeddings(document)
         AuditService(self.db).log(hotel_id, "knowledge.created", "knowledge_document", document.id, actor_id)
         self.db.commit()
         self.db.refresh(document)
@@ -236,15 +243,16 @@ class KnowledgeDocumentService:
         document = self.documents.get_for_hotel(hotel_id, document_id)
         if not document:
             raise not_found("Knowledge document not found")
-        data = payload.model_dump(exclude_unset=True)
-        content_changed = "content" in data
+        data = payload.model_dump(exclude_unset=True, exclude={"change_note"})
+        content_changed = "content" in data or "file_url" in data
         for key, value in data.items():
             setattr(document, key, value)
         if content_changed:
-            for embedding in self.embeddings.list_for_document(document.id):
-                self.db.delete(embedding)
-            self.db.flush()
-            self._rebuild_embeddings(document)
+            version_number = self.versions.next_version(document.id)
+            document.current_version = version_number
+            self._snapshot_version(document, version_number, actor_id, payload.change_note)
+            self._queue_embeddings(document)
+            self.process_document_embeddings(document)
         AuditService(self.db).log(hotel_id, "knowledge.updated", "knowledge_document", document.id, actor_id)
         self.db.commit()
         self.db.refresh(document)
@@ -257,6 +265,67 @@ class KnowledgeDocumentService:
         document.is_active = False
         AuditService(self.db).log(hotel_id, "knowledge.deleted", "knowledge_document", document.id, actor_id)
         self.db.commit()
+
+    def versions_for_document(self, hotel_id: str, document_id: str) -> list[KnowledgeDocumentVersion]:
+        document = self.documents.get_for_hotel(hotel_id, document_id)
+        if not document:
+            raise not_found("Knowledge document not found")
+        return list(self.versions.list_for_document(hotel_id, document_id))
+
+    def rollback(
+        self,
+        hotel_id: str,
+        document_id: str,
+        version_number: int,
+        actor_id: str | None,
+    ) -> KnowledgeDocument:
+        document = self.documents.get_for_hotel(hotel_id, document_id)
+        if not document:
+            raise not_found("Knowledge document not found")
+        target = self.versions.get_version(hotel_id, document_id, version_number)
+        if not target:
+            raise not_found("Knowledge document version not found")
+        document.content = target.content
+        document.file_url = target.file_url
+        new_version = self.versions.next_version(document.id)
+        document.current_version = new_version
+        self._snapshot_version(
+            document,
+            new_version,
+            actor_id,
+            f"Rollback to version {version_number}",
+        )
+        self._queue_embeddings(document)
+        self.process_document_embeddings(document)
+        AuditService(self.db).log(
+            hotel_id,
+            "knowledge.rollback",
+            "knowledge_document",
+            document.id,
+            actor_id,
+            {"version": version_number},
+        )
+        self.db.commit()
+        self.db.refresh(document)
+        return document
+
+    def process_pending_embeddings(self, hotel_id: str | None = None) -> list[KnowledgeDocument]:
+        if hotel_id:
+            candidates = self.documents.list_for_hotel(hotel_id, limit=500)
+        else:
+            from sqlalchemy import select
+
+            candidates = self.db.execute(
+                select(KnowledgeDocument).where(KnowledgeDocument.status == "processing")
+            ).scalars().all()
+        processed = []
+        for document in candidates:
+            if document.status != "processing":
+                continue
+            self.process_document_embeddings(document)
+            processed.append(document)
+        self.db.commit()
+        return processed
 
     def answer(self, hotel_id: str, text: str) -> str | None:
         query_words = self._words(text)
@@ -275,6 +344,37 @@ class KnowledgeDocumentService:
         if best_score == 0 or not best_chunk:
             return None
         return best_chunk.strip()
+
+    def _snapshot_version(
+        self,
+        document: KnowledgeDocument,
+        version_number: int,
+        actor_id: str | None,
+        change_note: str | None,
+    ) -> KnowledgeDocumentVersion:
+        version = KnowledgeDocumentVersion(
+            hotel_id=document.hotel_id,
+            document_id=document.id,
+            version_number=version_number,
+            content=document.content,
+            file_url=document.file_url,
+            changed_by=actor_id,
+            change_note=change_note,
+            created_at=utcnow(),
+        )
+        self.db.add(version)
+        self.db.flush()
+        return version
+
+    def _queue_embeddings(self, document: KnowledgeDocument) -> None:
+        self.embeddings.delete_for_document(document.id)
+        document.status = "processing"
+        self.db.flush()
+
+    def process_document_embeddings(self, document: KnowledgeDocument) -> None:
+        self._rebuild_embeddings(document)
+        document.status = "ready"
+        self.db.flush()
 
     def _rebuild_embeddings(self, document: KnowledgeDocument) -> None:
         for index, chunk in enumerate(self._chunks(document.content)):

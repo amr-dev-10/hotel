@@ -1,8 +1,8 @@
 # Arcadia Hotel Platform Backend
 
-FastAPI backend for the Arcadia hotel management platform, currently upgraded through the v3 final architecture shared in `docs/v3/`.
+FastAPI backend for the Arcadia hotel management platform, currently upgraded through the v4 definitive architecture shared in `docs/v4/`.
 
-The backend follows the v3 principles:
+The backend follows the v4 principles:
 
 - Modular monolith first.
 - PostgreSQL as the production source of truth.
@@ -26,6 +26,15 @@ The backend follows the v3 principles:
 - WhatsApp health monitoring, monthly usage tracking, and live-chat handoff.
 - Knowledge documents with chunk search before AI fallback.
 - Multi-hotel organizations, analytics snapshots, housekeeping, maintenance, and lost-and-found.
+- Multi-guest reservations with primary/secondary guest links.
+- Inventory vendors, items, transactions, purchase orders, and housekeeping stock deduction.
+- Restaurant/POS tables and orders with room-service folio posting and food-order tickets.
+- Employee shifts and shift-aware ticket assignment by active load.
+- Dynamic workflow states and transitions for ticket stages.
+- PostgreSQL RLS tenant context through `app.current_hotel_id`.
+- Knowledge document versions, rollback, and embedding processing status.
+- WhatsApp onboarding, test messages, and conversation-window billing rows.
+- SaaS features, plan features, and monthly usage limits.
 
 ## Quick Setup
 
@@ -59,6 +68,7 @@ Open:
 - `/api/v1/hotels/{hotel_id}/departments`
 - `/api/v1/hotels/{hotel_id}/guests`
 - `/api/v1/hotels/{hotel_id}/reservations`
+- `/api/v1/hotels/{hotel_id}/reservations/{reservation_id}/guests`
 - `/api/v1/hotels/{hotel_id}/reservations/{reservation_id}/change-room`
 - `/api/v1/hotels/{hotel_id}/reservations/{reservation_id}/stays`
 - `/api/v1/hotels/{hotel_id}/rate-plans`
@@ -68,6 +78,11 @@ Open:
 - `/api/v1/hotels/{hotel_id}/housekeeping`
 - `/api/v1/hotels/{hotel_id}/maintenance`
 - `/api/v1/hotels/{hotel_id}/lost-found`
+- `/api/v1/hotels/{hotel_id}/inventory`
+- `/api/v1/hotels/{hotel_id}/restaurant`
+- `/api/v1/hotels/{hotel_id}/shifts`
+- `/api/v1/hotels/{hotel_id}/workflows`
+- `/api/v1/hotels/{hotel_id}/saas`
 - `/api/v1/hotels/{hotel_id}/menu`
 - `/api/v1/hotels/{hotel_id}/bot-config`
 - `/api/v1/hotels/{hotel_id}/campaigns`
@@ -75,10 +90,13 @@ Open:
 - `/api/v1/hotels/{hotel_id}/whatsapp`
 - `/api/v1/hotels/{hotel_id}/whatsapp/health`
 - `/api/v1/hotels/{hotel_id}/whatsapp/usage`
+- `/api/v1/hotels/{hotel_id}/whatsapp/onboarding/start`
+- `/api/v1/hotels/{hotel_id}/whatsapp/conversation-windows`
 - `/api/v1/hotels/{hotel_id}/live-chat`
 - `/api/v1/hotels/{hotel_id}/faqs`
 - `/api/v1/hotels/{hotel_id}/service-forms`
 - `/api/v1/hotels/{hotel_id}/knowledge`
+- `/api/v1/hotels/{hotel_id}/knowledge/{document_id}/versions`
 - `/api/v1/hotels/{hotel_id}/audit-logs`
 - `/api/v1/hotels/{hotel_id}/notifications`
 - `/api/v1/hotels/{hotel_id}/media`
@@ -103,3 +121,8 @@ The shared v1 files are preserved in:
 - `docs/v2/arcadia_architecture_v2.md`
 - `docs/v2.1/architecture_v2_extended.md`
 - `docs/v3/architecture_v3_final.md`
+- `docs/v4/architecture_v4_definitive.md`
+
+## Migration Note
+
+Fresh development and test databases can be auto-created. Existing PostgreSQL databases need an Alembic migration for the v4 tables and new columns before running this code.

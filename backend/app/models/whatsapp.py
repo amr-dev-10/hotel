@@ -24,6 +24,9 @@ class WhatsAppAccount(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     webhook_verify_token: Mapped[str | None] = mapped_column(String(180))
     status: Mapped[str] = mapped_column(String(40), default="active")
     token_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    onboarding_step: Mapped[str] = mapped_column(String(40), default="connected")
+    connected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class WhatsAppAccountHealth(UUIDPrimaryKeyMixin, Base):
@@ -113,3 +116,16 @@ class LiveChatSession(UUIDPrimaryKeyMixin, Base):
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     ended_by: Mapped[str | None] = mapped_column(String(40))
+
+
+class ConversationWindow(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "conversation_windows"
+
+    hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
+    guest_phone: Mapped[str] = mapped_column(String(40), index=True)
+    category: Mapped[str] = mapped_column(String(40), default="service", index=True)
+    opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    closes_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    message_count: Mapped[int] = mapped_column(Integer, default=0)
+    estimated_cost: Mapped[Decimal] = mapped_column(Numeric(6, 4), default=0)
+    meta_conversation_id: Mapped[str | None] = mapped_column(String(180))

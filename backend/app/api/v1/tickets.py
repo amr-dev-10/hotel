@@ -47,5 +47,6 @@ def update_ticket_stage(
         payload.stage,
         note=payload.note,
         actor_id=current_user.id,
+        actor=current_user,
     )
     return ok(TicketRead.model_validate(ticket).model_dump())

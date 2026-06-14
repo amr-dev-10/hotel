@@ -85,6 +85,24 @@ class KnowledgeDocument(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     file_url: Mapped[str | None] = mapped_column(String(800))
     language: Mapped[str] = mapped_column(String(20), default="en")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    status: Mapped[str] = mapped_column(String(40), default="ready", index=True)
+    current_version: Mapped[int] = mapped_column(Integer, default=1)
+
+
+class KnowledgeDocumentVersion(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "knowledge_document_versions"
+    __table_args__ = (
+        UniqueConstraint("document_id", "version_number", name="uq_knowledge_document_version"),
+    )
+
+    hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
+    document_id: Mapped[str] = mapped_column(ForeignKey("knowledge_documents.id"), index=True)
+    version_number: Mapped[int] = mapped_column(Integer)
+    content: Mapped[str] = mapped_column(Text)
+    file_url: Mapped[str | None] = mapped_column(String(800))
+    changed_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
+    change_note: Mapped[str | None] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class KnowledgeEmbedding(UUIDPrimaryKeyMixin, Base):

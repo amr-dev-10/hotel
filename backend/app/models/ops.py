@@ -140,7 +140,7 @@ class HousekeepingChecklist(UUIDPrimaryKeyMixin, Base):
 
     hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
     task_type: Mapped[str] = mapped_column(String(60), index=True)
-    items: Mapped[list[str]] = mapped_column(JSON, default=list)
+    items: Mapped[list[dict | str]] = mapped_column(JSON, default=list)
 
 
 class MaintenanceOrder(UUIDPrimaryKeyMixin, Base):

@@ -9,6 +9,7 @@ from app.models.knowledge import (
     HotelFAQ,
     HotelLanguage,
     KnowledgeDocument,
+    KnowledgeDocumentVersion,
     KnowledgeEmbedding,
     ServiceForm,
     ServiceFormField,
@@ -124,4 +125,45 @@ class KnowledgeEmbeddingRepository(BaseRepository[KnowledgeEmbedding]):
             select(KnowledgeEmbedding)
             .where(KnowledgeEmbedding.document_id == document_id)
             .order_by(KnowledgeEmbedding.chunk_index)
+        ).scalars().all()
+
+    def delete_for_document(self, document_id: str) -> None:
+        for embedding in self.list_for_document(document_id):
+            self.db.delete(embedding)
+
+
+class KnowledgeDocumentVersionRepository(BaseRepository[KnowledgeDocumentVersion]):
+    def __init__(self, db: Session) -> None:
+        super().__init__(db, KnowledgeDocumentVersion)
+
+    def next_version(self, document_id: str) -> int:
+        current = self.db.execute(
+            select(func.max(KnowledgeDocumentVersion.version_number)).where(
+                KnowledgeDocumentVersion.document_id == document_id
+            )
+        ).scalar()
+        return int(current or 0) + 1
+
+    def get_version(
+        self,
+        hotel_id: str,
+        document_id: str,
+        version_number: int,
+    ) -> KnowledgeDocumentVersion | None:
+        return self.db.execute(
+            select(KnowledgeDocumentVersion).where(
+                KnowledgeDocumentVersion.hotel_id == hotel_id,
+                KnowledgeDocumentVersion.document_id == document_id,
+                KnowledgeDocumentVersion.version_number == version_number,
+            )
+        ).scalar_one_or_none()
+
+    def list_for_document(self, hotel_id: str, document_id: str) -> Sequence[KnowledgeDocumentVersion]:
+        return self.db.execute(
+            select(KnowledgeDocumentVersion)
+            .where(
+                KnowledgeDocumentVersion.hotel_id == hotel_id,
+                KnowledgeDocumentVersion.document_id == document_id,
+            )
+            .order_by(KnowledgeDocumentVersion.version_number.desc())
         ).scalars().all()

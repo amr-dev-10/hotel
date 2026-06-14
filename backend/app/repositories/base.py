@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from datetime import datetime
 from typing import Generic, TypeVar
 
 from sqlalchemy import Select, select
@@ -20,6 +21,8 @@ class BaseRepository(Generic[ModelT]):
             self.model.id == item_id,
             self.model.hotel_id == hotel_id,
         )
+        if hasattr(self.model, "deleted_at"):
+            statement = statement.where(self.model.deleted_at.is_(None))
         return self.db.execute(statement).scalar_one_or_none()
 
     def list_for_hotel(
@@ -47,4 +50,12 @@ class BaseRepository(Generic[ModelT]):
         self.db.commit()
         if instance is not None:
             self.db.refresh(instance)
+        return instance
+
+    def soft_delete(self, instance: ModelT, deleted_at: datetime) -> ModelT:
+        if not hasattr(instance, "deleted_at"):
+            self.db.delete(instance)
+        else:
+            instance.deleted_at = deleted_at
+        self.db.commit()
         return instance

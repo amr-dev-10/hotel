@@ -2,7 +2,7 @@ from fastapi import Depends
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
-from app.core.database import get_db
+from app.core.database import get_db, set_tenant_context
 from app.core.exceptions import forbidden
 from app.core.security import decode_access_token
 from app.models.user import User
@@ -36,6 +36,7 @@ def require_permission(permission_code: str):
         db: Session = Depends(get_db),
     ) -> User:
         ensure_hotel_access(hotel_id, current_user)
+        set_tenant_context(db, hotel_id)
         RBACService(db).require(current_user, permission_code)
         return current_user
 

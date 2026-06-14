@@ -1,12 +1,21 @@
 from sqlalchemy.orm import Session
 
-from app.core.encryption import encrypt_secret
+from app.core.encryption import decrypt_secret, encrypt_secret
 from app.core.vault import Vault
-from app.core.exceptions import bad_request
+from app.core.exceptions import bad_request, not_found
+from app.models.base import utcnow
 from app.models.whatsapp import WhatsAppAccount, WhatsAppTemplate
 from app.repositories.whatsapp_repository import WhatsAppAccountRepository, WhatsAppTemplateRepository
-from app.schemas.whatsapp_account import WhatsAppAccountCreate, WhatsAppTemplateCreate
+from app.schemas.whatsapp_account import (
+    WhatsAppAccountCreate,
+    WhatsAppOnboardingStart,
+    WhatsAppOnboardingVerify,
+    WhatsAppTemplateCreate,
+    WhatsAppTestMessageRequest,
+)
 from app.services.audit_service import AuditService
+from app.services.whatsapp_ops_service import ConversationWindowService, WhatsAppHealthService
+from app.services.whatsapp_service import WhatsAppService
 
 
 class WhatsAppAccountService:
@@ -45,6 +54,120 @@ class WhatsAppAccountService:
         self.db.commit()
         self.db.refresh(account)
         return account
+
+    def start_onboarding(
+        self,
+        hotel_id: str,
+        payload: WhatsAppOnboardingStart,
+        actor_id: str | None,
+    ) -> WhatsAppAccount:
+        account = self.accounts.get_any_by_phone_number_id(payload.phone_number_id)
+        if account and account.hotel_id != hotel_id:
+            raise bad_request("WhatsApp phone_number_id is already mapped")
+        if not account:
+            account = WhatsAppAccount(
+                hotel_id=hotel_id,
+                business_name=payload.business_name,
+                phone_number=payload.phone_number,
+                phone_number_id=payload.phone_number_id,
+                waba_id=payload.waba_id,
+                status="pending",
+                onboarding_step="token_required",
+            )
+            self.db.add(account)
+            self.db.flush()
+        else:
+            account.business_name = payload.business_name
+            account.phone_number = payload.phone_number
+            account.waba_id = payload.waba_id
+            account.status = "pending"
+            account.onboarding_step = "token_required"
+        AuditService(self.db).log(
+            hotel_id,
+            "whatsapp.onboarding.started",
+            "whatsapp_account",
+            account.id,
+            actor_id,
+        )
+        self.db.commit()
+        self.db.refresh(account)
+        return account
+
+    def verify_onboarding(
+        self,
+        hotel_id: str,
+        account_id: str,
+        payload: WhatsAppOnboardingVerify,
+        actor_id: str | None,
+    ) -> WhatsAppAccount:
+        account = self.accounts.get_for_hotel(hotel_id, account_id)
+        if not account:
+            raise not_found("WhatsApp account not found")
+        account.access_token = payload.access_token
+        account.access_token_encrypted = encrypt_secret(payload.access_token)
+        account.token_expires_at = payload.token_expires_at
+        account.status = "active"
+        account.onboarding_step = "test_message"
+        account.connected_at = account.connected_at or utcnow()
+        account.last_verified_at = utcnow()
+        Vault(self.db).store(
+            hotel_id,
+            f"whatsapp_token:{account.phone_number_id}",
+            payload.access_token,
+            commit=False,
+        )
+        AuditService(self.db).log(
+            hotel_id,
+            "whatsapp.onboarding.verified",
+            "whatsapp_account",
+            account.id,
+            actor_id,
+        )
+        self.db.commit()
+        self.db.refresh(account)
+        return account
+
+    def send_test_message(
+        self,
+        hotel_id: str,
+        account_id: str,
+        payload: WhatsAppTestMessageRequest,
+        actor_id: str | None,
+    ) -> dict:
+        account = self.accounts.get_for_hotel(hotel_id, account_id)
+        if not account:
+            raise not_found("WhatsApp account not found")
+        access_token = account.access_token or (
+            decrypt_secret(account.access_token_encrypted) if account.access_token_encrypted else None
+        )
+        result = WhatsAppService().send_text(
+            account.phone_number_id,
+            payload.to_phone,
+            payload.message,
+            access_token=access_token,
+        )
+        account.status = "active"
+        account.onboarding_step = "complete"
+        account.connected_at = account.connected_at or utcnow()
+        account.last_verified_at = utcnow()
+        WhatsAppHealthService(self.db).record_sent(hotel_id, account.id, commit=False)
+        ConversationWindowService(self.db).track_message(
+            hotel_id,
+            payload.to_phone,
+            category="service",
+            commit=False,
+        )
+        AuditService(self.db).log(
+            hotel_id,
+            "whatsapp.onboarding.test_message",
+            "whatsapp_account",
+            account.id,
+            actor_id,
+            {"to_phone": payload.to_phone},
+        )
+        self.db.commit()
+        self.db.refresh(account)
+        return {"account": account, "send_result": result}
 
     def update_account(
         self,

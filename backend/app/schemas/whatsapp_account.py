@@ -15,6 +15,7 @@ class WhatsAppAccountCreate(BaseModel):
     webhook_verify_token: str | None = None
     status: str = "active"
     token_expires_at: datetime | None = None
+    onboarding_step: str = "connected"
 
 
 class WhatsAppAccountRead(ORMModel):
@@ -27,6 +28,9 @@ class WhatsAppAccountRead(ORMModel):
     webhook_verify_token: str | None = None
     status: str
     token_expires_at: datetime | None = None
+    onboarding_step: str
+    connected_at: datetime | None = None
+    last_verified_at: datetime | None = None
 
 
 class WhatsAppTemplateCreate(BaseModel):
@@ -113,3 +117,32 @@ class LiveChatSessionRead(ORMModel):
 
 class LiveChatSendRequest(BaseModel):
     message: str = Field(min_length=1)
+
+
+class WhatsAppOnboardingStart(BaseModel):
+    business_name: str = Field(min_length=2, max_length=180)
+    phone_number: str | None = None
+    phone_number_id: str = Field(min_length=2, max_length=80)
+    waba_id: str | None = None
+
+
+class WhatsAppOnboardingVerify(BaseModel):
+    access_token: str = Field(min_length=2)
+    token_expires_at: datetime | None = None
+
+
+class WhatsAppTestMessageRequest(BaseModel):
+    to_phone: str = Field(min_length=5)
+    message: str = "Arcadia WhatsApp test message"
+
+
+class ConversationWindowRead(ORMModel):
+    id: str
+    hotel_id: str
+    guest_phone: str
+    category: str
+    opened_at: datetime
+    closes_at: datetime
+    message_count: int
+    estimated_cost: float
+    meta_conversation_id: str | None = None

@@ -4,10 +4,10 @@ from sqlalchemy import Date, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
-from app.models.base import TimestampMixin, UUIDPrimaryKeyMixin
+from app.models.base import SoftDeleteMixin, TimestampMixin, UUIDPrimaryKeyMixin
 
 
-class Guest(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+class Guest(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     __tablename__ = "guests"
 
     hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)

@@ -1,6 +1,6 @@
 from collections.abc import Generator
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.core.config import settings
@@ -36,6 +36,15 @@ def get_db() -> Generator[Session, None, None]:
         yield db
     finally:
         db.close()
+
+
+def set_tenant_context(db: Session, hotel_id: str) -> None:
+    if db.get_bind().dialect.name != "postgresql":
+        return
+    db.execute(
+        text("select set_config('app.current_hotel_id', :hotel_id, true)"),
+        {"hotel_id": hotel_id},
+    )
 
 
 def init_db() -> None:

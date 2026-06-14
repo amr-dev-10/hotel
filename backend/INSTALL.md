@@ -1,6 +1,6 @@
 # Arcadia Backend Setup
 
-The backend has been rebuilt from the versioned architecture documents in `docs/`, currently through v3.
+The backend has been rebuilt from the versioned architecture documents in `docs/`, currently through v4.
 Dependencies and local tooling are pinned so development can continue from a stable base.
 
 ## Library Versions
@@ -101,6 +101,7 @@ Open:
 - `/api/v1/hotels/{hotel_id}/reservations/{reservation_id}/checkin`
 - `/api/v1/hotels/{hotel_id}/reservations/{reservation_id}/checkout`
 - `/api/v1/hotels/{hotel_id}/reservations/{reservation_id}/change-room`
+- `/api/v1/hotels/{hotel_id}/reservations/{reservation_id}/guests`
 - `/api/v1/hotels/{hotel_id}/reservations/{reservation_id}/stays`
 - `/api/v1/hotels/{hotel_id}/rate-plans`
 - `/api/v1/hotels/{hotel_id}/folios`
@@ -109,6 +110,17 @@ Open:
 - `/api/v1/hotels/{hotel_id}/housekeeping`
 - `/api/v1/hotels/{hotel_id}/maintenance`
 - `/api/v1/hotels/{hotel_id}/lost-found`
+- `/api/v1/hotels/{hotel_id}/inventory/vendors`
+- `/api/v1/hotels/{hotel_id}/inventory/items`
+- `/api/v1/hotels/{hotel_id}/inventory/transactions`
+- `/api/v1/hotels/{hotel_id}/inventory/purchase-orders`
+- `/api/v1/hotels/{hotel_id}/restaurant/tables`
+- `/api/v1/hotels/{hotel_id}/restaurant/orders`
+- `/api/v1/hotels/{hotel_id}/shifts`
+- `/api/v1/hotels/{hotel_id}/workflows`
+- `/api/v1/hotels/{hotel_id}/saas/features`
+- `/api/v1/hotels/{hotel_id}/saas/plan-features`
+- `/api/v1/hotels/{hotel_id}/saas/usage-limits`
 - `/api/v1/hotels/{hotel_id}/menu/categories`
 - `/api/v1/hotels/{hotel_id}/menu/items`
 - `/api/v1/hotels/{hotel_id}/bot-config`
@@ -118,7 +130,9 @@ Open:
 - `/api/v1/hotels/{hotel_id}/whatsapp/account`
 - `/api/v1/hotels/{hotel_id}/whatsapp/templates`
 - `/api/v1/hotels/{hotel_id}/whatsapp/templates/sync`
+- `/api/v1/hotels/{hotel_id}/whatsapp/onboarding/start`
 - `/api/v1/hotels/{hotel_id}/whatsapp/conversations`
+- `/api/v1/hotels/{hotel_id}/whatsapp/conversation-windows`
 - `/api/v1/hotels/{hotel_id}/whatsapp/health`
 - `/api/v1/hotels/{hotel_id}/whatsapp/usage`
 - `/api/v1/hotels/{hotel_id}/live-chat/sessions`
@@ -130,6 +144,8 @@ Open:
 - `/api/v1/hotels/{hotel_id}/knowledge/languages`
 - `/api/v1/hotels/{hotel_id}/knowledge/department-configs`
 - `/api/v1/hotels/{hotel_id}/knowledge/service-forms`
+- `/api/v1/hotels/{hotel_id}/knowledge/{document_id}/versions`
+- `/api/v1/hotels/{hotel_id}/knowledge/{document_id}/rollback`
 - `/api/v1/hotels/{hotel_id}/service-forms`
 - `/api/v1/hotels/{hotel_id}/audit-logs`
 - `/api/v1/hotels/{hotel_id}/notifications`

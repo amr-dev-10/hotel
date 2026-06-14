@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.base import utcnow
@@ -21,6 +21,16 @@ class TicketRepository(BaseRepository[Ticket]):
                 Ticket.deleted_at.is_(None),
             )
         ).scalars().all()
+
+    def count_open_for_user(self, hotel_id: str, user_id: str) -> int:
+        return self.db.execute(
+            select(func.count()).select_from(Ticket).where(
+                Ticket.hotel_id == hotel_id,
+                Ticket.assigned_to == user_id,
+                Ticket.stage.not_in(("Completed", "Cancelled", "closed", "resolved")),
+                Ticket.deleted_at.is_(None),
+            )
+        ).scalar_one()
 
     def add_event(
         self,
