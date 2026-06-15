@@ -116,6 +116,67 @@ export interface Reservation {
   notes: string | null;
 }
 
+export interface Guest {
+  id: string;
+  hotel_id: string;
+  name: string;
+  phone: string | null;
+  whatsapp_phone: string | null;
+  email: string | null;
+  check_in_date: string | null;
+  check_out_date: string | null;
+  status: string;
+}
+
+export interface GuestConsent {
+  id: string;
+  guest_id: string;
+  hotel_id: string;
+  whatsapp_opt_in: boolean;
+  marketing_opt_in: boolean;
+  email_opt_in: boolean;
+  sms_opt_in: boolean;
+  consent_source: string;
+  consented_at: string | null;
+  updated_at: string;
+  ip_address: string | null;
+}
+
+export interface ReservationGuest {
+  id: string;
+  hotel_id: string;
+  reservation_id: string;
+  guest_id: string;
+  is_primary: boolean;
+  relationship: string | null;
+  added_at: string;
+}
+
+export interface StayRecord {
+  id: string;
+  hotel_id: string;
+  reservation_id: string;
+  room_id: string | null;
+  actual_checkin: string | null;
+  actual_checkout: string | null;
+  notes: string | null;
+}
+
+export interface Folio {
+  id: string;
+  hotel_id: string;
+  reservation_id: string;
+  guest_id: string;
+  folio_number: string;
+  status: string;
+  total_charges: string | number;
+  total_payments: string | number;
+  balance_due: string | number;
+  currency: string;
+  created_at: string;
+  closed_at: string | null;
+}
+
 export interface Room {
   id: string;
   hotel_id: string;

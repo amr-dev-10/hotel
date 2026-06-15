@@ -1,0 +1,40 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+
+import { apiGet, apiPost } from "@/lib/api/client";
+import { queryKeys } from "@/lib/api/query-keys";
+import type { Guest, GuestConsent } from "@/types/domain";
+import type { CreateGuestValues } from "@/features/guests/schemas/create-guest.schema";
+
+export function useGuests(hotelId: string) {
+  return useQuery({
+    queryKey: queryKeys.guests(hotelId),
+    queryFn: () => apiGet<Guest[]>(`/hotels/${hotelId}/guests`),
+    enabled: Boolean(hotelId),
+  });
+}
+
+export function useGuest(hotelId: string, guestId: string) {
+  const guests = useGuests(hotelId);
+
+  return {
+    ...guests,
+    data: guests.data?.find((guest) => guest.id === guestId),
+  };
+}
+
+export function useGuestConsent(hotelId: string, guestId: string) {
+  return useQuery({
+    queryKey: queryKeys.guestConsent(hotelId, guestId),
+    queryFn: () => apiGet<GuestConsent | null>(`/hotels/${hotelId}/guests/${guestId}/consent`),
+    enabled: Boolean(hotelId && guestId),
+  });
+}
+
+export function useCreateGuest(hotelId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: CreateGuestValues) => apiPost<Guest>(`/hotels/${hotelId}/guests`, payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.guests(hotelId) }),
+  });
+}

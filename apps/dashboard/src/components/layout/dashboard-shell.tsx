@@ -27,6 +27,7 @@ import { useAuthStore } from "@/stores/auth.store";
 const navItems = [
   { label: "Overview", href: "overview", icon: Gauge },
   { label: "Tickets", href: "tickets", icon: ListChecks },
+  { label: "Guests", href: "guests", icon: Users },
   { label: "Reservations", href: "reservations", icon: CalendarDays },
   { label: "Rooms", href: "rooms", icon: BedDouble },
   { label: "Housekeeping", href: "housekeeping", icon: Sparkles },

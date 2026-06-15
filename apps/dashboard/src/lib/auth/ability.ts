@@ -17,6 +17,7 @@ export type AppSubject =
   | "all"
   | "AI"
   | "Analytics"
+  | "Guest"
   | "Hierarchy"
   | "Housekeeping"
   | "HotelSettings"
@@ -44,6 +45,7 @@ export function buildAbility(user: CurrentUser | null): AppAbility {
     can("manage", "all");
   } else if (role.includes("supervisor")) {
     can(["view", "create", "accept", "assign", "approve"], "Ticket");
+    can(["view", "create", "edit"], "Guest");
     can(["view", "create", "edit"], "Housekeeping");
     can(["view", "edit"], "Reservation");
     can(["view", "edit"], "Room");
@@ -54,6 +56,7 @@ export function buildAbility(user: CurrentUser | null): AppAbility {
     can("view", "WhatsApp");
   } else {
     can(["view", "accept", "create"], "Ticket");
+    can("view", "Guest");
     can(["view", "edit"], "Housekeeping");
     can("view", "Room");
     can("view", "Reservation");
