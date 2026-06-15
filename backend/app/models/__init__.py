@@ -44,6 +44,7 @@ from app.models.ops import (
     Subscription,
 )
 from app.models.organization import Organization, OrganizationHotel, OrganizationUser
+from app.models.platform_admin import PlatformAdmin, PlatformSetting
 from app.models.rate_plan import RatePlan, RatePlanPeriod
 from app.models.rbac import Permission, PermissionGroup, Role, role_permissions, user_roles
 from app.models.reservation import Reservation, ReservationGuest, ReservationRoomType, StayRecord
@@ -118,6 +119,8 @@ __all__ = [
     "Payment",
     "PaymentTransaction",
     "PlanFeature",
+    "PlatformAdmin",
+    "PlatformSetting",
     "Permission",
     "PermissionGroup",
     "PurchaseOrder",

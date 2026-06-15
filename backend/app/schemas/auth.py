@@ -21,6 +21,8 @@ class CurrentUserRead(ORMModel):
     department_id: str | None = None
     name: str
     email: EmailStr
+    user_type: str
+    staff_level: str | None = None
     job_role: str | None = None
     is_hotel_owner: bool
     is_on_duty: bool

@@ -14,6 +14,7 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
     department_id: Mapped[str | None] = mapped_column(ForeignKey("departments.id"))
     reports_to: Mapped[str | None] = mapped_column(ForeignKey("users.id"), index=True)
+    user_type: Mapped[str] = mapped_column(String(30), default="HOTEL_EMPLOYEE", index=True)
     staff_level: Mapped[str | None] = mapped_column(String(20), index=True)
     name: Mapped[str] = mapped_column(String(255))
     email: Mapped[str] = mapped_column(String(255), index=True)

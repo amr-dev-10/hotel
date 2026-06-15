@@ -47,6 +47,7 @@ export function RoleEditorPage({
 
     setName(existingRole.name);
     setDescription(existingRole.description ?? "");
+    setPermissionCodes((existingRole.permissions ?? []).map((permission) => permission.code).sort());
   }, [existingRole]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -102,12 +103,6 @@ export function RoleEditorPage({
           Save role
         </Button>
       </div>
-
-      {roleId ? (
-        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          Existing permission assignments are not returned by the current backend response. Saving will apply the selected matrix below.
-        </div>
-      ) : null}
 
       <section className="grid gap-4 rounded-md border border-slate-200 bg-white p-4">
         <div className="grid gap-4 md:grid-cols-2">

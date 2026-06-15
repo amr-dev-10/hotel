@@ -88,6 +88,7 @@ class DemoDataService:
                 email=DEMO_EMAIL,
                 hashed_password=AuthService.password_hash(DEMO_PASSWORD),
                 job_role="Owner",
+                user_type="HOTEL_ADMIN",
                 staff_level="admin",
                 is_hotel_owner=True,
                 is_active=True,
@@ -102,6 +103,7 @@ class DemoDataService:
             owner.is_hotel_owner = True
             owner.is_on_duty = True
             owner.job_role = "Owner"
+            owner.user_type = "HOTEL_ADMIN"
             hotel.owner_user_id = owner.id
         return owner
 
@@ -185,6 +187,7 @@ class DemoDataService:
                     hotel_id=hotel.id,
                     department_id=departments.get(department_key).id if departments.get(department_key) else None,
                     reports_to=owner.id,
+                    user_type="HOTEL_EMPLOYEE",
                     staff_level=level,
                     name=name,
                     email=email,

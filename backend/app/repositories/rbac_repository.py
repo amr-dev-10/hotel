@@ -29,6 +29,11 @@ class PermissionRepository(BaseRepository[Permission]):
     def get_by_code(self, code: str) -> Permission | None:
         return self.db.execute(select(Permission).where(Permission.code == code)).scalar_one_or_none()
 
+    def get_by_codes(self, codes: list[str]) -> Sequence[Permission]:
+        if not codes:
+            return []
+        return self.db.execute(select(Permission).where(Permission.code.in_(codes))).scalars().all()
+
     def list_all(self) -> Sequence[Permission]:
         return self.db.execute(select(Permission).order_by(Permission.module, Permission.code)).scalars().all()
 

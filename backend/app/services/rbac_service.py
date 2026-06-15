@@ -153,6 +153,7 @@ class RBACService:
         return role
 
     def set_role_permissions(self, role: Role, permission_codes: Iterable[str]) -> None:
+        permission_codes = list(dict.fromkeys(permission_codes))
         permissions = []
         for code in permission_codes:
             permission = self.permissions.get_by_code(code)
@@ -160,6 +161,32 @@ class RBACService:
                 raise not_found(f"Permission does not exist: {code}")
             permissions.append(permission)
         self.roles.set_permissions(role.id, [permission.id for permission in permissions])
+
+    def replace_role_permissions(
+        self,
+        hotel_id: str,
+        role_id: str,
+        permission_codes: Iterable[str],
+        actor_id: str | None,
+    ) -> Role:
+        permission_codes = list(dict.fromkeys(permission_codes))
+        role = self.roles.get_for_hotel(hotel_id, role_id)
+        if not role:
+            raise not_found("Role not found")
+        old_codes = sorted(permission.code for permission in role.permissions)
+        self.set_role_permissions(role, permission_codes)
+        AuditService(self.db).log(
+            hotel_id,
+            "role.permissions.updated",
+            "role",
+            role.id,
+            actor_id,
+            old_payload={"permission_codes": old_codes},
+            new_payload={"permission_codes": permission_codes},
+        )
+        self.db.commit()
+        self.db.refresh(role)
+        return role
 
     def assign_roles(
         self,

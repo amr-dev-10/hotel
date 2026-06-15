@@ -11,12 +11,45 @@ export interface TokenResponse {
   expires_in_minutes: number;
 }
 
+export interface PlatformTokenResponse {
+  access_token: string;
+  token_type: "bearer";
+  expires_in_minutes: number;
+}
+
+export interface PlatformDashboard {
+  total_hotels: number;
+  active_hotels: number;
+  total_rooms: number;
+  total_users: number;
+  mrr: string | number;
+  whatsapp_usage: {
+    messages_sent: number;
+    messages_received: number;
+    estimated_cost: number;
+  };
+}
+
+export interface PlatformHotelSummary {
+  id: string;
+  slug: string;
+  name: string;
+  subscription_tier: string;
+  status: string;
+  active_users: number;
+  total_rooms: number;
+  open_tickets: number;
+  created_at: string;
+}
+
 export interface CurrentUser {
   id: string;
   hotel_id: string;
   department_id: string | null;
   name: string;
   email: string;
+  user_type: "SUPER_ADMIN" | "HOTEL_ADMIN" | "HOTEL_EMPLOYEE" | string;
+  staff_level: string | null;
   job_role: string | null;
   is_hotel_owner: boolean;
   is_on_duty: boolean;
@@ -114,6 +147,7 @@ export interface StaffUser {
   hotel_id: string;
   department_id: string | null;
   reports_to?: string | null;
+  user_type?: "HOTEL_ADMIN" | "HOTEL_EMPLOYEE" | string;
   staff_level?: string | null;
   name: string;
   email: string;
@@ -156,6 +190,7 @@ export interface Role {
   name: string;
   description: string | null;
   is_system_role: boolean;
+  permissions?: Permission[];
 }
 
 export interface DepartmentStaffNode {
