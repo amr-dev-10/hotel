@@ -42,6 +42,55 @@ export interface PlatformHotelSummary {
   created_at: string;
 }
 
+export interface PlatformUserSummary {
+  id: string;
+  hotel_id: string;
+  name: string;
+  email: string;
+  user_type: string;
+  staff_level: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface PlatformSubscriptionSummary {
+  id: string;
+  hotel_id: string;
+  plan: string;
+  status: string;
+  billing_cycle: string;
+  renewal_date: string | null;
+  created_at: string;
+}
+
+export interface PlatformSetting {
+  key: string;
+  value: unknown;
+  description: string | null;
+  updated_by: string | null;
+  updated_at: string;
+}
+
+export interface PlatformCreatedHotel {
+  id: string;
+  slug: string;
+  name: string;
+  address: string | null;
+  timezone: string;
+  contact_email: string | null;
+  contact_phone: string | null;
+  logo_url: string | null;
+  whatsapp_phone_number_id: string | null;
+  subscription_tier: string;
+  status: string;
+  owner_user_id: string | null;
+}
+
+export interface PlatformHotelCreateResponse {
+  hotel: PlatformCreatedHotel;
+  owner: CurrentUser;
+}
+
 export interface CurrentUser {
   id: string;
   hotel_id: string;
