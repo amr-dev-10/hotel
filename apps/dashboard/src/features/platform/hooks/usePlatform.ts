@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   platformGet,
+  platformPatch,
   platformPost,
   platformPut,
 } from "@/lib/api/platform-client";
@@ -25,6 +26,34 @@ export const platformKeys = {
   subscriptions: ["platform", "subscriptions"] as const,
   settings: ["platform", "settings"] as const,
 };
+
+export interface PlatformUserUpdatePayload {
+  name?: string;
+  email?: string;
+  department_id?: string | null;
+  reports_to?: string | null;
+  staff_level?: string | null;
+  user_type?: string | null;
+  job_role?: string | null;
+  is_active?: boolean;
+  is_on_duty?: boolean;
+}
+
+export interface PlatformSubscriptionUpdatePayload {
+  plan?: string;
+  status?: string;
+  billing_cycle?: string;
+  renewal_date?: string | null;
+  current_period_start?: string | null;
+  current_period_end?: string | null;
+  cancelled_at?: string | null;
+}
+
+export interface PasswordChangePayload {
+  current_password: string;
+  new_password: string;
+  confirm_password: string;
+}
 
 export function usePlatformDashboard() {
   return useQuery({
@@ -88,5 +117,44 @@ export function useSavePlatformSettings() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: platformKeys.settings });
     },
+  });
+}
+
+export function useUpdatePlatformUser() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ userId, payload }: { userId: string; payload: PlatformUserUpdatePayload }) =>
+      platformPatch<PlatformUserSummary>(`/platform/users/${userId}`, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: platformKeys.users });
+      queryClient.invalidateQueries({ queryKey: platformKeys.hotels });
+    },
+  });
+}
+
+export function useUpdatePlatformSubscription() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      subscriptionId,
+      payload,
+    }: {
+      subscriptionId: string;
+      payload: PlatformSubscriptionUpdatePayload;
+    }) => platformPatch<PlatformSubscriptionSummary>(`/platform/subscriptions/${subscriptionId}`, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: platformKeys.dashboard });
+      queryClient.invalidateQueries({ queryKey: platformKeys.hotels });
+      queryClient.invalidateQueries({ queryKey: platformKeys.subscriptions });
+    },
+  });
+}
+
+export function useChangePlatformPassword() {
+  return useMutation({
+    mutationFn: (payload: PasswordChangePayload) =>
+      platformPost<{ password_changed: boolean }>("/platform/auth/change-password", payload),
   });
 }

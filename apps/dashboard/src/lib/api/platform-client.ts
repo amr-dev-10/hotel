@@ -39,3 +39,12 @@ export async function platformPut<T, TPayload = unknown>(
   const response = await platformApi.put<ApiEnvelope<T>>(url, payload, config);
   return response.data.data;
 }
+
+export async function platformPatch<T, TPayload = unknown>(
+  url: string,
+  payload?: TPayload,
+  config?: AxiosRequestConfig,
+) {
+  const response = await platformApi.patch<ApiEnvelope<T>>(url, payload, config);
+  return response.data.data;
+}

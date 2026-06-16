@@ -17,3 +17,4 @@ __pycache__/
 npm-debug.log*
 backend/uvicorn.pid
 backend/uvicorn.*.log
+.codex-run/

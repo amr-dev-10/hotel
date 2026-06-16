@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { format, formatDistanceToNow } from "date-fns";
 import {
   ArrowLeft,
+  Ban,
   BedDouble,
   CalendarDays,
   CreditCard,
@@ -25,7 +26,9 @@ import { compactId, money, titleCase } from "@/lib/utils";
 import type { Folio, StayRecord, WhatsAppConversation } from "@/types/domain";
 import { useGuests } from "@/features/guests/hooks/useGuests";
 import { useRooms } from "@/features/rooms/hooks/useRooms";
+import { CancelReservationDialog } from "@/features/reservations/components/cancel-reservation-dialog";
 import {
+  useCancelReservation,
   useCheckInReservation,
   useCheckOutReservation,
   useReservation,
@@ -54,6 +57,8 @@ export function ReservationDetailPage({
   const conversations = useWhatsappConversations(hotelId);
   const checkIn = useCheckInReservation(hotelId);
   const checkOut = useCheckOutReservation(hotelId);
+  const cancelReservation = useCancelReservation(hotelId);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
 
   const guest = reservation.data ? guests.data?.find((item) => item.id === reservation.data.guest_id) : null;
   const room = reservation.data ? rooms.data?.find((item) => item.id === reservation.data?.room_id) : null;
@@ -89,6 +94,16 @@ export function ReservationDetailPage({
     }
   }
 
+  async function handleCancel(reason: string) {
+    try {
+      await cancelReservation.mutateAsync({ reservationId, reason });
+      toast.success("Reservation cancelled");
+      setCancelDialogOpen(false);
+    } catch (error) {
+      toast.error(apiErrorMessage(error));
+    }
+  }
+
   if (reservation.isLoading || guests.isLoading || rooms.isLoading || conversations.isLoading) {
     return <DataState isLoading />;
   }
@@ -100,6 +115,10 @@ export function ReservationDetailPage({
   if (!reservation.data) {
     return <DataState empty emptyTitle="Reservation not found." />;
   }
+
+  const canCancel = isReservationCancelable(reservation.data);
+  const canCheckIn = canCancel;
+  const canCheckOut = reservation.data.status === "checked_in";
 
   return (
     <div className="grid gap-5">
@@ -117,17 +136,37 @@ export function ReservationDetailPage({
         <div className="flex flex-wrap gap-2">
           <Badge variant={statusVariant(reservation.data.status)}>{titleCase(reservation.data.status)}</Badge>
           <Can I="edit" a="Reservation">
-            <Button disabled={checkIn.isPending} size="sm" type="button" variant="secondary" onClick={handleCheckIn}>
-              <LogIn />
-              Check in
-            </Button>
-            <Button disabled={checkOut.isPending} size="sm" type="button" variant="secondary" onClick={handleCheckOut}>
-              <LogOut />
-              Check out
-            </Button>
+            {canCheckIn ? (
+              <Button disabled={checkIn.isPending} size="sm" type="button" variant="secondary" onClick={handleCheckIn}>
+                <LogIn />
+                Check in
+              </Button>
+            ) : null}
+            {canCheckOut ? (
+              <Button disabled={checkOut.isPending} size="sm" type="button" variant="secondary" onClick={handleCheckOut}>
+                <LogOut />
+                Check out
+              </Button>
+            ) : null}
+            {canCancel ? (
+              <Button size="sm" type="button" variant="danger" onClick={() => setCancelDialogOpen(true)}>
+                <Ban />
+                Cancel
+              </Button>
+            ) : null}
           </Can>
         </div>
       </div>
+
+      {reservation.data.status === "cancelled" ? (
+        <section className="grid gap-2 rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
+          <h3 className="font-semibold">Reservation Cancelled</h3>
+          <p>
+            {reservation.data.cancelled_at ? `Cancelled ${formatDateTime(reservation.data.cancelled_at)}.` : "Cancelled."}
+            {reservation.data.cancellation_reason ? ` Reason: ${reservation.data.cancellation_reason}` : ""}
+          </p>
+        </section>
+      ) : null}
 
       <section className="grid gap-4 rounded-md border border-slate-200 bg-white p-4 lg:grid-cols-4">
         <Detail icon={UserRound} label="Guest" value={guest?.name ?? compactId(reservation.data.guest_id)} />
@@ -195,8 +234,20 @@ export function ReservationDetailPage({
           <p className="whitespace-pre-wrap text-sm text-slate-700">{reservation.data.notes}</p>
         </section>
       ) : null}
+
+      <CancelReservationDialog
+        isPending={cancelReservation.isPending}
+        open={cancelDialogOpen}
+        reservation={reservation.data}
+        onConfirm={handleCancel}
+        onOpenChange={setCancelDialogOpen}
+      />
     </div>
   );
+}
+
+function isReservationCancelable(reservation: { status: string }) {
+  return ["booked", "confirmed"].includes(reservation.status.toLowerCase());
 }
 
 function PaymentSummary({

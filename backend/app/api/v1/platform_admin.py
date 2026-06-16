@@ -7,9 +7,9 @@ from sqlalchemy.orm import Session
 from app.api.dependencies import get_platform_admin
 from app.core.config import settings
 from app.core.database import get_db
-from app.core.exceptions import bad_request
+from app.core.exceptions import bad_request, not_found
 from app.core.responses import ok
-from app.core.security import create_platform_access_token, verify_password
+from app.core.security import create_platform_access_token, hash_password, verify_password
 from app.models.hotel import Hotel
 from app.models.ops import Subscription
 from app.models.platform_admin import PlatformAdmin, PlatformSetting
@@ -17,7 +17,7 @@ from app.models.room import Room
 from app.models.ticket import Ticket
 from app.models.user import User
 from app.models.whatsapp import WhatsAppUsage
-from app.schemas.auth import LoginRequest
+from app.schemas.auth import LoginRequest, PasswordChangeRequest
 from app.schemas.hotel import HotelBootstrapRequest, HotelRead
 from app.schemas.platform import (
     PlatformDashboardRead,
@@ -26,12 +26,15 @@ from app.schemas.platform import (
     PlatformHotelSummary,
     PlatformSettingRead,
     PlatformSettingsUpdate,
+    PlatformSubscriptionUpdate,
     PlatformSubscriptionSummary,
     PlatformUserSummary,
 )
-from app.schemas.user import UserRead
+from app.schemas.user import UserRead, UserUpdate
+from app.services.audit_service import AuditService
 from app.services.hotel_service import HotelService
 from app.models.base import utcnow
+from app.services.user_service import UserService
 
 router = APIRouter()
 
@@ -75,6 +78,21 @@ def platform_login(payload: LoginRequest, db: Session = Depends(get_db)) -> dict
             "expires_in_minutes": settings.access_token_expire_minutes,
         }
     )
+
+
+@router.post("/auth/change-password")
+def platform_change_password(
+    payload: PasswordChangeRequest,
+    db: Session = Depends(get_db),
+    admin: PlatformAdmin = Depends(get_platform_admin),
+) -> dict:
+    if not verify_password(payload.current_password, admin.password_hash):
+        raise bad_request("Current password is incorrect")
+    if verify_password(payload.new_password, admin.password_hash):
+        raise bad_request("New password must be different from current password")
+    admin.password_hash = hash_password(payload.new_password)
+    db.commit()
+    return ok({"password_changed": True})
 
 
 @router.get("/dashboard")
@@ -191,6 +209,26 @@ def list_platform_users(
     return ok([PlatformUserSummary.model_validate(user).model_dump() for user in users])
 
 
+@router.patch("/users/{user_id}")
+def update_platform_user(
+    user_id: str,
+    payload: UserUpdate,
+    db: Session = Depends(get_db),
+    admin: PlatformAdmin = Depends(get_platform_admin),
+) -> dict:
+    user = db.get(User, user_id)
+    if not user or user.deleted_at is not None:
+        raise not_found("User not found")
+    updated = UserService(db).update_user(
+        user.hotel_id,
+        user.id,
+        payload,
+        actor=None,
+        audit_payload={"source": "platform_admin", "platform_admin_id": admin.id},
+    )
+    return ok(PlatformUserSummary.model_validate(updated).model_dump())
+
+
 @router.get("/subscriptions")
 def list_platform_subscriptions(
     db: Session = Depends(get_db),
@@ -198,6 +236,55 @@ def list_platform_subscriptions(
 ) -> dict:
     subscriptions = db.execute(select(Subscription).order_by(Subscription.created_at.desc())).scalars().all()
     return ok([PlatformSubscriptionSummary.model_validate(item).model_dump() for item in subscriptions])
+
+
+@router.patch("/subscriptions/{subscription_id}")
+def update_platform_subscription(
+    subscription_id: str,
+    payload: PlatformSubscriptionUpdate,
+    db: Session = Depends(get_db),
+    admin: PlatformAdmin = Depends(get_platform_admin),
+) -> dict:
+    subscription = db.get(Subscription, subscription_id)
+    if not subscription:
+        raise not_found("Subscription not found")
+
+    update_data = payload.model_dump(exclude_unset=True)
+    audit_update_data = payload.model_dump(exclude_unset=True, mode="json")
+    old_payload = {
+        "plan": subscription.plan,
+        "status": subscription.status,
+        "billing_cycle": subscription.billing_cycle,
+        "renewal_date": str(subscription.renewal_date) if subscription.renewal_date else None,
+        "current_period_start": subscription.current_period_start.isoformat()
+        if subscription.current_period_start
+        else None,
+        "current_period_end": subscription.current_period_end.isoformat()
+        if subscription.current_period_end
+        else None,
+        "cancelled_at": subscription.cancelled_at.isoformat() if subscription.cancelled_at else None,
+    }
+
+    for field, value in update_data.items():
+        setattr(subscription, field, value)
+    if "plan" in update_data:
+        hotel = db.get(Hotel, subscription.hotel_id)
+        if hotel:
+            hotel.subscription_tier = subscription.plan
+
+    AuditService(db).log(
+        subscription.hotel_id,
+        "subscription.updated",
+        "subscription",
+        subscription.id,
+        None,
+        payload={"source": "platform_admin", "platform_admin_id": admin.id},
+        old_payload=old_payload,
+        new_payload=audit_update_data,
+    )
+    db.commit()
+    db.refresh(subscription)
+    return ok(PlatformSubscriptionSummary.model_validate(subscription).model_dump())
 
 
 @router.get("/platform-settings")

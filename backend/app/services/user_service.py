@@ -35,7 +35,8 @@ class UserService:
         hotel_id: str,
         user_id: str,
         payload: UserUpdate,
-        actor: User,
+        actor: User | None,
+        audit_payload: dict[str, Any] | None = None,
     ) -> User:
         user = self.get_user(hotel_id, user_id)
         update_data = payload.model_dump(exclude_unset=True)
@@ -75,7 +76,8 @@ class UserService:
             "user.updated",
             "user",
             user.id,
-            actor.id,
+            actor.id if actor else None,
+            payload=audit_payload,
             old_payload=old_payload,
             new_payload=self._user_audit_payload(user),
         )

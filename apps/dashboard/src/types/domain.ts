@@ -45,11 +45,16 @@ export interface PlatformHotelSummary {
 export interface PlatformUserSummary {
   id: string;
   hotel_id: string;
+  department_id: string | null;
+  reports_to: string | null;
   name: string;
   email: string;
   user_type: string;
   staff_level: string | null;
+  job_role: string | null;
+  is_hotel_owner: boolean;
   is_active: boolean;
+  is_on_duty: boolean;
   created_at: string;
 }
 
@@ -60,6 +65,9 @@ export interface PlatformSubscriptionSummary {
   status: string;
   billing_cycle: string;
   renewal_date: string | null;
+  current_period_start: string | null;
+  current_period_end: string | null;
+  cancelled_at: string | null;
   created_at: string;
 }
 
@@ -163,6 +171,9 @@ export interface Reservation {
   checkout_date: string;
   source: string;
   notes: string | null;
+  cancelled_at: string | null;
+  cancelled_by: string | null;
+  cancellation_reason: string | null;
 }
 
 export interface Guest {

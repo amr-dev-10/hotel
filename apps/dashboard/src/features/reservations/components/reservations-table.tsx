@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { createColumnHelper, flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table";
 import { format } from "date-fns";
-import { Eye, LogIn, LogOut, Search } from "lucide-react";
+import { Ban, Eye, LogIn, LogOut, Search } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +17,9 @@ import { apiErrorMessage } from "@/lib/api/client";
 import { compactId, titleCase } from "@/lib/utils";
 import type { Guest, Reservation } from "@/types/domain";
 import { useGuests } from "@/features/guests/hooks/useGuests";
+import { CancelReservationDialog } from "@/features/reservations/components/cancel-reservation-dialog";
 import {
+  useCancelReservation,
   useCheckInReservation,
   useCheckOutReservation,
   useReservations,
@@ -30,6 +32,8 @@ export function ReservationsTable({ hotelId }: { hotelId: string }) {
   const guests = useGuests(hotelId);
   const checkIn = useCheckInReservation(hotelId);
   const checkOut = useCheckOutReservation(hotelId);
+  const cancelReservation = useCancelReservation(hotelId);
+  const [reservationToCancel, setReservationToCancel] = useState<Reservation | null>(null);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [fromDate, setFromDate] = useState("");
@@ -121,52 +125,68 @@ export function ReservationsTable({ hotelId }: { hotelId: string }) {
     columnHelper.display({
       id: "actions",
       header: "",
-      cell: ({ row }) => (
-        <div className="flex justify-end gap-2">
-          <Button asChild size="sm" type="button" variant="secondary">
-            <Link href={`/${hotelId}/reservations/${row.original.id}`}>
-              <Eye />
-              Detail
-            </Link>
-          </Button>
-          <Can I="edit" a="Reservation">
-            <Button
-              disabled={checkIn.isPending}
-              size="sm"
-              type="button"
-              variant="secondary"
-              onClick={async () => {
-                try {
-                  await checkIn.mutateAsync(row.original.id);
-                  toast.success("Reservation checked in");
-                } catch (error) {
-                  toast.error(apiErrorMessage(error));
-                }
-              }}
-            >
-              <LogIn />
-              Check in
+      cell: ({ row }) => {
+        const canCancel = isReservationCancelable(row.original);
+        const canCheckIn = canCancel;
+        const canCheckOut = row.original.status === "checked_in";
+
+        return (
+          <div className="flex justify-end gap-2">
+            <Button asChild size="sm" type="button" variant="secondary">
+              <Link href={`/${hotelId}/reservations/${row.original.id}`}>
+                <Eye />
+                Detail
+              </Link>
             </Button>
-            <Button
-              disabled={checkOut.isPending}
-              size="sm"
-              type="button"
-              variant="secondary"
-              onClick={async () => {
-                try {
-                  await checkOut.mutateAsync(row.original.id);
-                  toast.success("Reservation checked out");
-                } catch (error) {
-                  toast.error(apiErrorMessage(error));
-                }
-              }}
-            >
-              <LogOut />
-              Check out
-            </Button>
-          </Can>
-        </div>
-      ),
+            <Can I="edit" a="Reservation">
+              {canCheckIn ? (
+                <Button
+                  disabled={checkIn.isPending}
+                  size="sm"
+                  type="button"
+                  variant="secondary"
+                  onClick={async () => {
+                    try {
+                      await checkIn.mutateAsync(row.original.id);
+                      toast.success("Reservation checked in");
+                    } catch (error) {
+                      toast.error(apiErrorMessage(error));
+                    }
+                  }}
+                >
+                  <LogIn />
+                  Check in
+                </Button>
+              ) : null}
+              {canCheckOut ? (
+                <Button
+                  disabled={checkOut.isPending}
+                  size="sm"
+                  type="button"
+                  variant="secondary"
+                  onClick={async () => {
+                    try {
+                      await checkOut.mutateAsync(row.original.id);
+                      toast.success("Reservation checked out");
+                    } catch (error) {
+                      toast.error(apiErrorMessage(error));
+                    }
+                  }}
+                >
+                  <LogOut />
+                  Check out
+                </Button>
+              ) : null}
+              {canCancel ? (
+                <Button size="sm" type="button" variant="danger" onClick={() => setReservationToCancel(row.original)}>
+                  <Ban />
+                  Cancel
+                </Button>
+              ) : null}
+            </Can>
+          </div>
+        );
+      },
     }),
   ];
 
@@ -255,8 +275,38 @@ export function ReservationsTable({ hotelId }: { hotelId: string }) {
           </div>
         </div>
       )}
+
+      <CancelReservationDialog
+        isPending={cancelReservation.isPending}
+        open={Boolean(reservationToCancel)}
+        reservation={reservationToCancel}
+        onConfirm={async (reason) => {
+          if (!reservationToCancel) {
+            return;
+          }
+          try {
+            await cancelReservation.mutateAsync({
+              reservationId: reservationToCancel.id,
+              reason,
+            });
+            toast.success("Reservation cancelled");
+            setReservationToCancel(null);
+          } catch (error) {
+            toast.error(apiErrorMessage(error));
+          }
+        }}
+        onOpenChange={(open) => {
+          if (!open) {
+            setReservationToCancel(null);
+          }
+        }}
+      />
     </div>
   );
+}
+
+function isReservationCancelable(reservation: Reservation) {
+  return ["booked", "confirmed"].includes(reservation.status.toLowerCase());
 }
 
 function statusVariant(status: string) {

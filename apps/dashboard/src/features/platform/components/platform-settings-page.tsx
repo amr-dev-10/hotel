@@ -1,16 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Save } from "lucide-react";
+import { KeyRound, Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { PlatformShell } from "@/features/platform/components/platform-shell";
 import {
+  useChangePlatformPassword,
   usePlatformSettings,
   useSavePlatformSettings,
 } from "@/features/platform/hooks/usePlatform";
@@ -28,8 +30,14 @@ export function PlatformSettingsPage() {
 function PlatformSettingsContent() {
   const settings = usePlatformSettings();
   const saveSettings = useSavePlatformSettings();
+  const changePassword = useChangePlatformPassword();
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [parseError, setParseError] = useState<string | null>(null);
+  const [passwordForm, setPasswordForm] = useState({
+    current_password: "",
+    new_password: "",
+    confirm_password: "",
+  });
 
   useEffect(() => {
     if (settings.data) {
@@ -70,6 +78,26 @@ function PlatformSettingsContent() {
     }
   }
 
+  async function handlePasswordChange(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (passwordForm.new_password !== passwordForm.confirm_password) {
+      toast.error("New password and confirmation do not match");
+      return;
+    }
+
+    try {
+      await changePassword.mutateAsync(passwordForm);
+      setPasswordForm({
+        current_password: "",
+        new_password: "",
+        confirm_password: "",
+      });
+      toast.success("Platform password changed");
+    } catch (error) {
+      toast.error(apiErrorMessage(error));
+    }
+  }
+
   if (settings.isLoading) {
     return <DataState isLoading />;
   }
@@ -96,6 +124,62 @@ function PlatformSettingsContent() {
           {parseError}
         </div>
       ) : null}
+
+      <section className="grid gap-4 rounded-md border border-slate-200 bg-white p-4">
+        <div>
+          <h3 className="flex items-center gap-2 text-base font-semibold">
+            <KeyRound className="size-4" />
+            Platform Password
+          </h3>
+          <p className="mt-1 text-sm text-slate-500">Update the password for the signed-in super admin account.</p>
+        </div>
+        <form className="grid gap-4 md:grid-cols-3" onSubmit={handlePasswordChange}>
+          <div className="grid gap-2">
+            <Label htmlFor="platform-current-password">Current password</Label>
+            <Input
+              autoComplete="current-password"
+              id="platform-current-password"
+              type="password"
+              value={passwordForm.current_password}
+              onChange={(event) =>
+                setPasswordForm((current) => ({ ...current, current_password: event.target.value }))
+              }
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="platform-new-password">New password</Label>
+            <Input
+              autoComplete="new-password"
+              id="platform-new-password"
+              minLength={8}
+              type="password"
+              value={passwordForm.new_password}
+              onChange={(event) =>
+                setPasswordForm((current) => ({ ...current, new_password: event.target.value }))
+              }
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="platform-confirm-password">Confirm password</Label>
+            <Input
+              autoComplete="new-password"
+              id="platform-confirm-password"
+              minLength={8}
+              type="password"
+              value={passwordForm.confirm_password}
+              onChange={(event) =>
+                setPasswordForm((current) => ({ ...current, confirm_password: event.target.value }))
+              }
+            />
+          </div>
+          <div className="md:col-span-3">
+            <Button disabled={changePassword.isPending} type="submit">
+              {changePassword.isPending ? <Loader2 className="animate-spin" /> : <Save />}
+              Change password
+            </Button>
+          </div>
+        </form>
+      </section>
 
       {!settings.data?.length ? (
         <DataState empty emptyTitle="No platform settings found." />

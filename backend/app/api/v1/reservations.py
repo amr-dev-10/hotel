@@ -13,6 +13,7 @@ from app.repositories.reservation_repository import (
 )
 from app.schemas.reservation import (
     ReservationCheckInRequest,
+    ReservationCancelRequest,
     ReservationCreate,
     ReservationGuestNew,
     ReservationGuestRead,
@@ -148,6 +149,23 @@ def checkout_alias(
     current_user: User = Depends(require_permission("guest.checkout")),
 ) -> dict:
     reservation = ReservationService(db).check_out(hotel_id, reservation_id, current_user.id)
+    return ok(ReservationRead.model_validate(reservation).model_dump())
+
+
+@router.post("/{reservation_id}/cancel")
+def cancel_reservation(
+    hotel_id: str,
+    reservation_id: str,
+    payload: ReservationCancelRequest | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("reservation.cancel")),
+) -> dict:
+    reservation = ReservationService(db).cancel_reservation(
+        hotel_id,
+        reservation_id,
+        reason=payload.reason if payload else None,
+        actor_id=current_user.id,
+    )
     return ok(ReservationRead.model_validate(reservation).model_dump())
 
 

@@ -23,6 +23,9 @@ class Reservation(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     checkout_date: Mapped[date] = mapped_column(Date)
     source: Mapped[str] = mapped_column(String(40), default="walk_in")
     notes: Mapped[str | None] = mapped_column(Text)
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    cancelled_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
+    cancellation_reason: Mapped[str | None] = mapped_column(Text)
 
 
 class ReservationGuest(UUIDPrimaryKeyMixin, Base):

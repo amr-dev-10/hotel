@@ -87,7 +87,19 @@ Open:
 - `POST /api/v1/auth/refresh`
 - `POST /api/v1/auth/logout`
 - `POST /api/v1/auth/logout-all`
+- `POST /api/v1/auth/change-password`
 - `GET /api/v1/auth/me`
+- `POST /api/v1/platform/auth/login`
+- `POST /api/v1/platform/auth/change-password`
+- `GET /api/v1/platform/dashboard`
+- `GET /api/v1/platform/hotels`
+- `POST /api/v1/platform/hotels`
+- `GET /api/v1/platform/users`
+- `PATCH /api/v1/platform/users/{user_id}`
+- `GET /api/v1/platform/subscriptions`
+- `PATCH /api/v1/platform/subscriptions/{subscription_id}`
+- `GET /api/v1/platform/platform-settings`
+- `PUT /api/v1/platform/platform-settings`
 - `/api/v1/orgs`
 - `/api/v1/hotels/{hotel_id}/users`
 - `/api/v1/hotels/{hotel_id}/roles`
@@ -102,6 +114,7 @@ Open:
 - `/api/v1/hotels/{hotel_id}/reservations/{reservation_id}`
 - `/api/v1/hotels/{hotel_id}/reservations/{reservation_id}/checkin`
 - `/api/v1/hotels/{hotel_id}/reservations/{reservation_id}/checkout`
+- `/api/v1/hotels/{hotel_id}/reservations/{reservation_id}/cancel`
 - `/api/v1/hotels/{hotel_id}/reservations/{reservation_id}/change-room`
 - `/api/v1/hotels/{hotel_id}/reservations/{reservation_id}/guests`
 - `/api/v1/hotels/{hotel_id}/reservations/{reservation_id}/room-types`

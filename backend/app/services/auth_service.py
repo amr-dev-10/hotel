@@ -80,6 +80,17 @@ class AuthService:
             session.revoked_at = now
         self.db.commit()
 
+    def change_password(self, user: User, current_password: str, new_password: str) -> None:
+        if not verify_password(current_password, user.hashed_password):
+            raise bad_request("Current password is incorrect")
+        if verify_password(new_password, user.hashed_password):
+            raise bad_request("New password must be different from current password")
+        user.hashed_password = hash_password(new_password)
+        now = utcnow()
+        for session in self.sessions.active_for_user(user.id):
+            session.revoked_at = now
+        self.db.commit()
+
     @staticmethod
     def password_hash(password: str) -> str:
         return hash_password(password)

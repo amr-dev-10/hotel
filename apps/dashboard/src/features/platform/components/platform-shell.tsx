@@ -5,11 +5,13 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Building2,
+  CreditCard,
   DoorOpen,
   Hotel,
   LayoutDashboard,
   Settings,
   ShieldCheck,
+  UsersRound,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -20,6 +22,8 @@ import { usePlatformAuthStore } from "@/stores/platform-auth.store";
 const navItems = [
   { label: "Stats", href: "/platform/stats", icon: LayoutDashboard },
   { label: "Hotels", href: "/platform/hotels", icon: Hotel },
+  { label: "Users", href: "/platform/users", icon: UsersRound },
+  { label: "Subscriptions", href: "/platform/subscriptions", icon: CreditCard },
   { label: "Settings", href: "/platform/settings", icon: Settings },
 ];
 

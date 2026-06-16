@@ -146,11 +146,16 @@ class PlatformHotelCreateResponse(BaseModel):
 class PlatformUserSummary(ORMModel):
     id: str
     hotel_id: str
+    department_id: str | None = None
+    reports_to: str | None = None
     name: str
     email: EmailStr
     user_type: str
     staff_level: str | None = None
+    job_role: str | None = None
+    is_hotel_owner: bool
     is_active: bool
+    is_on_duty: bool
     created_at: datetime
 
 
@@ -161,7 +166,20 @@ class PlatformSubscriptionSummary(ORMModel):
     status: str
     billing_cycle: str
     renewal_date: date | None = None
+    current_period_start: datetime | None = None
+    current_period_end: datetime | None = None
+    cancelled_at: datetime | None = None
     created_at: datetime
+
+
+class PlatformSubscriptionUpdate(BaseModel):
+    plan: str | None = Field(default=None, min_length=2, max_length=40)
+    status: str | None = Field(default=None, min_length=2, max_length=40)
+    billing_cycle: str | None = Field(default=None, min_length=2, max_length=40)
+    renewal_date: date | None = None
+    current_period_start: datetime | None = None
+    current_period_end: datetime | None = None
+    cancelled_at: datetime | None = None
 
 
 class PlatformSettingRead(ORMModel):

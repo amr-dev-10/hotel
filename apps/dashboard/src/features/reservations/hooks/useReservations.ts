@@ -88,3 +88,19 @@ export function useCheckOutReservation(hotelId: string) {
     },
   });
 }
+
+export function useCancelReservation(hotelId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ reservationId, reason }: { reservationId: string; reason: string }) =>
+      apiPost<Reservation>(`/hotels/${hotelId}/reservations/${reservationId}/cancel`, {
+        reason: reason.trim() || null,
+      }),
+    onSuccess: (_reservation, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.reservations(hotelId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.reservationDetail(hotelId, variables.reservationId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.reservationStays(hotelId, variables.reservationId) });
+    },
+  });
+}

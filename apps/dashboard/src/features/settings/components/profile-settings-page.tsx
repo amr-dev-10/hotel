@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Bell, Languages, Moon, UserCircle } from "lucide-react";
+import { Bell, KeyRound, Languages, Loader2, Moon, Save, UserCircle } from "lucide-react";
+import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { apiErrorMessage, apiPost } from "@/lib/api/client";
 import { titleCase } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth.store";
 
@@ -17,6 +19,12 @@ export function ProfileSettingsPage() {
   const currentUser = useAuthStore((state) => state.currentUser);
   const [theme, setTheme] = useState("system");
   const [language, setLanguage] = useState("en");
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({
+    current_password: "",
+    new_password: "",
+    confirm_password: "",
+  });
   const [prefs, setPrefs] = useState<Record<string, Record<string, boolean>>>(() =>
     Object.fromEntries(events.map((event) => [event, { push: true, email: event.includes("SLA"), inApp: true }])),
   );
@@ -29,6 +37,29 @@ export function ProfileSettingsPage() {
         [channel]: !current[event]?.[channel],
       },
     }));
+  }
+
+  async function handlePasswordChange(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (passwordForm.new_password !== passwordForm.confirm_password) {
+      toast.error("New password and confirmation do not match");
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      await apiPost<{ password_changed: boolean }>("/auth/change-password", passwordForm);
+      setPasswordForm({
+        current_password: "",
+        new_password: "",
+        confirm_password: "",
+      });
+      toast.success("Password changed");
+    } catch (error) {
+      toast.error(apiErrorMessage(error));
+    } finally {
+      setIsChangingPassword(false);
+    }
   }
 
   return (
@@ -61,6 +92,59 @@ export function ProfileSettingsPage() {
             <Input id="profile-role" readOnly value={titleCase(currentUser?.job_role)} />
           </Field>
         </div>
+      </section>
+
+      <section className="grid gap-4 rounded-md border border-slate-200 bg-white p-4">
+        <div>
+          <h3 className="flex items-center gap-2 text-base font-semibold">
+            <KeyRound className="size-4" />
+            Password
+          </h3>
+          <p className="mt-1 text-sm text-slate-500">Update your sign-in password for this hotel account.</p>
+        </div>
+        <form className="grid gap-4 md:grid-cols-3" onSubmit={handlePasswordChange}>
+          <Field label="Current password" id="profile-current-password">
+            <Input
+              autoComplete="current-password"
+              id="profile-current-password"
+              type="password"
+              value={passwordForm.current_password}
+              onChange={(event) =>
+                setPasswordForm((current) => ({ ...current, current_password: event.target.value }))
+              }
+            />
+          </Field>
+          <Field label="New password" id="profile-new-password">
+            <Input
+              autoComplete="new-password"
+              id="profile-new-password"
+              minLength={8}
+              type="password"
+              value={passwordForm.new_password}
+              onChange={(event) =>
+                setPasswordForm((current) => ({ ...current, new_password: event.target.value }))
+              }
+            />
+          </Field>
+          <Field label="Confirm password" id="profile-confirm-password">
+            <Input
+              autoComplete="new-password"
+              id="profile-confirm-password"
+              minLength={8}
+              type="password"
+              value={passwordForm.confirm_password}
+              onChange={(event) =>
+                setPasswordForm((current) => ({ ...current, confirm_password: event.target.value }))
+              }
+            />
+          </Field>
+          <div className="md:col-span-3">
+            <Button disabled={isChangingPassword} type="submit">
+              {isChangingPassword ? <Loader2 className="animate-spin" /> : <Save />}
+              Change password
+            </Button>
+          </div>
+        </form>
       </section>
 
       <section className="grid gap-4 rounded-md border border-slate-200 bg-white p-4">

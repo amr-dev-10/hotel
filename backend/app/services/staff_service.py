@@ -23,11 +23,13 @@ class ShiftService:
         self.tickets = TicketRepository(db)
 
     def create(self, hotel_id: str, payload: ShiftCreate, actor_id: str | None) -> EmployeeShift:
-        if not self.users.get_for_hotel(hotel_id, payload.user_id):
+        user = self.users.get_for_hotel(hotel_id, payload.user_id)
+        if not user:
             raise not_found("User not found")
         if payload.department_id and not self.departments.get_for_hotel(hotel_id, payload.department_id):
             raise not_found("Department not found")
         shift = EmployeeShift(hotel_id=hotel_id, created_by=actor_id, **payload.model_dump())
+        self._sync_shift_presence(shift, user)
         self.db.add(shift)
         AuditService(self.db).log(hotel_id, "shift.created", "employee_shift", None, actor_id)
         self.db.commit()
@@ -65,10 +67,9 @@ class ShiftService:
         data = payload.model_dump(exclude_unset=True)
         for key, value in data.items():
             setattr(shift, key, value)
-        if shift.status == "checked_in" and not shift.actual_start:
-            shift.actual_start = utcnow()
-        if shift.status == "checked_out" and not shift.actual_end:
-            shift.actual_end = utcnow()
+        user = self.users.get_for_hotel(hotel_id, shift.user_id)
+        if user:
+            self._sync_shift_presence(shift, user)
         AuditService(self.db).log(hotel_id, "shift.updated", "employee_shift", shift.id, actor_id)
         self.db.commit()
         self.db.refresh(shift)
@@ -81,11 +82,21 @@ class ShiftService:
         shift_date: date,
         current_time: time,
     ) -> User | None:
+        current_time = current_time.replace(tzinfo=None)
         staff = list(self.shifts.active_staff(hotel_id, department_id, shift_date, current_time))
         if not staff:
             return None
         staff.sort(key=lambda user: self.tickets.count_open_for_user(hotel_id, user.id))
         return staff[0]
+
+    @staticmethod
+    def _sync_shift_presence(shift: EmployeeShift, user: User) -> None:
+        if shift.status == "checked_in":
+            shift.actual_start = shift.actual_start or utcnow()
+            user.is_on_duty = True
+        if shift.status == "checked_out":
+            shift.actual_end = shift.actual_end or utcnow()
+            user.is_on_duty = False
 
 
 class StaffService:

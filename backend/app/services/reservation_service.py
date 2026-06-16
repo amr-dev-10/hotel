@@ -3,7 +3,7 @@ from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
-from app.core.exceptions import bad_request, not_found
+from app.core.exceptions import bad_request, conflict, not_found
 from app.models.base import utcnow
 from app.models.guest import Guest
 from app.models.reservation import Reservation, ReservationGuest, ReservationRoomType, StayRecord
@@ -325,6 +325,62 @@ class ReservationService:
         self.availability.release_by_reference(hotel_id, "reservation", reservation.id)
         FolioService(self.db).close(hotel_id, reservation.id, actor_id)
         self.audit.log(hotel_id, "reservation.checked_out", "reservation", reservation.id, actor_id)
+        self.db.commit()
+        self.db.refresh(reservation)
+        return reservation
+
+    def cancel_reservation(
+        self,
+        hotel_id: str,
+        reservation_id: str,
+        reason: str | None = None,
+        actor_id: str | None = None,
+    ) -> Reservation:
+        reservation = self.reservations.get_for_hotel(hotel_id, reservation_id)
+        if not reservation:
+            raise not_found("Reservation not found")
+        if reservation.status == "cancelled":
+            raise conflict("Reservation is already cancelled")
+        if reservation.status in {"checked_in", "checked_out", "completed"}:
+            raise bad_request("Reservation cannot be cancelled after check-in or checkout")
+
+        old_payload = {
+            "status": reservation.status,
+            "room_id": reservation.room_id,
+            "cancelled_at": reservation.cancelled_at.isoformat() if reservation.cancelled_at else None,
+            "cancelled_by": reservation.cancelled_by,
+            "cancellation_reason": reservation.cancellation_reason,
+        }
+        reservation.status = "cancelled"
+        reservation.cancelled_at = utcnow()
+        reservation.cancelled_by = actor_id
+        reservation.cancellation_reason = reason
+
+        guest = self.guests.get_for_hotel(hotel_id, reservation.guest_id)
+        if guest and guest.status not in {"checked_in", "checked_out"}:
+            guest.status = "cancelled"
+
+        self.availability.release_by_reference(hotel_id, "reservation", reservation.id)
+        if reservation.room_id:
+            room = self.rooms.get_for_hotel(hotel_id, reservation.room_id)
+            if room and room.status != "occupied":
+                room.status = "available"
+
+        self.audit.log(
+            hotel_id,
+            "reservation.cancelled",
+            "reservation",
+            reservation.id,
+            actor_id,
+            payload={"reason": reason},
+            old_payload=old_payload,
+            new_payload={
+                "status": reservation.status,
+                "cancelled_at": reservation.cancelled_at.isoformat(),
+                "cancelled_by": reservation.cancelled_by,
+                "cancellation_reason": reservation.cancellation_reason,
+            },
+        )
         self.db.commit()
         self.db.refresh(reservation)
         return reservation
