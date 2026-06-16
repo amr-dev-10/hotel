@@ -104,9 +104,10 @@ export function StaffCreatePage({ hotelId }: { hotelId: string }) {
           </Field>
           <Field label="Level" id="staff-level">
             <Select id="staff-level" {...form.register("staff_level")}>
-              <option value="attendant">Attendant</option>
-              <option value="supervisor">Supervisor</option>
+              <option value="admin">Admin</option>
               <option value="manager">Manager</option>
+              <option value="supervisor">Supervisor</option>
+              <option value="attendant">Attendant</option>
             </Select>
           </Field>
           <label className="flex items-center gap-2 rounded-md border border-slate-200 p-3 text-sm">

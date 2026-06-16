@@ -276,6 +276,28 @@ export interface StaffUser {
   is_hotel_owner: boolean;
   is_active: boolean;
   is_on_duty: boolean;
+  is_deleted?: boolean;
+  deleted_at?: string | null;
+  deleted_by?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface EmployeeShift {
+  id: string;
+  hotel_id: string;
+  user_id: string;
+  department_id: string | null;
+  shift_date: string;
+  shift_start: string;
+  shift_end: string;
+  shift_type: string;
+  status: string;
+  actual_start: string | null;
+  actual_end: string | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
 }
 
 export interface Department {
