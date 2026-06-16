@@ -45,6 +45,8 @@ The backend follows the v5.1 principles:
 
 ## Quick Setup
 
+For the current Windows-native backend setup with `.venv-win`, Windows PostgreSQL, and WSL Redis, see `docs/windows-backend-db-setup.md`.
+
 ```bash
 cd /mnt/c/Users/Lenovo/Documents/Hotel\ Managment
 python3 -m venv .venv

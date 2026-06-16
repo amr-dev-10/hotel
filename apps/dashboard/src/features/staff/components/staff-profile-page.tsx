@@ -135,6 +135,7 @@ export function StaffProfilePage({
       is_on_duty: user.is_on_duty,
       is_active: user.is_active,
     });
+    setSelectedRoles((user.roles ?? []).map((role) => role.id).sort());
   }, [form, user]);
 
   async function handleAssignRoles() {

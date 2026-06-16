@@ -3,6 +3,7 @@ from datetime import datetime
 from pydantic import BaseModel, EmailStr, Field
 
 from app.schemas.common import ORMModel
+from app.schemas.rbac import RoleRead
 
 
 class UserCreate(BaseModel):
@@ -47,5 +48,6 @@ class UserRead(ORMModel):
     is_deleted: bool = False
     deleted_at: datetime | None = None
     deleted_by: str | None = None
+    roles: list[RoleRead] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime

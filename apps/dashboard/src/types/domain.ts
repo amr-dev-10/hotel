@@ -279,6 +279,7 @@ export interface StaffUser {
   is_deleted?: boolean;
   deleted_at?: string | null;
   deleted_by?: string | null;
+  roles?: Role[];
   created_at?: string;
   updated_at?: string;
 }

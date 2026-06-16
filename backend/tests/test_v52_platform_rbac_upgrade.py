@@ -104,6 +104,34 @@ def test_user_update_delete_soft_delete_sessions_and_audit() -> None:
         user_id = created.json()["data"]["id"]
         assert created.json()["data"]["user_type"] == "HOTEL_EMPLOYEE"
 
+        role = client.post(
+            f"/api/v1/hotels/{hotel_id}/roles",
+            headers=headers,
+            json={
+                "name": f"Room Viewer {suffix}",
+                "permission_codes": ["room.view"],
+            },
+        )
+        assert role.status_code == 200
+        role_id = role.json()["data"]["id"]
+        assigned = client.post(
+            f"/api/v1/hotels/{hotel_id}/roles/users/{user_id}",
+            headers=headers,
+            json={"role_ids": [role_id]},
+        )
+        assert assigned.status_code == 200
+
+        fetched = client.get(f"/api/v1/hotels/{hotel_id}/users/{user_id}", headers=headers)
+        assert fetched.status_code == 200
+        fetched_roles = fetched.json()["data"]["roles"]
+        assert [item["id"] for item in fetched_roles] == [role_id]
+        assert {item["code"] for item in fetched_roles[0]["permissions"]} == {"room.view"}
+
+        users = client.get(f"/api/v1/hotels/{hotel_id}/users", headers=headers)
+        assert users.status_code == 200
+        listed_user = next(item for item in users.json()["data"] if item["id"] == user_id)
+        assert [item["id"] for item in listed_user["roles"]] == [role_id]
+
         login = client.post("/api/v1/auth/login", json={"email": email, "password": "secretpass123"})
         assert login.status_code == 200
 

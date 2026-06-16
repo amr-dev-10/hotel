@@ -18,3 +18,4 @@ npm-debug.log*
 backend/uvicorn.pid
 backend/uvicorn.*.log
 .codex-run/
+.venv-win

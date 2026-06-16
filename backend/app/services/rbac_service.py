@@ -6,6 +6,7 @@ from app.core.exceptions import bad_request, forbidden, not_found
 from app.models.rbac import Permission, PermissionGroup, Role
 from app.models.user import User
 from app.repositories.rbac_repository import PermissionGroupRepository, PermissionRepository, RoleRepository
+from app.repositories.user_repository import UserRepository
 from app.services.audit_service import AuditService
 from app.services.defaults import DEFAULT_PERMISSIONS, OWNER_ROLE_NAME, PERMISSION_GROUPS
 
@@ -16,6 +17,7 @@ class RBACService:
         self.permission_groups = PermissionGroupRepository(db)
         self.permissions = PermissionRepository(db)
         self.roles = RoleRepository(db)
+        self.users = UserRepository(db)
 
     def seed_permissions(self) -> list[Permission]:
         self.seed_permission_groups()
@@ -195,6 +197,8 @@ class RBACService:
         role_ids: list[str],
         actor_id: str | None,
     ) -> None:
+        if not self.users.get_for_hotel(hotel_id, user_id):
+            raise not_found("User not found")
         for role_id in role_ids:
             role = self.roles.get_for_hotel(hotel_id, role_id)
             if not role:
