@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -18,10 +19,10 @@ def verify_whatsapp_webhook(
     hub_mode: str | None = Query(default=None, alias="hub.mode"),
     hub_verify_token: str | None = Query(default=None, alias="hub.verify_token"),
     hub_challenge: str | None = Query(default=None, alias="hub.challenge"),
-) -> str:
+):
     if hub_mode == "subscribe" and hub_verify_token == settings.whatsapp_verify_token:
-        return hub_challenge or ""
-    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid verify token")
+        return PlainTextResponse(content=hub_challenge or "")
+    return PlainTextResponse(content="Verification failed", status_code=403)
 
 
 @router.post("/webhook/whatsapp")
