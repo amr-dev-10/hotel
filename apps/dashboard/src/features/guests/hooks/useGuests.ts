@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { apiGet, apiPatch, apiPost } from "@/lib/api/client";
 import { queryKeys } from "@/lib/api/query-keys";
-import type { Guest, GuestConsent } from "@/types/domain";
+import type { Guest, GuestConsent, GuestTimelineEvent } from "@/types/domain";
 import type { CreateGuestValues } from "@/features/guests/schemas/create-guest.schema";
 
 export function useGuests(hotelId: string) {
@@ -54,7 +54,7 @@ export function useUpdateGuest(hotelId: string, guestId: string) {
 export function useGuestTimeline(hotelId: string, guestId: string) {
   return useQuery({
     queryKey: queryKeys.guestTimeline(hotelId, guestId),
-    queryFn: () => apiGet<any[]>(`/hotels/${hotelId}/guests/${guestId}/timeline`),
+    queryFn: () => apiGet<GuestTimelineEvent[]>(`/hotels/${hotelId}/guests/${guestId}/timeline`),
     enabled: Boolean(hotelId && guestId),
   });
 }

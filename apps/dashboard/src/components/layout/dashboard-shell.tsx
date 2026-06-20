@@ -40,7 +40,7 @@ const settingsNavItems = [
   { label: "Staff", href: "settings/staff", icon: Users },
   { label: "Roles & Access", href: "settings/roles", icon: Shield },
   { label: "Workflow", href: "settings/workflow", icon: GitBranch },
-  { label: "AI Configuration", href: "ai/settings", icon: Bot },
+  { label: "AI Configuration", href: "ai", icon: Bot },
 ];
 
 const allNavItems = [...navItems, ...settingsNavItems];

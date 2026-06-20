@@ -209,7 +209,7 @@ function GuestTimeline({ hotelId, guestId }: { hotelId: string, guestId: string 
               <div className="grid gap-1">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold">{event.title}</span>
-                  {event.status && <Badge variant="secondary" className="h-4 text-[10px] uppercase">{event.status}</Badge>}
+                  {event.status && <Badge variant="default" className="h-4 text-[10px] uppercase">{event.status}</Badge>}
                   <span className="text-xs text-slate-400 ml-auto">
                     {format(new Date(event.timestamp), "MMM d, h:mm a")}
                   </span>

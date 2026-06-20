@@ -2,13 +2,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { apiGet, apiPatch, apiPost } from "@/lib/api/client";
 import { queryKeys } from "@/lib/api/query-keys";
-import type { EscalationLog, Ticket, TicketAcceptance } from "@/types/domain";
+import type { EscalationLog, Ticket, TicketAcceptance, TicketMessage, TicketTimelineItem } from "@/types/domain";
 import type { CreateTicketValues } from "@/features/tickets/schemas/create-ticket.schema";
 
-export function useTickets(hotelId: string, filters: Record<string, string>) {
+type TicketFilters = Record<string, string | undefined>;
+
+export function useTickets(hotelId: string, filters: TicketFilters) {
   return useQuery({
     queryKey: queryKeys.tickets.list(hotelId, filters),
-    queryFn: () => apiGet<Ticket[]>(`/hotels/${hotelId}/tickets`, { params: filters }),
+    queryFn: () => apiGet<Ticket[]>(`/hotels/${hotelId}/tickets`, { params: compactFilters(filters) }),
     enabled: Boolean(hotelId),
   });
 }
@@ -26,6 +28,35 @@ export function useTicketEscalations(hotelId: string, ticketId: string | null) {
     queryKey: queryKeys.tickets.escalations(hotelId, ticketId ?? "none"),
     queryFn: () => apiGet<EscalationLog[]>(`/hotels/${hotelId}/tickets/${ticketId}/escalations`),
     enabled: Boolean(hotelId && ticketId),
+  });
+}
+
+export function useTicketMessages(hotelId: string, ticketId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.tickets.messages(hotelId, ticketId ?? "none"),
+    queryFn: () => apiGet<TicketMessage[]>(`/hotels/${hotelId}/tickets/${ticketId}/messages`),
+    enabled: Boolean(hotelId && ticketId),
+  });
+}
+
+export function useTicketTimeline(hotelId: string, ticketId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.tickets.timeline(hotelId, ticketId ?? "none"),
+    queryFn: () => apiGet<TicketTimelineItem[]>(`/hotels/${hotelId}/tickets/${ticketId}/timeline`),
+    enabled: Boolean(hotelId && ticketId),
+  });
+}
+
+export function useCreateTicketMessage(hotelId: string, ticketId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: { content: string; sender_type?: string }) =>
+      apiPost<TicketMessage>(`/hotels/${hotelId}/tickets/${ticketId}/messages`, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.tickets.messages(hotelId, ticketId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.tickets.timeline(hotelId, ticketId) });
+    },
   });
 }
 
@@ -92,4 +123,8 @@ export function useUpdateTicketStage(hotelId: string) {
       apiPatch<Ticket>(`/hotels/${hotelId}/tickets/${ticketId}/stage`, { stage }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.tickets.all(hotelId) }),
   });
+}
+
+function compactFilters(filters: TicketFilters) {
+  return Object.fromEntries(Object.entries(filters).filter(([, value]) => Boolean(value)));
 }

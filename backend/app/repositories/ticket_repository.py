@@ -4,7 +4,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.base import utcnow
-from app.models.ticket import Ticket, TicketEvent
+from app.models.ticket import Ticket, TicketEvent, TicketMessage
 from app.repositories.base import BaseRepository
 
 
@@ -21,6 +21,31 @@ class TicketRepository(BaseRepository[Ticket]):
                 Ticket.deleted_at.is_(None),
             )
         ).scalars().all()
+
+    def list_filtered(
+        self,
+        hotel_id: str,
+        guest_id: str | None = None,
+        reservation_id: str | None = None,
+        conversation_id: str | None = None,
+        stage: str | None = None,
+        priority: int | None = None,
+    ) -> Sequence[Ticket]:
+        statement = select(Ticket).where(
+            Ticket.hotel_id == hotel_id,
+            Ticket.deleted_at.is_(None),
+        )
+        if guest_id:
+            statement = statement.where(Ticket.guest_id == guest_id)
+        if reservation_id:
+            statement = statement.where(Ticket.reservation_id == reservation_id)
+        if conversation_id:
+            statement = statement.where(Ticket.conversation_id == conversation_id)
+        if stage:
+            statement = statement.where(Ticket.stage == stage)
+        if priority:
+            statement = statement.where(Ticket.priority == priority)
+        return self.db.execute(statement.order_by(Ticket.created_at.desc())).scalars().all()
 
     def list_unresolved(self, hotel_id: str | None = None) -> Sequence[Ticket]:
         terminal = (
@@ -70,3 +95,18 @@ class TicketRepository(BaseRepository[Ticket]):
             self.db.commit()
             self.db.refresh(event)
         return event
+
+
+class TicketMessageRepository(BaseRepository[TicketMessage]):
+    def __init__(self, db: Session) -> None:
+        super().__init__(db, TicketMessage)
+
+    def list_for_ticket(self, hotel_id: str, ticket_id: str) -> Sequence[TicketMessage]:
+        return self.db.execute(
+            select(TicketMessage)
+            .where(
+                TicketMessage.hotel_id == hotel_id,
+                TicketMessage.ticket_id == ticket_id,
+            )
+            .order_by(TicketMessage.created_at)
+        ).scalars().all()

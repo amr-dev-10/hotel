@@ -8,7 +8,14 @@ from app.models.user import User
 from app.repositories.escalation_repository import EscalationLogRepository
 from app.repositories.ticket_acceptance_repository import TicketAcceptanceRepository
 from app.repositories.ticket_repository import TicketRepository
-from app.schemas.ticket import TicketAcceptanceRead, TicketCreate, TicketRead, TicketStageUpdate
+from app.schemas.ticket import (
+    TicketAcceptanceRead,
+    TicketCreate,
+    TicketMessageCreate,
+    TicketMessageRead,
+    TicketRead,
+    TicketStageUpdate,
+)
 from app.schemas.v51 import EscalationLogRead
 from app.services.ticket_service import TicketService
 
@@ -18,10 +25,22 @@ router = APIRouter()
 @router.get("")
 def list_tickets(
     hotel_id: str,
+    guest_id: str | None = None,
+    reservation_id: str | None = None,
+    conversation_id: str | None = None,
+    stage: str | None = None,
+    priority: int | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("ticket.view")),
 ) -> dict:
-    tickets = TicketRepository(db).list_for_hotel(hotel_id)
+    tickets = TicketRepository(db).list_filtered(
+        hotel_id,
+        guest_id=guest_id,
+        reservation_id=reservation_id,
+        conversation_id=conversation_id,
+        stage=stage,
+        priority=priority,
+    )
     return ok([TicketRead.model_validate(item).model_dump() for item in tickets])
 
 
@@ -34,6 +53,40 @@ def create_ticket(
 ) -> dict:
     ticket = TicketService(db).create_ticket(hotel_id, payload, actor_id=current_user.id)
     return ok(TicketRead.model_validate(ticket).model_dump())
+
+
+@router.get("/{ticket_id}/messages")
+def list_ticket_messages(
+    hotel_id: str,
+    ticket_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("ticket.view")),
+) -> dict:
+    messages = TicketService(db).list_messages(hotel_id, ticket_id)
+    return ok([TicketMessageRead.model_validate(item).model_dump() for item in messages])
+
+
+@router.post("/{ticket_id}/messages")
+def create_ticket_message(
+    hotel_id: str,
+    ticket_id: str,
+    payload: TicketMessageCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("ticket.view")),
+) -> dict:
+    message = TicketService(db).create_message(hotel_id, ticket_id, payload, current_user.id)
+    return ok(TicketMessageRead.model_validate(message).model_dump())
+
+
+@router.get("/{ticket_id}/timeline")
+def get_ticket_timeline(
+    hotel_id: str,
+    ticket_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("ticket.view")),
+) -> dict:
+    items = TicketService(db).timeline(hotel_id, ticket_id)
+    return ok([item.model_dump() for item in items])
 
 
 @router.patch("/{ticket_id}/stage")

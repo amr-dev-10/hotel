@@ -92,7 +92,7 @@ export function useSendWhatsappMessage(hotelId: string, conversationId: string) 
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (payload: { message: string }) =>
+    mutationFn: (payload: { message: string; reservation_id?: string }) =>
       apiPost(`/hotels/${hotelId}/whatsapp/conversations/${conversationId}/messages`, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.whatsapp.messages(hotelId, conversationId) });

@@ -117,6 +117,8 @@ export interface Ticket {
   ticket_code: string;
   hotel_id: string;
   guest_id: string | null;
+  reservation_id: string | null;
+  conversation_id: string | null;
   room_id: string | null;
   department_id: string | null;
   assigned_to: string | null;
@@ -141,6 +143,28 @@ export interface TicketAcceptance {
   responded_at: string | null;
   auto_expired: boolean;
   expire_after_minutes: number;
+}
+
+export interface TicketMessage {
+  id: string;
+  hotel_id: string;
+  ticket_id: string;
+  sender_type: string;
+  sender_id: string | null;
+  content: string;
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface TicketTimelineItem {
+  id: string;
+  item_type: "event" | "message" | string;
+  event_type: string | null;
+  sender_type: string | null;
+  sender_id: string | null;
+  content: string;
+  payload: Record<string, unknown> | null;
+  created_at: string;
 }
 
 export interface EscalationLog {
@@ -186,6 +210,7 @@ export interface Guest {
   check_in_date: string | null;
   check_out_date: string | null;
   status: string;
+  internal_notes: string | null;
 }
 
 export interface GuestConsent {
@@ -200,6 +225,16 @@ export interface GuestConsent {
   consented_at: string | null;
   updated_at: string;
   ip_address: string | null;
+}
+
+export interface GuestTimelineEvent {
+  event_type: string;
+  timestamp: string;
+  id: string;
+  title: string;
+  description: string | null;
+  status: string | null;
+  metadata: Record<string, unknown> | null;
 }
 
 export interface ReservationGuest {
@@ -406,6 +441,12 @@ export interface WhatsAppConversation {
   guest_id: string | null;
   phone: string;
   status: string;
+  priority: string;
+  assigned_staff_id: string | null;
+  assigned_at: string | null;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  unread_count: number;
   last_message_at: string | null;
 }
 
@@ -413,6 +454,7 @@ export interface WhatsAppMessage {
   id: string;
   hotel_id: string;
   conversation_id: string;
+  reservation_id: string | null;
   direction: string;
   message_type: string;
   message_text: string | null;

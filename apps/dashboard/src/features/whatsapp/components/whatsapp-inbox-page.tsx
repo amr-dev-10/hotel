@@ -4,11 +4,11 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { format, formatDistanceToNow } from "date-fns";
-import { 
-  MessageCircle, Settings, Search, Phone, User, 
-  Loader2, Send, CheckCircle, Clock, MapPin, 
-  Ticket, Paperclip, Mic, Image as ImageIcon, FileText,
-  AlertCircle
+import {
+  MessageCircle, Settings, Search, User,
+  Loader2, Send, CheckCircle, MapPin,
+  Ticket as TicketIcon, Paperclip, Mic, Image as ImageIcon, FileText,
+  AlertCircle, Wrench, Sparkles, Utensils
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DataState } from "@/components/ui/data-state";
 import { cn, titleCase, compactId } from "@/lib/utils";
+import { useAuthStore } from "@/stores/auth.store";
 import { 
   useWhatsappConversations, 
   useWhatsappMessages, 
@@ -24,7 +25,7 @@ import {
   useUpdateWhatsappConversation
 } from "@/features/whatsapp/hooks/useWhatsapp";
 import { useGuest, useGuests, useGuestConversation } from "@/features/guests/hooks/useGuests";
-import { useTickets } from "@/features/tickets/hooks/useTickets";
+import { useCreateTicket, useTicketTimeline, useTickets } from "@/features/tickets/hooks/useTickets";
 import { useReservation } from "@/features/reservations/hooks/useReservations";
 import {
   DropdownMenu,
@@ -32,6 +33,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import type { Ticket as TicketRecord } from "@/types/domain";
 
 export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
   const router = useRouter();
@@ -39,12 +41,23 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
   const activeConversationId = searchParams.get("c");
   const guestQueryParam = searchParams.get("guest");
   const reservationQueryParam = searchParams.get("reservation");
+  const currentUser = useAuthStore((state) => state.currentUser);
 
   const conversations = useWhatsappConversations(hotelId);
   const allGuests = useGuests(hotelId);
-  const autoConversation = useGuestConversation(hotelId, (guestQueryParam && !activeConversationId) ? guestQueryParam : "");
+  const selectedConversation = conversations.data?.find((c) => c.id === activeConversationId);
+  const contextGuestId =
+    guestQueryParam && !activeConversationId
+      ? guestQueryParam
+      : selectedConversation?.guest_id && !reservationQueryParam
+        ? selectedConversation.guest_id
+        : "";
+  const autoConversation = useGuestConversation(hotelId, contextGuestId);
   const activeReservationId = reservationQueryParam || autoConversation.data?.reservation_id || "";
   const reservationQuery = useReservation(hotelId, activeReservationId);
+  const guestTicketsQuery = useTickets(hotelId, selectedConversation?.guest_id ? { guest_id: selectedConversation.guest_id } : { guest_id: "__none__" });
+  const reservationTicketsQuery = useTickets(hotelId, activeReservationId ? { reservation_id: activeReservationId } : { reservation_id: "__none__" });
+  const createTicket = useCreateTicket(hotelId);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
@@ -69,25 +82,26 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
 
     // Apply Filter
     if (activeFilter === "unread") {
-      filtered = filtered.filter((c) => (c as any).unread_count > 0);
+      filtered = filtered.filter((c) => c.unread_count > 0);
     } else if (activeFilter === "open") {
       filtered = filtered.filter((c) => c.status === "open");
     } else if (activeFilter === "vip") {
-      // Mock VIP filter until guest VIP status is pulled into conversation
-      filtered = filtered.filter((c) => false); 
+      filtered = filtered.filter((c) => ["high", "urgent"].includes(c.priority));
     } else if (activeFilter === "mine") {
-      filtered = filtered.filter((c) => false); // Mock until assigned_staff_id is populated
+      filtered = filtered.filter((c) => Boolean(currentUser?.id) && c.assigned_staff_id === currentUser?.id);
     }
 
     return filtered;
-  }, [conversations.data, searchQuery, activeFilter]);
-
-  const selectedConversation = conversations.data?.find((c) => c.id === activeConversationId);
+  }, [activeFilter, conversations.data, currentUser?.id, searchQuery]);
 
   // If a conversation is selected, fetch messages and guest info
   const messagesQuery = useWhatsappMessages(hotelId, activeConversationId || "");
   const guestQuery = useGuest(hotelId, selectedConversation?.guest_id || "");
-  const ticketsQuery = useTickets(hotelId, selectedConversation?.guest_id ? { guest_id: selectedConversation.guest_id } : {});
+  const reservationTickets = (reservationTicketsQuery.data ?? []).filter((ticket) => ticket.reservation_id === activeReservationId);
+  const guestTickets = (guestTicketsQuery.data ?? []).filter((ticket) => !activeReservationId || ticket.reservation_id !== activeReservationId);
+  const focusTicket = [...reservationTickets, ...guestTickets].find((ticket) => !isTicketClosed(ticket.stage)) ?? reservationTickets[0] ?? guestTickets[0];
+  const focusTicketTimeline = useTicketTimeline(hotelId, focusTicket?.id ?? null);
+  const latestTicketMessage = [...(focusTicketTimeline.data ?? [])].reverse().find((item) => item.item_type === "message");
 
   const sendMessage = useSendWhatsappMessage(hotelId, activeConversationId || "");
   const updateConversation = useUpdateWhatsappConversation(hotelId, activeConversationId || "");
@@ -105,19 +119,59 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
     if (!text.trim() || !activeConversationId) return;
 
     try {
-      await sendMessage.mutateAsync({ message: text });
+      await sendMessage.mutateAsync({ message: text, reservation_id: activeReservationId || undefined });
       setText("");
     } catch (error) {
       toast.error("Failed to send message");
     }
   }
 
+  async function handleQuickTicket(config: {
+    label: string;
+    department_key: "front_office" | "housekeeping" | "engineering" | "food_beverage";
+    task_category: string;
+    priority: number;
+    type?: "Ticket" | "Complaint" | "Food Order";
+    prompt?: boolean;
+  }) {
+    if (!selectedConversation) {
+      return;
+    }
+    const baseDescription = `${config.label} request from WhatsApp${guestQuery.data?.name ? ` for ${guestQuery.data.name}` : ""}`;
+    const description = config.prompt
+      ? window.prompt("Ticket description", baseDescription)
+      : baseDescription;
+    if (!description?.trim()) {
+      return;
+    }
+
+    try {
+      await createTicket.mutateAsync({
+        guest_id: selectedConversation.guest_id || undefined,
+        reservation_id: activeReservationId || undefined,
+        conversation_id: selectedConversation.id,
+        room_id: reservationQuery.data?.room_id || undefined,
+        department_key: config.department_key,
+        type: config.type ?? "Ticket",
+        task_category: config.task_category,
+        source: "WHATSAPP",
+        priority: config.priority,
+        item_description: description.trim().slice(0, 255),
+      });
+      toast.success("Ticket created");
+    } catch (error) {
+      toast.error("Failed to create ticket");
+    }
+  }
+
   if (conversations.isLoading) return <DataState isLoading />;
   if (conversations.error) return <DataState error={conversations.error} />;
 
-  // Mocks for UI Demo
-  const unreadCount = conversations.data?.filter(c => (c as any).unread_count > 0).length || 0;
+  // Conversation counters
+  const unreadCount = conversations.data?.filter(c => c.unread_count > 0).length || 0;
   const openCount = conversations.data?.filter(c => c.status === "open").length || 0;
+  const vipCount = conversations.data?.filter(c => ["high", "urgent"].includes(c.priority)).length || 0;
+  const mineCount = conversations.data?.filter(c => Boolean(currentUser?.id) && c.assigned_staff_id === currentUser?.id).length || 0;
 
   return (
     <div className="flex h-[85vh] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
@@ -158,10 +212,10 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
               Open <span className="text-xs text-slate-400">({openCount})</span>
             </FilterButton>
             <FilterButton active={activeFilter === "vip"} onClick={() => setActiveFilter("vip")}>
-              VIP <span className="text-xs text-slate-400">(0)</span>
+              VIP <span className="text-xs text-slate-400">({vipCount})</span>
             </FilterButton>
             <FilterButton active={activeFilter === "mine"} onClick={() => setActiveFilter("mine")}>
-              Mine <span className="text-xs text-slate-400">(0)</span>
+              Mine <span className="text-xs text-slate-400">({mineCount})</span>
             </FilterButton>
           </div>
         </div>
@@ -172,8 +226,8 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
           ) : (
             filteredConversations.map((conversation) => {
               const isActive = conversation.id === activeConversationId;
-              const unread = (conversation as any).unread_count || 0;
-              const isVIP = (conversation as any).priority === "high" || (conversation as any).priority === "urgent";
+              const unread = conversation.unread_count || 0;
+              const isVIP = conversation.priority === "high" || conversation.priority === "urgent";
               return (
                 <button
                   key={conversation.id}
@@ -186,7 +240,7 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
                   <div className="flex items-start justify-between">
                     <h3 className="flex items-center gap-2 truncate text-sm font-semibold">
                       {conversation.guest_id ? (allGuests.data?.find((g) => g.id === conversation.guest_id)?.name || "Unknown Guest") : conversation.phone}
-                      {isVIP && <Badge variant="destructive" className="h-4 text-[10px] px-1">VIP</Badge>}
+                      {isVIP && <Badge variant="rose" className="h-4 px-1 text-[10px]">VIP</Badge>}
                     </h3>
                     <span className="shrink-0 text-xs text-slate-500">
                       {conversation.last_message_at ? formatDistanceToNow(new Date(conversation.last_message_at), { addSuffix: true }).replace('about ', '') : 'New'}
@@ -225,17 +279,17 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
               <div>
                 <h3 className="font-semibold text-slate-800">
                   {guestQuery.data?.name || selectedConversation.phone}
-                  {(selectedConversation as any).priority === "urgent" && <Badge variant="destructive" className="ml-2">Urgent</Badge>}
+                  {selectedConversation.priority === "urgent" && <Badge variant="rose" className="ml-2">Urgent</Badge>}
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Assigned to: {(selectedConversation as any).assigned_staff_id ? "Staff" : "Unassigned"} • 
+                  Assigned to: {selectedConversation.assigned_staff_id ? "Staff" : "Unassigned"} -
                   Status: {titleCase(selectedConversation.status)}
                 </p>
               </div>
               <div className="flex items-center gap-2">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button size="sm" variant="outline" className="h-8 text-xs">Priority</Button>
+                    <Button size="sm" variant="secondary" className="h-8 text-xs">Priority</Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem onClick={() => updateConversation.mutate({ priority: "low" })}>Low</DropdownMenuItem>
@@ -247,10 +301,10 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button size="sm" variant="outline" className="h-8 text-xs">Transfer</Button>
+                    <Button size="sm" variant="secondary" className="h-8 text-xs">Transfer</Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => updateConversation.mutate({ assigned_staff_id: "staff_1" })}>Assign to me</DropdownMenuItem>
+                    <DropdownMenuItem disabled={!currentUser?.id} onClick={() => updateConversation.mutate({ assigned_staff_id: currentUser?.id })}>Assign to me</DropdownMenuItem>
                     <DropdownMenuItem onClick={() => updateConversation.mutate({ assigned_staff_id: null })}>Unassign</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -266,7 +320,7 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
                 ) : (
                   <Button 
                     size="sm" 
-                    variant="outline"
+                    variant="secondary"
                     className="h-8 text-xs"
                     onClick={() => updateConversation.mutate({ status: "open" })}
                   >
@@ -359,7 +413,7 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
               <div className="p-4 bg-white grid grid-cols-2 gap-3">
                 <div>
                   <p className="text-xs text-slate-500 uppercase font-semibold mb-1">Status</p>
-                  <Badge variant={guestQuery.data?.status === 'checked_in' ? 'green' : 'secondary'} className="text-[10px]">
+                  <Badge variant={guestQuery.data?.status === 'checked_in' ? 'green' : 'default'} className="text-[10px]">
                     {guestQuery.data ? titleCase(guestQuery.data.status) : "Unknown"}
                   </Badge>
                 </div>
@@ -368,7 +422,7 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
                   <p className="text-sm font-semibold text-slate-800">4 Stays</p>
                 </div>
                 <div className="col-span-2">
-                  <Button asChild variant="outline" className="w-full text-xs h-8">
+                  <Button asChild variant="secondary" className="h-8 w-full text-xs">
                     <Link href={`/${hotelId}/guests/${selectedConversation.guest_id || ""}`}>
                       View Full Profile
                     </Link>
@@ -398,8 +452,8 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
                       <span className="font-medium text-slate-900">{format(new Date(reservationQuery.data.checkin_date), "MMM d")} → {format(new Date(reservationQuery.data.checkout_date), "MMM d")}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-500">Occupants</span>
-                      <span className="font-medium text-slate-900">{reservationQuery.data.adults} Adults, {reservationQuery.data.children} Children</span>
+                      <span className="text-slate-500">Source</span>
+                      <span className="font-medium text-slate-900">{titleCase(reservationQuery.data.source)}</span>
                     </div>
                     {reservationQuery.data.notes && (
                       <div className="pt-1 mt-1 border-t border-slate-200">
@@ -417,7 +471,123 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
               </div>
             ) : null}
 
-            {/* 3. INTERNAL NOTES */}
+            {/* 3. QUICK ACTIONS */}
+            <div>
+              <h4 className="mb-2 flex items-center gap-2 text-xs font-bold uppercase text-slate-500">
+                <TicketIcon className="size-4" /> Quick Actions
+              </h4>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  disabled={createTicket.isPending}
+                  type="button"
+                  variant="secondary"
+                  className="h-9 justify-start text-xs"
+                  onClick={() =>
+                    handleQuickTicket({
+                      label: "General",
+                      department_key: "front_office",
+                      task_category: "guest_request",
+                      priority: 2,
+                      prompt: true,
+                    })
+                  }
+                >
+                  <TicketIcon className="size-4" />
+                  Create Ticket
+                </Button>
+                <Button
+                  disabled={createTicket.isPending}
+                  type="button"
+                  variant="secondary"
+                  className="h-9 justify-start text-xs"
+                  onClick={() =>
+                    handleQuickTicket({
+                      label: "Housekeeping",
+                      department_key: "housekeeping",
+                      task_category: "housekeeping",
+                      priority: 3,
+                    })
+                  }
+                >
+                  <Sparkles className="size-4" />
+                  Housekeeping
+                </Button>
+                <Button
+                  disabled={createTicket.isPending}
+                  type="button"
+                  variant="secondary"
+                  className="h-9 justify-start text-xs"
+                  onClick={() =>
+                    handleQuickTicket({
+                      label: "Maintenance",
+                      department_key: "engineering",
+                      task_category: "maintenance",
+                      priority: 4,
+                    })
+                  }
+                >
+                  <Wrench className="size-4" />
+                  Maintenance
+                </Button>
+                <Button
+                  disabled={createTicket.isPending}
+                  type="button"
+                  variant="secondary"
+                  className="h-9 justify-start text-xs"
+                  onClick={() =>
+                    handleQuickTicket({
+                      label: "Room service",
+                      department_key: "food_beverage",
+                      task_category: "room_service",
+                      priority: 3,
+                      type: "Food Order",
+                    })
+                  }
+                >
+                  <Utensils className="size-4" />
+                  Room Service
+                </Button>
+              </div>
+            </div>
+
+            {/* 4. TICKET CONTEXT */}
+            <TicketListBlock
+              hotelId={hotelId}
+              isLoading={reservationTicketsQuery.isLoading}
+              tickets={reservationTickets}
+              title="Reservation Tickets"
+            />
+            <TicketListBlock
+              hotelId={hotelId}
+              isLoading={guestTicketsQuery.isLoading}
+              tickets={guestTickets}
+              title="Guest Tickets"
+            />
+
+            {focusTicket ? (
+              <div>
+                <h4 className="mb-2 flex items-center gap-2 text-xs font-bold uppercase text-slate-500">
+                  <MessageCircle className="size-4" /> Ticket Discussion Preview
+                </h4>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <Link className="truncate text-sm font-semibold text-[#0F3D91]" href={`/${hotelId}/tickets/${focusTicket.id}`}>
+                      {focusTicket.ticket_code}
+                    </Link>
+                    <Badge variant={isTicketClosed(focusTicket.stage) ? "green" : "amber"}>{titleCase(focusTicket.stage)}</Badge>
+                  </div>
+                  {focusTicketTimeline.isLoading ? (
+                    <p className="text-sm text-slate-500">Loading discussion...</p>
+                  ) : latestTicketMessage ? (
+                    <p className="line-clamp-3 text-sm text-slate-700">{latestTicketMessage.content}</p>
+                  ) : (
+                    <p className="text-sm text-slate-500">No internal staff comments yet.</p>
+                  )}
+                </div>
+              </div>
+            ) : null}
+
+            {/* 5. INTERNAL NOTES */}
             {guestQuery.data && (
               <div>
                 <h4 className="mb-2 text-xs font-bold uppercase text-slate-500 flex items-center gap-2"><AlertCircle className="size-4" /> Internal Notes</h4>
@@ -449,4 +619,49 @@ function FilterButton({ active, onClick, children }: { active: boolean, onClick:
       {children}
     </button>
   );
+}
+
+function TicketListBlock({
+  hotelId,
+  isLoading,
+  tickets,
+  title,
+}: {
+  hotelId: string;
+  isLoading: boolean;
+  tickets: TicketRecord[];
+  title: string;
+}) {
+  return (
+    <div>
+      <h4 className="mb-2 flex items-center gap-2 text-xs font-bold uppercase text-slate-500">
+        <TicketIcon className="size-4" /> {title}
+      </h4>
+      <div className="grid gap-2">
+        {isLoading ? <p className="text-sm text-slate-500">Loading tickets...</p> : null}
+        {!isLoading && !tickets.length ? (
+          <div className="rounded-lg border border-dashed border-slate-200 p-3 text-sm text-slate-500">
+            No tickets linked.
+          </div>
+        ) : null}
+        {tickets.slice(0, 4).map((ticket) => (
+          <Link
+            className="rounded-lg border border-slate-200 p-3 transition-colors hover:bg-slate-50"
+            href={`/${hotelId}/tickets/${ticket.id}`}
+            key={ticket.id}
+          >
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <span className="truncate text-sm font-semibold text-slate-800">{ticket.ticket_code}</span>
+              <Badge variant={isTicketClosed(ticket.stage) ? "green" : "amber"}>{titleCase(ticket.stage)}</Badge>
+            </div>
+            <p className="line-clamp-2 text-xs text-slate-500">{ticket.item_description}</p>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function isTicketClosed(stage: string) {
+  return ["approved", "completed", "closed", "resolved", "cancelled"].includes(stage.toLowerCase());
 }

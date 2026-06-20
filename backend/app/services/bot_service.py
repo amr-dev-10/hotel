@@ -500,14 +500,17 @@ class BotService:
         if form_responses:
             details = ", ".join(f"{key}: {value}" for key, value in form_responses.items())
             description = f"{description} ({details})"
+        conversation = self.conversations.get_or_create(hotel_id, session.phone, session.guest_id)
         ticket = self.ticket_service.create_ticket(
             hotel_id,
             TicketCreate(
                 guest_id=session.guest_id,
+                reservation_id=self._active_reservation_id(hotel_id, session.guest_id),
+                conversation_id=conversation.id,
                 room_id=session.room_id,
                 department_key=service.get("department_key"),
                 item_description=description,
-                source="whatsapp",
+                source="WHATSAPP",
                 type="Ticket",
                 priority=int(service.get("priority") or 2),
             ),
@@ -621,22 +624,10 @@ class BotService:
             conversation.status = "open"
             conversation.resolved_at = None
         
-        reservation_id = None
-        if session.guest_id:
-            res = self.reservations.db.execute(
-                select(Reservation).where(
-                    Reservation.hotel_id == hotel_id,
-                    Reservation.guest_id == session.guest_id,
-                    Reservation.status.in_(["checked_in", "pre_arrival"])
-                ).order_by(Reservation.checkin_date.desc())
-            ).scalars().first()
-            if res:
-                reservation_id = res.id
-
         message = WhatsAppMessage(
             hotel_id=hotel_id,
             conversation_id=conversation.id,
-            reservation_id=reservation_id,
+            reservation_id=self._active_reservation_id(hotel_id, session.guest_id),
             direction=direction,
             message_type=message_type,
             message_text=text,
@@ -650,3 +641,17 @@ class BotService:
             category="service",
             commit=False,
         )
+
+    def _active_reservation_id(self, hotel_id: str, guest_id: str | None) -> str | None:
+        if not guest_id:
+            return None
+        reservation = self.reservations.db.execute(
+            select(Reservation)
+            .where(
+                Reservation.hotel_id == hotel_id,
+                Reservation.guest_id == guest_id,
+                Reservation.status.in_(["checked_in", "pre_arrival", "confirmed"]),
+            )
+            .order_by(Reservation.checkin_date.desc())
+        ).scalars().first()
+        return reservation.id if reservation else None

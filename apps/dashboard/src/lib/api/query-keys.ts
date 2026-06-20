@@ -51,11 +51,15 @@ export const queryKeys = {
   },
   tickets: {
     all: (hotelId: string) => ["tickets", hotelId] as const,
-    list: (hotelId: string, filters: Record<string, string>) =>
+    list: (hotelId: string, filters: Record<string, string | undefined>) =>
       ["tickets", hotelId, "list", filters] as const,
     acceptances: (hotelId: string, ticketId: string) =>
       ["tickets", hotelId, ticketId, "acceptances"] as const,
     escalations: (hotelId: string, ticketId: string) =>
       ["tickets", hotelId, ticketId, "escalations"] as const,
+    messages: (hotelId: string, ticketId: string) =>
+      ["tickets", hotelId, ticketId, "messages"] as const,
+    timeline: (hotelId: string, ticketId: string) =>
+      ["tickets", hotelId, ticketId, "timeline"] as const,
   },
 };

@@ -11,6 +11,15 @@ export const createReservationSchema = z
     checkout_date: z.string().min(1),
     source: z.string().min(1),
     notes: z.string().optional(),
+    guests: z
+      .array(
+        z.object({
+          guest_id: z.string().min(1),
+          is_primary: z.boolean().optional(),
+          relationship: z.string().optional(),
+        }),
+      )
+      .optional(),
   })
   .refine((values) => new Date(values.checkout_date) > new Date(values.checkin_date), {
     message: "Checkout must be after check-in",

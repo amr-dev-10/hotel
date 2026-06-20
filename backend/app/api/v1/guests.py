@@ -175,15 +175,21 @@ def get_guest_conversation(
             )
         ).scalar_one_or_none()
         
-        if conversation:
+        if conversation and conversation.guest_id == guest_id:
+            pass
+        elif conversation and not conversation.guest_id:
+            # Link existing phone conversation to this guest
             conversation.guest_id = guest_id
         else:
+            from app.models.base import utcnow
             conversation = WhatsAppConversation(
                 hotel_id=hotel_id,
                 guest_id=guest_id,
                 phone=phone,
                 status="open",
-                unread_count=0
+                priority="normal",
+                unread_count=0,
+                started_at=utcnow(),
             )
             db.add(conversation)
         
@@ -192,10 +198,19 @@ def get_guest_conversation(
 
     # find active reservation for context
     active_reservation_id = None
+    via_join = db.execute(
+        select(ReservationGuest.reservation_id).where(
+            ReservationGuest.hotel_id == hotel_id,
+            ReservationGuest.guest_id == guest_id,
+        )
+    ).scalars().all()
     reservations = db.execute(
         select(Reservation).where(
             Reservation.hotel_id == hotel_id,
-            Reservation.guest_id == guest_id
+            or_(
+                Reservation.guest_id == guest_id,
+                Reservation.id.in_(via_join),
+            )
         ).order_by(Reservation.created_at.desc())
     ).scalars().all()
     
@@ -215,4 +230,3 @@ def get_guest_conversation(
         "conversation_id": conversation.id,
         "reservation_id": active_reservation_id
     })
-

@@ -176,6 +176,7 @@ class WhatsAppAccountService:
         conversation_id: str,
         message: str,
         actor_id: str | None,
+        reservation_id: str | None = None,
     ) -> dict:
         conversation = WhatsAppConversationRepository(self.db).get_for_hotel(hotel_id, conversation_id)
         if not conversation:
@@ -189,7 +190,6 @@ class WhatsAppAccountService:
         access_token = account.access_token or (
             decrypt_secret(account.access_token_encrypted) if account.access_token_encrypted else None
         )
-        
         result = WhatsAppService().send_text(
             account.phone_number_id,
             conversation.phone,
@@ -201,6 +201,7 @@ class WhatsAppAccountService:
         msg = WhatsAppMessage(
             hotel_id=hotel_id,
             conversation_id=conversation.id,
+            reservation_id=reservation_id,
             direction="outbound",
             message_type="text",
             message_text=message,
@@ -208,6 +209,7 @@ class WhatsAppAccountService:
             created_at=utcnow(),
         )
         self.db.add(msg)
+        conversation.last_message_at = utcnow()
         
         WhatsAppHealthService(self.db).record_sent(hotel_id, account.id, commit=False)
         ConversationWindowService(self.db).track_message(

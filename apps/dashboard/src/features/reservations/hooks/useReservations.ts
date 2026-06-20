@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { apiGet, apiPost } from "@/lib/api/client";
 import { queryKeys } from "@/lib/api/query-keys";
-import type { Folio, Reservation, ReservationGuest, StayRecord } from "@/types/domain";
+import type { Folio, Reservation, ReservationGuest, StayRecord, WhatsAppMessage } from "@/types/domain";
 import type { CreateReservationValues } from "@/features/reservations/schemas/create-reservation.schema";
 
 export function useReservations(hotelId: string) {
@@ -32,7 +32,7 @@ export function useReservationGuests(hotelId: string, reservationId: string) {
 export function useReservationMessages(hotelId: string, reservationId: string) {
   return useQuery({
     queryKey: queryKeys.reservationMessages(hotelId, reservationId),
-    queryFn: () => apiGet<any[]>(`/hotels/${hotelId}/reservations/${reservationId}/messages`),
+    queryFn: () => apiGet<WhatsAppMessage[]>(`/hotels/${hotelId}/reservations/${reservationId}/messages`),
     enabled: Boolean(hotelId && reservationId),
   });
 }

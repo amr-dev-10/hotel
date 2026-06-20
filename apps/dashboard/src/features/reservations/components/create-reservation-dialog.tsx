@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { addDays, format } from "date-fns";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, Plus } from "lucide-react";
+import { Loader2, Plus, Search, UserCheck, UserPlus, X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -20,18 +20,27 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { apiErrorMessage } from "@/lib/api/client";
 import { useRooms } from "@/features/rooms/hooks/useRooms";
+import { useGuests } from "@/features/guests/hooks/useGuests";
 import {
   createReservationSchema,
   type CreateReservationValues,
 } from "@/features/reservations/schemas/create-reservation.schema";
 import { useCreateReservation } from "@/features/reservations/hooks/useReservations";
+import type { Guest } from "@/types/domain";
 
 export function CreateReservationDialog({ hotelId }: { hotelId: string }) {
   const [open, setOpen] = useState(false);
+  const [guestSearch, setGuestSearch] = useState("");
+  const [selectedGuest, setSelectedGuest] = useState<Guest | null>(null);
+  const [showGuestSearch, setShowGuestSearch] = useState(false);
+
   const rooms = useRooms(hotelId);
+  const guests = useGuests(hotelId);
   const createReservation = useCreateReservation(hotelId);
+
   const form = useForm<CreateReservationValues>({
     resolver: zodResolver(createReservationSchema),
     defaultValues: {
@@ -47,6 +56,37 @@ export function CreateReservationDialog({ hotelId }: { hotelId: string }) {
     },
   });
 
+  // Filter guests based on search query
+  const filteredGuests = useMemo(() => {
+    if (!guestSearch.trim() || !guests.data) return [];
+    const q = guestSearch.toLowerCase();
+    return guests.data
+      .filter(
+        (g) =>
+          g.name?.toLowerCase().includes(q) ||
+          g.phone?.includes(q) ||
+          g.whatsapp_phone?.includes(q) ||
+          g.email?.toLowerCase().includes(q)
+      )
+      .slice(0, 6);
+  }, [guestSearch, guests.data]);
+
+  function handleSelectGuest(guest: Guest) {
+    setSelectedGuest(guest);
+    setGuestSearch("");
+    setShowGuestSearch(false);
+    form.setValue("guest_name", guest.name || "");
+    form.setValue("phone", guest.phone || "");
+    form.setValue("whatsapp_phone", guest.whatsapp_phone || "");
+  }
+
+  function handleClearGuest() {
+    setSelectedGuest(null);
+    form.setValue("guest_name", "");
+    form.setValue("phone", "");
+    form.setValue("whatsapp_phone", "");
+  }
+
   const onSubmit = form.handleSubmit(async (values) => {
     try {
       await createReservation.mutateAsync({
@@ -56,9 +96,13 @@ export function CreateReservationDialog({ hotelId }: { hotelId: string }) {
         room_id: values.room_id || undefined,
         room_type_id: values.room_type_id || undefined,
         notes: values.notes || undefined,
+        guests: selectedGuest
+          ? [{ guest_id: selectedGuest.id, is_primary: true, relationship: "self" }]
+          : undefined,
       });
       toast.success("Reservation created");
       form.reset();
+      setSelectedGuest(null);
       setOpen(false);
     } catch (error) {
       toast.error(apiErrorMessage(error));
@@ -73,24 +117,116 @@ export function CreateReservationDialog({ hotelId }: { hotelId: string }) {
           New reservation
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Create Reservation</DialogTitle>
-          <DialogDescription>Add a walk-in or direct booking without changing backend reservation logic.</DialogDescription>
+          <DialogDescription>
+            Search for an existing guest or enter details for a new guest.
+          </DialogDescription>
         </DialogHeader>
 
         <form className="grid gap-4" onSubmit={onSubmit}>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="grid gap-2">
-              <Label htmlFor="guest_name">Guest name</Label>
-              <Input id="guest_name" {...form.register("guest_name")} />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="phone">Phone</Label>
-              <Input id="phone" {...form.register("phone")} />
-            </div>
+
+          {/* Guest selector */}
+          <div className="grid gap-2">
+            <Label>Guest</Label>
+
+            {selectedGuest ? (
+              // Existing guest selected — show card
+              <div className="flex items-center justify-between rounded-lg border border-green-200 bg-green-50 px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <UserCheck className="size-4 text-green-600" />
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">{selectedGuest.name}</p>
+                    <p className="text-xs text-slate-500">{selectedGuest.phone || selectedGuest.whatsapp_phone || "No phone"}</p>
+                  </div>
+                  <Badge variant="green" className="text-[10px]">Existing Guest</Badge>
+                </div>
+                <button type="button" onClick={handleClearGuest} className="text-slate-400 hover:text-slate-600">
+                  <X className="size-4" />
+                </button>
+              </div>
+            ) : (
+              // Guest search
+              <div className="relative">
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                    <Input
+                      placeholder="Search existing guests by name or phone..."
+                      className="pl-9"
+                      value={guestSearch}
+                      onChange={(e) => {
+                        setGuestSearch(e.target.value);
+                        setShowGuestSearch(true);
+                      }}
+                      onFocus={() => setShowGuestSearch(true)}
+                    />
+                  </div>
+                </div>
+
+                {showGuestSearch && filteredGuests.length > 0 && (
+                  <div className="absolute z-50 mt-1 w-full rounded-md border border-slate-200 bg-white shadow-lg">
+                    {filteredGuests.map((guest) => (
+                      <button
+                        key={guest.id}
+                        type="button"
+                        className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-slate-50 border-b border-slate-100 last:border-0"
+                        onClick={() => handleSelectGuest(guest)}
+                      >
+                        <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#0F3D91]/10 text-xs font-bold text-[#0F3D91]">
+                          {guest.name?.[0]?.toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{guest.name}</p>
+                          <p className="text-xs text-slate-500">{guest.phone || guest.whatsapp_phone || guest.email || "No contact"}</p>
+                        </div>
+                        <Badge variant={guest.status === "checked_in" ? "green" : "default"} className="ml-auto shrink-0 text-[10px]">
+                          {guest.status}
+                        </Badge>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {showGuestSearch && guestSearch && filteredGuests.length === 0 && (
+                  <div className="absolute z-50 mt-1 w-full rounded-md border border-slate-200 bg-white shadow-lg px-3 py-3">
+                    <div className="flex items-center gap-2 text-sm text-slate-500">
+                      <UserPlus className="size-4" />
+                      No existing guest found — a new guest will be created.
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
+          {/* New guest fields — shown when no guest selected */}
+          {!selectedGuest && (
+            <div className="grid gap-4 rounded-lg border border-slate-100 bg-slate-50 p-3">
+              <p className="text-xs font-semibold uppercase text-slate-500">New Guest Details</p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-2">
+                  <Label htmlFor="guest_name">Full Name *</Label>
+                  <Input id="guest_name" placeholder="John Smith" {...form.register("guest_name")} />
+                  {form.formState.errors.guest_name && (
+                    <p className="text-xs text-rose-600">{form.formState.errors.guest_name.message}</p>
+                  )}
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="phone">Phone</Label>
+                  <Input id="phone" placeholder="+92 300 1234567" {...form.register("phone")} />
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="whatsapp_phone">WhatsApp Number</Label>
+                <Input id="whatsapp_phone" placeholder="+92 300 1234567" {...form.register("whatsapp_phone")} />
+                <p className="text-xs text-slate-400">If different from phone. Used to send WhatsApp confirmation.</p>
+              </div>
+            </div>
+          )}
+
+          {/* Stay details */}
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="grid gap-2">
               <Label htmlFor="checkin_date">Check-in</Label>
@@ -111,27 +247,21 @@ export function CreateReservationDialog({ hotelId }: { hotelId: string }) {
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="grid gap-2">
-              <Label htmlFor="room_id">Room</Label>
-              <Select id="room_id" {...form.register("room_id")}>
-                <option value="">Assign later</option>
-                {(rooms.data ?? []).map((room) => (
-                  <option key={room.id} value={room.id}>
-                    {room.room_number} {room.room_type ? `- ${room.room_type}` : ""}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="whatsapp_phone">WhatsApp</Label>
-              <Input id="whatsapp_phone" {...form.register("whatsapp_phone")} />
-            </div>
+          <div className="grid gap-2">
+            <Label htmlFor="room_id">Room</Label>
+            <Select id="room_id" {...form.register("room_id")}>
+              <option value="">Assign later</option>
+              {(rooms.data ?? []).map((room) => (
+                <option key={room.id} value={room.id}>
+                  {room.room_number} {room.room_type ? `- ${room.room_type}` : ""}
+                </option>
+              ))}
+            </Select>
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="notes">Notes</Label>
-            <Textarea id="notes" {...form.register("notes")} />
+            <Label htmlFor="notes">Notes / Special Requests</Label>
+            <Textarea id="notes" placeholder="Any special requests or notes..." {...form.register("notes")} />
           </div>
 
           {form.formState.errors.checkout_date ? (
@@ -144,7 +274,7 @@ export function CreateReservationDialog({ hotelId }: { hotelId: string }) {
             </Button>
             <Button disabled={createReservation.isPending} type="submit">
               {createReservation.isPending ? <Loader2 className="animate-spin" /> : <Plus />}
-              Create
+              Create Reservation
             </Button>
           </div>
         </form>

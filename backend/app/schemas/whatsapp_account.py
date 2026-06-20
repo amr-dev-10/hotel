@@ -162,3 +162,4 @@ class ConversationWindowRead(ORMModel):
 
 class WhatsAppMessageSendRequest(BaseModel):
     message: str = Field(min_length=1)
+    reservation_id: str | None = None

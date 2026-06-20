@@ -178,7 +178,11 @@ def send_conversation_message(
     current_user: User = Depends(require_permission("ticket.assign")),
 ) -> dict:
     result = WhatsAppAccountService(db).send_conversation_message(
-        hotel_id, conversation_id, payload.message, current_user.id
+        hotel_id,
+        conversation_id,
+        payload.message,
+        current_user.id,
+        reservation_id=payload.reservation_id,
     )
     return ok(result)
 

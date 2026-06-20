@@ -2,20 +2,24 @@ from datetime import timedelta
 from uuid import uuid4
 
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 
 from app.core.exceptions import bad_request, not_found
+from app.models.guest import Guest
+from app.models.reservation import Reservation
 from app.models.base import utcnow
-from app.models.ticket import Ticket
+from app.models.ticket import Ticket, TicketEvent, TicketMessage
 from app.models.user import User
+from app.models.whatsapp import WhatsAppConversation
 from app.repositories.bot_config_repository import BotConfigRepository
 from app.repositories.department_repository import DepartmentRepository
 from app.repositories.knowledge_repository import DepartmentConfigRepository
 from app.repositories.routing_rule_repository import RoutingRuleRepository
 from app.repositories.ticket_acceptance_repository import TicketAcceptanceRepository
-from app.repositories.ticket_repository import TicketRepository
+from app.repositories.ticket_repository import TicketMessageRepository, TicketRepository
 from app.repositories.user_repository import UserRepository
 from app.repositories.workflow_repository import WorkflowDefinitionRepository, WorkflowStateRepository
-from app.schemas.ticket import TicketCreate
+from app.schemas.ticket import TicketCreate, TicketMessageCreate, TicketTimelineItem
 from app.schemas.ops import NotificationCreate
 from app.services.audit_service import AuditService
 from app.services.hierarchy_service import HierarchyService
@@ -32,6 +36,7 @@ class TicketService:
     def __init__(self, db: Session) -> None:
         self.db = db
         self.tickets = TicketRepository(db)
+        self.ticket_messages = TicketMessageRepository(db)
         self.departments = DepartmentRepository(db)
         self.users = UserRepository(db)
         self.acceptances = TicketAcceptanceRepository(db)
@@ -54,6 +59,7 @@ class TicketService:
         commit: bool = True,
     ) -> Ticket:
         UsageService(self.db).check_and_increment(hotel_id, "tickets", commit=False)
+        self._validate_context(hotel_id, payload)
         department = None
         if payload.department_id:
             department = self.departments.get_for_hotel(hotel_id, payload.department_id)
@@ -98,6 +104,8 @@ class TicketService:
             hotel_id=hotel_id,
             ticket_code=self._ticket_code(),
             guest_id=payload.guest_id,
+            reservation_id=payload.reservation_id,
+            conversation_id=payload.conversation_id,
             room_id=payload.room_id,
             department_id=department.id,
             assigned_to=None if uses_acceptance else (assignee.id if assignee else None),
@@ -105,7 +113,7 @@ class TicketService:
             type=payload.type,
             task_category=payload.task_category,
             item_description=payload.item_description,
-            source=payload.source,
+            source=self._normalize_source(payload.source),
             priority=(routing_rule.priority_override if fast_tracked and routing_rule and routing_rule.priority_override else payload.priority),
             sla_due_at=None if uses_acceptance else now + timedelta(minutes=sla_config.sla_minutes),
         )
@@ -115,7 +123,10 @@ class TicketService:
             ticket,
             "created",
             {
-                "source": payload.source,
+                "source": ticket.source,
+                "guest_id": payload.guest_id,
+                "reservation_id": payload.reservation_id,
+                "conversation_id": payload.conversation_id,
                 "item_description": payload.item_description,
                 "priority": payload.priority,
                 "task_category": payload.task_category,
@@ -185,6 +196,66 @@ class TicketService:
             self.db.refresh(ticket)
             self._publish_created(ticket, assignee_name=assignee.name if assignee else None)
         return ticket
+
+    def list_messages(self, hotel_id: str, ticket_id: str) -> list[TicketMessage]:
+        self._get_ticket(hotel_id, ticket_id)
+        return list(self.ticket_messages.list_for_ticket(hotel_id, ticket_id))
+
+    def create_message(
+        self,
+        hotel_id: str,
+        ticket_id: str,
+        payload: TicketMessageCreate,
+        actor_id: str | None,
+    ) -> TicketMessage:
+        ticket = self._get_ticket(hotel_id, ticket_id)
+        message = TicketMessage(
+            hotel_id=hotel_id,
+            ticket_id=ticket.id,
+            sender_type=payload.sender_type,
+            sender_id=actor_id,
+            content=payload.content,
+            is_read=False,
+            created_at=utcnow(),
+        )
+        self.db.add(message)
+        self.db.commit()
+        self.db.refresh(message)
+        return message
+
+    def timeline(self, hotel_id: str, ticket_id: str) -> list[TicketTimelineItem]:
+        self._get_ticket(hotel_id, ticket_id)
+        events = self.db.execute(
+            select(TicketEvent).where(
+                TicketEvent.hotel_id == hotel_id,
+                TicketEvent.ticket_id == ticket_id,
+            )
+        ).scalars().all()
+        messages = self.ticket_messages.list_for_ticket(hotel_id, ticket_id)
+        items = [
+            TicketTimelineItem(
+                id=event.id,
+                item_type="event",
+                event_type=event.event_type,
+                content=self._event_label(event.event_type),
+                payload=event.payload,
+                created_at=event.created_at,
+            )
+            for event in events
+        ]
+        items.extend(
+            TicketTimelineItem(
+                id=message.id,
+                item_type="message",
+                sender_type=message.sender_type,
+                sender_id=message.sender_id,
+                content=message.content,
+                payload=None,
+                created_at=message.created_at,
+            )
+            for message in messages
+        )
+        return sorted(items, key=lambda item: item.created_at)
 
     def offer_ticket(
         self,
@@ -437,6 +508,43 @@ class TicketService:
             raise not_found("Ticket not found")
         return ticket
 
+    def _validate_context(self, hotel_id: str, payload: TicketCreate) -> None:
+        if payload.guest_id and not self.db.execute(
+            select(Guest.id).where(Guest.hotel_id == hotel_id, Guest.id == payload.guest_id)
+        ).scalar_one_or_none():
+            raise not_found("Guest not found")
+        if payload.reservation_id and not self.db.execute(
+            select(Reservation.id).where(
+                Reservation.hotel_id == hotel_id,
+                Reservation.id == payload.reservation_id,
+                Reservation.deleted_at.is_(None),
+            )
+        ).scalar_one_or_none():
+            raise not_found("Reservation not found")
+        if payload.conversation_id and not self.db.execute(
+            select(WhatsAppConversation.id).where(
+                WhatsAppConversation.hotel_id == hotel_id,
+                WhatsAppConversation.id == payload.conversation_id,
+            )
+        ).scalar_one_or_none():
+            raise not_found("WhatsApp conversation not found")
+
+    def _normalize_source(self, source: str) -> str:
+        normalized = source.strip()
+        mapping = {
+            "dashboard": "DASHBOARD",
+            "whatsapp": "WHATSAPP",
+            "staff": "STAFF",
+            "email": "EMAIL",
+            "phone": "PHONE",
+            "walk_in": "WALK_IN",
+            "walk-in": "WALK_IN",
+        }
+        return mapping.get(normalized.lower(), normalized)
+
+    def _event_label(self, event_type: str) -> str:
+        return event_type.replace("_", " ").replace(".", " ").title()
+
     def _offer_next_after_decline(
         self,
         ticket: Ticket,
@@ -494,6 +602,8 @@ class TicketService:
                 "department_id": ticket.department_id,
                 "room_id": ticket.room_id,
                 "guest_id": ticket.guest_id,
+                "reservation_id": ticket.reservation_id,
+                "conversation_id": ticket.conversation_id,
                 "item": ticket.item_description,
                 "assigned_to": ticket.assigned_to,
                 "assigned_to_name": assignee_name,
