@@ -85,6 +85,11 @@ class WhatsAppConversation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     guest_id: Mapped[str | None] = mapped_column(ForeignKey("guests.id"))
     phone: Mapped[str] = mapped_column(String(40), index=True)
     status: Mapped[str] = mapped_column(String(40), default="open")
+    priority: Mapped[str] = mapped_column(String(40), default="normal")
+    assigned_staff_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
+    assigned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    unread_count: Mapped[int] = mapped_column(Integer, default=0)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     last_message_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
