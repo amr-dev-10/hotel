@@ -42,6 +42,7 @@ class Ticket(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     task_category: Mapped[str | None] = mapped_column(String(80), index=True)
     item_description: Mapped[str] = mapped_column(Text)
     source: Mapped[str] = mapped_column(String(40), default="DASHBOARD")
+    followers: Mapped[list[str]] = mapped_column(JSON, default=list)
     priority: Mapped[int] = mapped_column(Integer, default=2)
     sla_due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

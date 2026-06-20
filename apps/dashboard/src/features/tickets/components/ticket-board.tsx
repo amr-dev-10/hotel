@@ -46,6 +46,9 @@ export function TicketBoard({ hotelId }: { hotelId: string }) {
       q: searchParams.get("q") ?? "",
       stage: searchParams.get("stage") ?? "",
       priority: searchParams.get("priority") ?? "",
+      assigned_to: searchParams.get("assigned_to") ?? "",
+      department_key: searchParams.get("department_key") ?? "",
+      sla_status: searchParams.get("sla_status") ?? "",
     }),
     [searchParams],
   );

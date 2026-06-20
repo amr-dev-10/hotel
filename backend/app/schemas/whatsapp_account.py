@@ -80,6 +80,7 @@ class WhatsAppMessageRead(ORMModel):
     hotel_id: str
     conversation_id: str
     reservation_id: str | None = None
+    ticket_id: str | None = None
     direction: str
     message_type: str
     message_text: str | None = None
@@ -163,3 +164,4 @@ class ConversationWindowRead(ORMModel):
 class WhatsAppMessageSendRequest(BaseModel):
     message: str = Field(min_length=1)
     reservation_id: str | None = None
+    ticket_id: str | None = None

@@ -8,6 +8,7 @@ from app.models.user import User
 from app.repositories.escalation_repository import EscalationLogRepository
 from app.repositories.ticket_acceptance_repository import TicketAcceptanceRepository
 from app.repositories.ticket_repository import TicketRepository
+from app.repositories.whatsapp_repository import WhatsAppConversationRepository
 from app.schemas.ticket import (
     TicketAcceptanceRead,
     TicketCreate,
@@ -17,6 +18,7 @@ from app.schemas.ticket import (
     TicketStageUpdate,
 )
 from app.schemas.v51 import EscalationLogRead
+from app.schemas.whatsapp_account import WhatsAppMessageRead
 from app.services.ticket_service import TicketService
 
 router = APIRouter()
@@ -30,6 +32,9 @@ def list_tickets(
     conversation_id: str | None = None,
     stage: str | None = None,
     priority: int | None = None,
+    assigned_to: str | None = None,
+    department_key: str | None = None,
+    sla_status: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("ticket.view")),
 ) -> dict:
@@ -40,6 +45,9 @@ def list_tickets(
         conversation_id=conversation_id,
         stage=stage,
         priority=priority,
+        assigned_to=assigned_to,
+        department_key=department_key,
+        sla_status=sla_status,
     )
     return ok([TicketRead.model_validate(item).model_dump() for item in tickets])
 
@@ -87,6 +95,22 @@ def get_ticket_timeline(
 ) -> dict:
     items = TicketService(db).timeline(hotel_id, ticket_id)
     return ok([item.model_dump() for item in items])
+
+
+@router.get("/{ticket_id}/guest-messages")
+def list_ticket_guest_messages(
+    hotel_id: str,
+    ticket_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("ticket.view")),
+) -> dict:
+    ticket = TicketRepository(db).get_for_hotel(hotel_id, ticket_id)
+    if not ticket:
+        from app.core.exceptions import not_found
+
+        raise not_found("Ticket not found")
+    messages = WhatsAppConversationRepository(db).list_ticket_messages(hotel_id, ticket_id)
+    return ok([WhatsAppMessageRead.model_validate(item).model_dump() for item in messages])
 
 
 @router.patch("/{ticket_id}/stage")

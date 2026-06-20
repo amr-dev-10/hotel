@@ -162,10 +162,11 @@ def sync_templates(
 def list_conversation_messages(
     hotel_id: str,
     conversation_id: str,
+    ticket_id: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("ticket.view")),
 ) -> dict:
-    messages = WhatsAppConversationRepository(db).list_messages(hotel_id, conversation_id)
+    messages = WhatsAppConversationRepository(db).list_messages(hotel_id, conversation_id, ticket_id=ticket_id)
     return ok([WhatsAppMessageRead.model_validate(item).model_dump() for item in messages])
 
 
@@ -183,6 +184,7 @@ def send_conversation_message(
         payload.message,
         current_user.id,
         reservation_id=payload.reservation_id,
+        ticket_id=payload.ticket_id,
     )
     return ok(result)
 

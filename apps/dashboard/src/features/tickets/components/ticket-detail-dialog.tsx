@@ -35,24 +35,26 @@ export function TicketDetailDialog({ hotelId, tickets }: { hotelId: string; tick
 
   return (
     <Dialog open={Boolean(ticketId)} onOpenChange={(open) => (!open ? close() : undefined)}>
-      <DialogContent className="max-w-3xl">
-        <DialogHeader>
+      <DialogContent className="left-auto right-0 top-0 h-screen max-h-screen w-full max-w-xl translate-x-0 translate-y-0 gap-0 overflow-y-auto rounded-none border-y-0 border-r-0 p-0 sm:w-[32rem]">
+        <DialogHeader className="border-b border-slate-200 p-5">
           <DialogTitle>{ticket?.ticket_code ?? "Ticket details"}</DialogTitle>
           <DialogDescription>{ticket ? ticket.item_description : "Ticket was not found in the current list."}</DialogDescription>
         </DialogHeader>
 
         {ticket ? (
-          <div className="grid gap-5">
-            <section className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-5 p-5">
+            <section className="grid gap-3 sm:grid-cols-2">
               <Detail label="Stage" value={titleCase(ticket.stage)} />
               <Detail label="Priority" value={`P${ticket.priority}`} />
               <Detail label="Assigned" value={compactId(ticket.assigned_to)} />
               <Detail label="Room" value={compactId(ticket.room_id)} />
+              <Detail label="Reservation" value={compactId(ticket.reservation_id)} />
+              <Detail label="Conversation" value={compactId(ticket.conversation_id)} />
               <Detail label="Source" value={titleCase(ticket.source)} />
               <Detail label="Created" value={format(new Date(ticket.created_at), "dd MMM, HH:mm")} />
             </section>
 
-            <section className="grid gap-4 lg:grid-cols-2">
+            <section className="grid gap-4">
               <div className="rounded-md border border-slate-200 p-4">
                 <div className="mb-3 flex items-center justify-between">
                   <h3 className="text-sm font-semibold">Acceptance Flow</h3>
@@ -96,7 +98,7 @@ export function TicketDetailDialog({ hotelId, tickets }: { hotelId: string; tick
               </div>
             </section>
 
-            <div className="flex justify-end">
+            <div className="sticky bottom-0 -mx-5 -mb-5 flex justify-end border-t border-slate-200 bg-white p-4">
               <Button asChild type="button">
                 <Link href={`/${hotelId}/tickets/${ticket.id}`}>Open full page</Link>
               </Button>

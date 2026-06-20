@@ -127,6 +127,7 @@ export interface Ticket {
   task_category: string | null;
   item_description: string;
   source: string;
+  followers: string[];
   priority: number;
   sla_due_at: string | null;
   resolved_at: string | null;
@@ -455,6 +456,7 @@ export interface WhatsAppMessage {
   hotel_id: string;
   conversation_id: string;
   reservation_id: string | null;
+  ticket_id: string | null;
   direction: string;
   message_type: string;
   message_text: string | null;

@@ -114,6 +114,7 @@ class TicketService:
             task_category=payload.task_category,
             item_description=payload.item_description,
             source=self._normalize_source(payload.source),
+            followers=list(dict.fromkeys([*payload.followers, *([assignee.id] if assignee else [])])),
             priority=(routing_rule.priority_override if fast_tracked and routing_rule and routing_rule.priority_override else payload.priority),
             sla_due_at=None if uses_acceptance else now + timedelta(minutes=sla_config.sla_minutes),
         )

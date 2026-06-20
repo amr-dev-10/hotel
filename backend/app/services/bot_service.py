@@ -125,6 +125,7 @@ class BotService:
                 direction="outbound",
                 message_type=reply["kind"],
                 text=reply.get("text"),
+                ticket_id=ticket_id,
             )
         self.db.commit()
         return {
@@ -618,6 +619,7 @@ class BotService:
         message_type: str,
         text: str | None = None,
         interactive_id: str | None = None,
+        ticket_id: str | None = None,
     ) -> None:
         conversation = self.conversations.get_or_create(hotel_id, session.phone, session.guest_id)
         if direction == "inbound" and conversation.status == "resolved":
@@ -628,6 +630,7 @@ class BotService:
             hotel_id=hotel_id,
             conversation_id=conversation.id,
             reservation_id=self._active_reservation_id(hotel_id, session.guest_id),
+            ticket_id=ticket_id,
             direction=direction,
             message_type=message_type,
             message_text=text,

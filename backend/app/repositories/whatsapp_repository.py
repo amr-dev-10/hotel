@@ -108,12 +108,26 @@ class WhatsAppConversationRepository(BaseRepository[WhatsAppConversation]):
         self.db.flush()
         return conversation
 
-    def list_messages(self, hotel_id: str, conversation_id: str) -> Sequence[WhatsAppMessage]:
+    def list_messages(
+        self,
+        hotel_id: str,
+        conversation_id: str,
+        ticket_id: str | None = None,
+    ) -> Sequence[WhatsAppMessage]:
+        statement = select(WhatsAppMessage).where(
+            WhatsAppMessage.hotel_id == hotel_id,
+            WhatsAppMessage.conversation_id == conversation_id,
+        )
+        if ticket_id:
+            statement = statement.where(WhatsAppMessage.ticket_id == ticket_id)
+        return self.db.execute(statement.order_by(WhatsAppMessage.created_at)).scalars().all()
+
+    def list_ticket_messages(self, hotel_id: str, ticket_id: str) -> Sequence[WhatsAppMessage]:
         return self.db.execute(
             select(WhatsAppMessage)
             .where(
                 WhatsAppMessage.hotel_id == hotel_id,
-                WhatsAppMessage.conversation_id == conversation_id,
+                WhatsAppMessage.ticket_id == ticket_id,
             )
             .order_by(WhatsAppMessage.created_at)
         ).scalars().all()

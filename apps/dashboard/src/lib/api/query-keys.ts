@@ -61,5 +61,7 @@ export const queryKeys = {
       ["tickets", hotelId, ticketId, "messages"] as const,
     timeline: (hotelId: string, ticketId: string) =>
       ["tickets", hotelId, ticketId, "timeline"] as const,
+    guestMessages: (hotelId: string, ticketId: string) =>
+      ["tickets", hotelId, ticketId, "guest-messages"] as const,
   },
 };

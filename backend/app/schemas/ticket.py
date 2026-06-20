@@ -17,6 +17,7 @@ class TicketCreate(BaseModel):
     task_category: str | None = None
     item_description: str = Field(min_length=2)
     source: str = "DASHBOARD"
+    followers: list[str] = Field(default_factory=list)
     priority: int = Field(default=2, ge=1, le=5)
 
 
@@ -40,6 +41,7 @@ class TicketRead(ORMModel):
     task_category: str | None = None
     item_description: str
     source: str
+    followers: list[str]
     priority: int
     sla_due_at: datetime | None = None
     resolved_at: datetime | None = None

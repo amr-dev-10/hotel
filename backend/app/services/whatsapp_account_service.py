@@ -5,6 +5,7 @@ from app.core.vault import Vault
 from app.core.exceptions import bad_request, not_found
 from app.models.base import utcnow
 from app.models.whatsapp import WhatsAppAccount, WhatsAppTemplate
+from app.repositories.ticket_repository import TicketRepository
 from app.repositories.whatsapp_repository import WhatsAppAccountRepository, WhatsAppTemplateRepository, WhatsAppConversationRepository
 from app.schemas.whatsapp_account import (
     WhatsAppAccountCreate,
@@ -177,10 +178,17 @@ class WhatsAppAccountService:
         message: str,
         actor_id: str | None,
         reservation_id: str | None = None,
+        ticket_id: str | None = None,
     ) -> dict:
         conversation = WhatsAppConversationRepository(self.db).get_for_hotel(hotel_id, conversation_id)
         if not conversation:
             raise not_found("Conversation not found")
+        if ticket_id:
+            ticket = TicketRepository(self.db).get_for_hotel(hotel_id, ticket_id)
+            if not ticket:
+                raise not_found("Ticket not found")
+            if ticket.conversation_id and ticket.conversation_id != conversation_id:
+                raise bad_request("Ticket is linked to another WhatsApp conversation")
             
         accounts = self.accounts.list_for_hotel(hotel_id, limit=1)
         if not accounts:
@@ -202,6 +210,7 @@ class WhatsAppAccountService:
             hotel_id=hotel_id,
             conversation_id=conversation.id,
             reservation_id=reservation_id,
+            ticket_id=ticket_id,
             direction="outbound",
             message_type="text",
             message_text=message,

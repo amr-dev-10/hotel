@@ -2,7 +2,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { apiGet, apiPatch, apiPost } from "@/lib/api/client";
 import { queryKeys } from "@/lib/api/query-keys";
-import type { EscalationLog, Ticket, TicketAcceptance, TicketMessage, TicketTimelineItem } from "@/types/domain";
+import type {
+  EscalationLog,
+  Ticket,
+  TicketAcceptance,
+  TicketMessage,
+  TicketTimelineItem,
+  WhatsAppMessage,
+} from "@/types/domain";
 import type { CreateTicketValues } from "@/features/tickets/schemas/create-ticket.schema";
 
 type TicketFilters = Record<string, string | undefined>;
@@ -47,6 +54,15 @@ export function useTicketTimeline(hotelId: string, ticketId: string | null) {
   });
 }
 
+export function useTicketGuestMessages(hotelId: string, ticketId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.tickets.guestMessages(hotelId, ticketId ?? "none"),
+    queryFn: () => apiGet<WhatsAppMessage[]>(`/hotels/${hotelId}/tickets/${ticketId}/guest-messages`),
+    enabled: Boolean(hotelId && ticketId),
+    refetchInterval: 5000,
+  });
+}
+
 export function useCreateTicketMessage(hotelId: string, ticketId: string) {
   const queryClient = useQueryClient();
 
@@ -56,6 +72,25 @@ export function useCreateTicketMessage(hotelId: string, ticketId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.tickets.messages(hotelId, ticketId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.tickets.timeline(hotelId, ticketId) });
+    },
+  });
+}
+
+export function useSendTicketGuestMessage(hotelId: string, ticketId: string, conversationId: string | null) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: { message: string; reservation_id?: string | null }) =>
+      apiPost(`/hotels/${hotelId}/whatsapp/conversations/${conversationId}/messages`, {
+        ...payload,
+        ticket_id: ticketId,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.tickets.guestMessages(hotelId, ticketId) });
+      if (conversationId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.whatsapp.messages(hotelId, conversationId) });
+      }
+      queryClient.invalidateQueries({ queryKey: queryKeys.whatsapp.conversations(hotelId) });
     },
   });
 }

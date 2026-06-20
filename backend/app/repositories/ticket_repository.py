@@ -4,6 +4,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.base import utcnow
+from app.models.department import Department
 from app.models.ticket import Ticket, TicketEvent, TicketMessage
 from app.repositories.base import BaseRepository
 
@@ -30,6 +31,9 @@ class TicketRepository(BaseRepository[Ticket]):
         conversation_id: str | None = None,
         stage: str | None = None,
         priority: int | None = None,
+        assigned_to: str | None = None,
+        department_key: str | None = None,
+        sla_status: str | None = None,
     ) -> Sequence[Ticket]:
         statement = select(Ticket).where(
             Ticket.hotel_id == hotel_id,
@@ -42,9 +46,30 @@ class TicketRepository(BaseRepository[Ticket]):
         if conversation_id:
             statement = statement.where(Ticket.conversation_id == conversation_id)
         if stage:
-            statement = statement.where(Ticket.stage == stage)
+            stage_aliases = {
+                "created": ("created", "Open"),
+                "accepted": ("accepted", "reopened"),
+                "approved": ("approved", "Completed"),
+            }
+            statement = statement.where(Ticket.stage.in_(stage_aliases.get(stage, (stage,))))
         if priority:
             statement = statement.where(Ticket.priority == priority)
+        if assigned_to == "unassigned":
+            statement = statement.where(Ticket.assigned_to.is_(None))
+        elif assigned_to:
+            statement = statement.where(Ticket.assigned_to == assigned_to)
+        if department_key:
+            statement = statement.join(Department, Ticket.department_id == Department.id).where(
+                Department.hotel_id == hotel_id,
+                Department.key == department_key,
+                Department.deleted_at.is_(None),
+            )
+        if sla_status == "breached":
+            statement = statement.where(
+                Ticket.sla_due_at.is_not(None),
+                Ticket.sla_due_at < utcnow(),
+                Ticket.stage.not_in(("approved", "Completed", "Cancelled", "closed", "resolved")),
+            )
         return self.db.execute(statement.order_by(Ticket.created_at.desc())).scalars().all()
 
     def list_unresolved(self, hotel_id: str | None = None) -> Sequence[Ticket]:

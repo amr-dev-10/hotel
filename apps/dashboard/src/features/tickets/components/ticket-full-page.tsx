@@ -3,7 +3,24 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { format, formatDistanceToNowStrict } from "date-fns";
-import { ArrowLeft, CheckCircle2, Loader2, MessageCircle, RotateCcw, Send, ThumbsDown, ThumbsUp } from "lucide-react";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Clock,
+  FileText,
+  History,
+  LinkIcon,
+  Loader2,
+  MessageCircle,
+  MessagesSquare,
+  Paperclip,
+  RotateCcw,
+  Send,
+  ShieldCheck,
+  ThumbsDown,
+  ThumbsUp,
+  Users,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +29,9 @@ import { DataState } from "@/components/ui/data-state";
 import { Textarea } from "@/components/ui/textarea";
 import { Can } from "@/lib/auth/can";
 import { apiErrorMessage } from "@/lib/api/client";
-import { compactId, titleCase } from "@/lib/utils";
+import { cn, compactId, titleCase } from "@/lib/utils";
+import { useWhatsappMessages } from "@/features/whatsapp/hooks/useWhatsapp";
+import type { TicketTimelineItem, WhatsAppMessage } from "@/types/domain";
 import {
   useAcceptTicket,
   useApproveTicket,
@@ -20,11 +39,15 @@ import {
   useCompleteTicket,
   useRejectTicket,
   useReopenTicket,
+  useSendTicketGuestMessage,
   useTicketAcceptances,
   useTicketEscalations,
+  useTicketGuestMessages,
   useTicketTimeline,
   useTickets,
 } from "@/features/tickets/hooks/useTickets";
+
+type CommunicationTab = "internal" | "ticket-chat" | "whatsapp-history";
 
 export function TicketFullPage({
   hotelId,
@@ -38,15 +61,20 @@ export function TicketFullPage({
   const acceptances = useTicketAcceptances(hotelId, ticketId);
   const escalations = useTicketEscalations(hotelId, ticketId);
   const timeline = useTicketTimeline(hotelId, ticketId);
+  const guestMessages = useTicketGuestMessages(hotelId, ticketId);
   const acceptTicket = useAcceptTicket(hotelId);
   const rejectTicket = useRejectTicket(hotelId);
   const completeTicket = useCompleteTicket(hotelId);
   const approveTicket = useApproveTicket(hotelId);
   const reopenTicket = useReopenTicket(hotelId);
   const createTicketMessage = useCreateTicketMessage(hotelId, ticketId);
+  const ticket = tickets.data?.find((item) => item.id === ticketId);
+  const whatsappHistory = useWhatsappMessages(hotelId, ticket?.conversation_id ?? "");
+  const sendGuestMessage = useSendTicketGuestMessage(hotelId, ticketId, ticket?.conversation_id ?? null);
+  const [activeTab, setActiveTab] = useState<CommunicationTab>("internal");
   const [reopenNote, setReopenNote] = useState("");
   const [discussionMessage, setDiscussionMessage] = useState("");
-  const ticket = tickets.data?.find((item) => item.id === ticketId);
+  const [guestReply, setGuestReply] = useState("");
 
   async function runAction(action: () => Promise<unknown>, label: string) {
     try {
@@ -71,6 +99,23 @@ export function TicketFullPage({
     }
   }
 
+  async function handleSendGuestReply(event: React.FormEvent) {
+    event.preventDefault();
+    if (!guestReply.trim() || !ticket?.conversation_id) {
+      return;
+    }
+    try {
+      await sendGuestMessage.mutateAsync({
+        message: guestReply.trim(),
+        reservation_id: ticket.reservation_id,
+      });
+      setGuestReply("");
+      toast.success("Guest message sent");
+    } catch (error) {
+      toast.error(apiErrorMessage(error));
+    }
+  }
+
   if (tickets.isLoading) {
     return <DataState isLoading />;
   }
@@ -89,27 +134,25 @@ export function TicketFullPage({
     completeTicket.isPending ||
     approveTicket.isPending ||
     reopenTicket.isPending;
+  const eventTimeline = (timeline.data ?? []).filter((item) => item.item_type !== "message");
 
   return (
     <div className="grid gap-5">
-      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-        <div>
+      <header className="flex flex-col justify-between gap-3 border-b border-slate-200 pb-4 xl:flex-row xl:items-center">
+        <div className="min-w-0">
           <Button asChild type="button" variant="ghost">
             <Link href={`/${hotelId}/tickets`}>
               <ArrowLeft />
               Tickets
             </Link>
           </Button>
-          <h2 className="mt-2 text-xl font-semibold">{ticket.ticket_code}</h2>
-          <p className="text-sm text-slate-500">{ticket.item_description}</p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <h2 className="text-xl font-semibold">{ticket.ticket_code}</h2>
+            <Badge variant={ticket.priority >= 4 ? "rose" : "blue"}>P{ticket.priority}</Badge>
+            <Badge variant={ticket.stage === "approved" ? "green" : "amber"}>{titleCase(ticket.stage)}</Badge>
+          </div>
+          <p className="mt-1 max-w-4xl text-sm text-slate-500">{ticket.item_description}</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Badge variant={ticket.priority >= 4 ? "rose" : "blue"}>P{ticket.priority}</Badge>
-          <Badge variant={ticket.stage === "approved" ? "green" : "amber"}>{titleCase(ticket.stage)}</Badge>
-        </div>
-      </div>
-
-      <section className="grid gap-4 rounded-md border border-slate-200 bg-white p-4">
         <div className="flex flex-wrap gap-2">
           <Can I="accept" a="Ticket">
             <Button disabled={busy} type="button" onClick={() => runAction(() => acceptTicket.mutateAsync(ticket.id), "Ticket accepted")}>
@@ -129,30 +172,117 @@ export function TicketFullPage({
           </Can>
           <Can I="approve" a="Ticket">
             <Button disabled={busy} type="button" onClick={() => runAction(() => approveTicket.mutateAsync(ticket.id), "Ticket approved")}>
-              {approveTicket.isPending ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}
+              {approveTicket.isPending ? <Loader2 className="animate-spin" /> : <ShieldCheck />}
               Approve
             </Button>
           </Can>
         </div>
-      </section>
+      </header>
 
-      <section className="grid gap-4 lg:grid-cols-[1.4fr_0.9fr]">
-        <div className="grid gap-4">
-          <section className="grid gap-4 rounded-md border border-slate-200 bg-white p-4 md:grid-cols-3">
-            <Detail label="SLA" value={ticket.sla_due_at ? formatDistanceToNowStrict(new Date(ticket.sla_due_at), { addSuffix: true }) : "Not set"} />
-            <Detail label="Assigned to" value={compactId(ticket.assigned_to)} />
-            <Detail label="Department" value={compactId(ticket.department_id)} />
-            <Detail label="Room" value={compactId(ticket.room_id)} />
-            <Detail label="Reservation" value={compactId(ticket.reservation_id)} />
-            <Detail label="Conversation" value={compactId(ticket.conversation_id)} />
-            <Detail label="Source" value={titleCase(ticket.source)} />
-            <Detail label="Created" value={format(new Date(ticket.created_at), "dd MMM yyyy, HH:mm")} />
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <main className="grid min-w-0 gap-4">
+          <section className="grid gap-4 rounded-md border border-slate-200 bg-white p-4">
+            <div className="flex flex-wrap gap-2 border-b border-slate-100 pb-3">
+              <TabButton active={activeTab === "internal"} label="Internal Discussion" onClick={() => setActiveTab("internal")} />
+              <TabButton active={activeTab === "ticket-chat"} label="Guest Ticket Chat" onClick={() => setActiveTab("ticket-chat")} />
+              <TabButton active={activeTab === "whatsapp-history"} label="Full WhatsApp History" onClick={() => setActiveTab("whatsapp-history")} />
+            </div>
+
+            {activeTab === "internal" ? (
+              <InternalDiscussion
+                isPosting={createTicketMessage.isPending}
+                message={discussionMessage}
+                timeline={timeline.data ?? []}
+                timelineError={timeline.error}
+                timelineLoading={timeline.isLoading}
+                onChangeMessage={setDiscussionMessage}
+                onSubmit={handlePostMessage}
+              />
+            ) : null}
+
+            {activeTab === "ticket-chat" ? (
+              <GuestTicketChat
+                canSend={Boolean(ticket.conversation_id)}
+                isSending={sendGuestMessage.isPending}
+                messages={guestMessages.data ?? []}
+                reply={guestReply}
+                messagesError={guestMessages.error}
+                messagesLoading={guestMessages.isLoading}
+                onChangeReply={setGuestReply}
+                onSubmit={handleSendGuestReply}
+              />
+            ) : null}
+
+            {activeTab === "whatsapp-history" ? (
+              <FullWhatsAppHistory
+                hasConversation={Boolean(ticket.conversation_id)}
+                messages={whatsappHistory.data ?? []}
+                messagesError={whatsappHistory.error}
+                messagesLoading={whatsappHistory.isLoading}
+              />
+            ) : null}
           </section>
 
           <section className="grid gap-3 rounded-md border border-slate-200 bg-white p-4">
-            <h3 className="text-base font-semibold">Reopen Note</h3>
-            <Textarea value={reopenNote} onChange={(event) => setReopenNote(event.target.value)} />
-            <div className="flex justify-end">
+            <div className="flex items-center gap-2">
+              <Paperclip className="size-4 text-[#0F3D91]" />
+              <h3 className="text-base font-semibold">Attachments</h3>
+            </div>
+            <p className="text-sm text-slate-500">No attachments have been added to this ticket.</p>
+          </section>
+        </main>
+
+        <aside className="grid h-max gap-4">
+          <SidePanel icon={<FileText />} title="Ticket Details">
+            <div className="grid gap-2">
+              <Detail label="SLA" value={ticket.sla_due_at ? formatDistanceToNowStrict(new Date(ticket.sla_due_at), { addSuffix: true }) : "Not set"} />
+              <Detail label="Assigned to" value={compactId(ticket.assigned_to)} />
+              <Detail label="Department" value={compactId(ticket.department_id)} />
+              <Detail label="Room" value={compactId(ticket.room_id)} />
+              <Detail label="Source" value={titleCase(ticket.source)} />
+              <Detail label="Created" value={format(new Date(ticket.created_at), "dd MMM yyyy, HH:mm")} />
+            </div>
+          </SidePanel>
+
+          <SidePanel icon={<Users />} title="Ticket Followers">
+            {(ticket.followers ?? []).length ? (
+              <div className="flex flex-wrap gap-2">
+                {(ticket.followers ?? []).map((follower) => (
+                  <Badge key={follower} variant="blue">{compactId(follower)}</Badge>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-slate-500">No followers yet.</p>
+            )}
+          </SidePanel>
+
+          <SidePanel icon={<LinkIcon />} title="Related Records">
+            <div className="grid gap-2">
+              <Detail label="Guest" value={compactId(ticket.guest_id)} />
+              <Detail label="Reservation" value={compactId(ticket.reservation_id)} />
+              <Detail label="Conversation" value={compactId(ticket.conversation_id)} />
+            </div>
+          </SidePanel>
+
+          <SidePanel icon={<Clock />} title="Activity Timeline & SLA">
+            {timeline.isLoading ? <DataState isLoading /> : null}
+            {timeline.error ? <DataState error={timeline.error} /> : null}
+            {!timeline.isLoading && !eventTimeline.length ? (
+              <p className="text-sm text-slate-500">No activity recorded yet.</p>
+            ) : null}
+            <div className="grid gap-2">
+              {eventTimeline.slice(-5).map((item) => (
+                <div className="rounded-md bg-slate-50 p-3 text-sm" key={item.id}>
+                  <p className="font-medium">{titleCase(item.event_type ?? item.content)}</p>
+                  <p className="text-xs text-slate-500">{format(new Date(item.created_at), "dd MMM, HH:mm")}</p>
+                </div>
+              ))}
+            </div>
+          </SidePanel>
+
+          <SidePanel icon={<RotateCcw />} title="Reopen">
+            <div className="grid gap-3">
+              <Textarea value={reopenNote} onChange={(event) => setReopenNote(event.target.value)} />
               <Can I="approve" a="Ticket">
                 <Button
                   disabled={busy}
@@ -165,58 +295,8 @@ export function TicketFullPage({
                 </Button>
               </Can>
             </div>
-          </section>
+          </SidePanel>
 
-          <section className="grid gap-4 rounded-md border border-slate-200 bg-white p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <MessageCircle className="size-4 text-[#0F3D91]" />
-                <h3 className="text-base font-semibold">Internal Discussion</h3>
-              </div>
-              <Badge>{timeline.data?.length ?? 0}</Badge>
-            </div>
-
-            {timeline.isLoading ? <DataState isLoading /> : null}
-            {timeline.error ? <DataState error={timeline.error} /> : null}
-            {!timeline.isLoading && !timeline.data?.length ? (
-              <p className="text-sm text-slate-500">No ticket activity yet.</p>
-            ) : null}
-            {timeline.data?.length ? (
-              <div className="grid max-h-[34rem] gap-3 overflow-y-auto pr-1">
-                {timeline.data.map((item) => (
-                  <div
-                    className={item.item_type === "message" ? "rounded-md border border-blue-100 bg-blue-50/50 p-3" : "rounded-md border border-slate-200 bg-slate-50 p-3"}
-                    key={`${item.item_type}-${item.id}`}
-                  >
-                    <div className="mb-2 flex items-center justify-between gap-3">
-                      <Badge variant={item.item_type === "message" ? "blue" : "default"}>
-                        {item.item_type === "message" ? titleCase(item.sender_type ?? "staff") : titleCase(item.event_type ?? "event")}
-                      </Badge>
-                      <span className="text-xs text-slate-500">{format(new Date(item.created_at), "dd MMM, HH:mm")}</span>
-                    </div>
-                    <p className="whitespace-pre-wrap text-sm text-slate-800">{item.content}</p>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-
-            <form className="grid gap-3 border-t border-slate-100 pt-3" onSubmit={handlePostMessage}>
-              <Textarea
-                placeholder="Post an internal update for the staff working this ticket..."
-                value={discussionMessage}
-                onChange={(event) => setDiscussionMessage(event.target.value)}
-              />
-              <div className="flex justify-end">
-                <Button disabled={createTicketMessage.isPending || !discussionMessage.trim()} type="submit">
-                  {createTicketMessage.isPending ? <Loader2 className="animate-spin" /> : <Send />}
-                  Post message
-                </Button>
-              </div>
-            </form>
-          </section>
-        </div>
-
-        <div className="grid gap-4">
           <HistoryPanel
             count={acceptances.data?.length ?? 0}
             isLoading={acceptances.isLoading}
@@ -244,8 +324,209 @@ export function TicketFullPage({
               </div>
             ))}
           </HistoryPanel>
-        </div>
+        </aside>
       </section>
+    </div>
+  );
+}
+
+function TabButton({
+  active,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <Button
+      className={cn(active && "border-[#0F3D91]/30 bg-[#0F3D91]/5 text-[#0F3D91]")}
+      size="sm"
+      type="button"
+      variant="secondary"
+      onClick={onClick}
+    >
+      {label}
+    </Button>
+  );
+}
+
+function InternalDiscussion({
+  isPosting,
+  message,
+  timeline,
+  timelineError,
+  timelineLoading,
+  onChangeMessage,
+  onSubmit,
+}: {
+  isPosting: boolean;
+  message: string;
+  timeline: TicketTimelineItem[];
+  timelineError: unknown;
+  timelineLoading: boolean;
+  onChangeMessage: (message: string) => void;
+  onSubmit: (event: React.FormEvent) => void;
+}) {
+  return (
+    <div className="grid gap-4">
+      <SectionTitle count={timeline.length} icon={<MessageCircle />} title="Internal Discussion" />
+      {timelineLoading ? <DataState isLoading /> : null}
+      {timelineError ? <DataState error={timelineError} /> : null}
+      {!timelineLoading && !timeline.length ? (
+        <p className="text-sm text-slate-500">No internal discussion yet.</p>
+      ) : null}
+      <div className="grid max-h-[34rem] gap-3 overflow-y-auto pr-1">
+        {timeline.map((item) => (
+          <div
+            className={item.item_type === "message" ? "rounded-md border border-blue-100 bg-blue-50/50 p-3" : "rounded-md border border-slate-200 bg-slate-50 p-3"}
+            key={`${item.item_type}-${item.id}`}
+          >
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <Badge variant={item.item_type === "message" ? "blue" : "default"}>
+                {item.item_type === "message" ? titleCase(item.sender_type ?? "staff") : titleCase(item.event_type ?? "event")}
+              </Badge>
+              <span className="text-xs text-slate-500">{format(new Date(item.created_at), "dd MMM, HH:mm")}</span>
+            </div>
+            <p className="whitespace-pre-wrap text-sm text-slate-800">{item.content}</p>
+          </div>
+        ))}
+      </div>
+      <form className="grid gap-3 border-t border-slate-100 pt-3" onSubmit={onSubmit}>
+        <Textarea
+          placeholder="Post an internal update for staff..."
+          value={message}
+          onChange={(event) => onChangeMessage(event.target.value)}
+        />
+        <div className="flex justify-end">
+          <Button disabled={isPosting || !message.trim()} type="submit">
+            {isPosting ? <Loader2 className="animate-spin" /> : <Send />}
+            Post message
+          </Button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function GuestTicketChat({
+  canSend,
+  isSending,
+  messages,
+  messagesError,
+  messagesLoading,
+  reply,
+  onChangeReply,
+  onSubmit,
+}: {
+  canSend: boolean;
+  isSending: boolean;
+  messages: WhatsAppMessage[];
+  messagesError: unknown;
+  messagesLoading: boolean;
+  reply: string;
+  onChangeReply: (message: string) => void;
+  onSubmit: (event: React.FormEvent) => void;
+}) {
+  return (
+    <div className="grid gap-4">
+      <SectionTitle count={messages.length} icon={<MessagesSquare />} title="Guest Ticket Chat" />
+      {!canSend ? <p className="text-sm text-slate-500">This ticket is not linked to a WhatsApp conversation.</p> : null}
+      {messagesLoading ? <DataState isLoading /> : null}
+      {messagesError ? <DataState error={messagesError} /> : null}
+      {!messagesLoading && canSend && !messages.length ? (
+        <p className="text-sm text-slate-500">No WhatsApp messages have been linked to this ticket yet.</p>
+      ) : null}
+      <div className="grid max-h-[34rem] gap-3 overflow-y-auto pr-1">
+        {messages.map((message) => (
+          <WhatsAppBubble key={message.id} message={message} />
+        ))}
+      </div>
+      <form className="grid gap-3 border-t border-slate-100 pt-3" onSubmit={onSubmit}>
+        <Textarea
+          disabled={!canSend}
+          placeholder="Reply to the guest for this ticket..."
+          value={reply}
+          onChange={(event) => onChangeReply(event.target.value)}
+        />
+        <div className="flex justify-end">
+          <Button disabled={!canSend || isSending || !reply.trim()} type="submit">
+            {isSending ? <Loader2 className="animate-spin" /> : <Send />}
+            Send to guest
+          </Button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function FullWhatsAppHistory({
+  hasConversation,
+  messages,
+  messagesError,
+  messagesLoading,
+}: {
+  hasConversation: boolean;
+  messages: WhatsAppMessage[];
+  messagesError: unknown;
+  messagesLoading: boolean;
+}) {
+  return (
+    <div className="grid gap-4">
+      <SectionTitle count={messages.length} icon={<History />} title="Full WhatsApp History" />
+      {!hasConversation ? <p className="text-sm text-slate-500">This ticket is not linked to a WhatsApp conversation.</p> : null}
+      {messagesLoading ? <DataState isLoading /> : null}
+      {messagesError ? <DataState error={messagesError} /> : null}
+      {!messagesLoading && hasConversation && !messages.length ? (
+        <p className="text-sm text-slate-500">No WhatsApp messages are available for this conversation.</p>
+      ) : null}
+      <div className="grid max-h-[40rem] gap-3 overflow-y-auto pr-1">
+        {messages.map((message) => (
+          <WhatsAppBubble key={message.id} message={message} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function WhatsAppBubble({ message }: { message: WhatsAppMessage }) {
+  const outbound = message.direction === "outbound";
+
+  return (
+    <div className={cn("flex", outbound ? "justify-end" : "justify-start")}>
+      <div
+        className={cn(
+          "max-w-[82%] rounded-md border p-3 text-sm",
+          outbound ? "border-[#0F3D91]/15 bg-[#0F3D91]/5" : "border-slate-200 bg-slate-50",
+        )}
+      >
+        <div className="mb-1 flex items-center justify-between gap-3 text-xs text-slate-500">
+          <span>{titleCase(message.direction)}</span>
+          <span>{format(new Date(message.created_at), "dd MMM, HH:mm")}</span>
+        </div>
+        <p className="whitespace-pre-wrap text-slate-800">{message.message_text ?? titleCase(message.message_type)}</p>
+      </div>
+    </div>
+  );
+}
+
+function SectionTitle({
+  count,
+  icon,
+  title,
+}: {
+  count: number;
+  icon: React.ReactNode;
+  title: string;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center gap-2">
+        <span className="[&_svg]:size-4 [&_svg]:text-[#0F3D91]">{icon}</span>
+        <h3 className="text-base font-semibold">{title}</h3>
+      </div>
+      <Badge>{count}</Badge>
     </div>
   );
 }
@@ -256,6 +537,26 @@ function Detail({ label, value }: { label: string; value: string }) {
       <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">{label}</p>
       <p className="mt-1 truncate text-sm font-medium">{value}</p>
     </div>
+  );
+}
+
+function SidePanel({
+  children,
+  icon,
+  title,
+}: {
+  children: React.ReactNode;
+  icon: React.ReactNode;
+  title: string;
+}) {
+  return (
+    <section className="grid gap-3 rounded-md border border-slate-200 bg-white p-4">
+      <div className="flex items-center gap-2">
+        <span className="[&_svg]:size-4 [&_svg]:text-[#0F3D91]">{icon}</span>
+        <h3 className="text-base font-semibold">{title}</h3>
+      </div>
+      {children}
+    </section>
   );
 }
 

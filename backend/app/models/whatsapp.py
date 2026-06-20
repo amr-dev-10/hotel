@@ -107,6 +107,10 @@ class WhatsAppMessage(UUIDPrimaryKeyMixin, Base):
         ForeignKey("reservations.id"),
         index=True,
     )
+    ticket_id: Mapped[str | None] = mapped_column(
+        ForeignKey("tickets.id"),
+        index=True,
+    )
     direction: Mapped[str] = mapped_column(String(20))
     message_type: Mapped[str] = mapped_column(String(40), default="text")
     message_text: Mapped[str | None] = mapped_column(Text)
