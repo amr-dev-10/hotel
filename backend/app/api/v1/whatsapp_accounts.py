@@ -18,6 +18,7 @@ from app.schemas.whatsapp_account import (
     WhatsAppConversationRead,
     WhatsAppHealthRead,
     WhatsAppMessageRead,
+    WhatsAppMessageSendRequest,
     WhatsAppOnboardingStart,
     WhatsAppOnboardingVerify,
     WhatsAppTemplateCreate,
@@ -164,6 +165,20 @@ def list_conversation_messages(
 ) -> dict:
     messages = WhatsAppConversationRepository(db).list_messages(hotel_id, conversation_id)
     return ok([WhatsAppMessageRead.model_validate(item).model_dump() for item in messages])
+
+
+@router.post("/conversations/{conversation_id}/messages")
+def send_conversation_message(
+    hotel_id: str,
+    conversation_id: str,
+    payload: WhatsAppMessageSendRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("ticket.assign")),
+) -> dict:
+    result = WhatsAppAccountService(db).send_conversation_message(
+        hotel_id, conversation_id, payload.message, current_user.id
+    )
+    return ok(result)
 
 
 @router.get("/conversations")

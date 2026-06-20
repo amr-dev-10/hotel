@@ -1,14 +1,17 @@
 "use client";
 
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2, Send } from "lucide-react";
+import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
+import { Input } from "@/components/ui/input";
 import { cn, titleCase } from "@/lib/utils";
-import { useWhatsappMessages } from "@/features/whatsapp/hooks/useWhatsapp";
+import { useSendWhatsappMessage, useWhatsappMessages } from "@/features/whatsapp/hooks/useWhatsapp";
 
 export function WhatsAppConversationPage({
   hotelId,
@@ -18,6 +21,27 @@ export function WhatsAppConversationPage({
   conversationId: string;
 }) {
   const messages = useWhatsappMessages(hotelId, conversationId);
+  const sendMessage = useSendWhatsappMessage(hotelId, conversationId);
+  const [text, setText] = useState("");
+  const endRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (messages.data?.length) {
+      endRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages.data]);
+
+  async function handleSend(e: React.FormEvent) {
+    e.preventDefault();
+    if (!text.trim()) return;
+
+    try {
+      await sendMessage.mutateAsync({ message: text });
+      setText("");
+    } catch (error) {
+      toast.error("Failed to send message");
+    }
+  }
 
   if (messages.isLoading) {
     return <DataState isLoading />;
@@ -76,8 +100,23 @@ export function WhatsAppConversationPage({
               </div>
             );
           })}
+          <div ref={endRef} />
         </section>
       )}
+
+      <form onSubmit={handleSend} className="flex items-center gap-3 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+        <Input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Type a message to the guest..."
+          className="flex-1"
+          disabled={sendMessage.isPending}
+        />
+        <Button type="submit" disabled={!text.trim() || sendMessage.isPending}>
+          {sendMessage.isPending ? <Loader2 className="animate-spin" /> : <Send className="size-4" />}
+          Send
+        </Button>
+      </form>
     </div>
   );
 }

@@ -146,3 +146,7 @@ class ConversationWindowRead(ORMModel):
     message_count: int
     estimated_cost: float
     meta_conversation_id: str | None = None
+
+
+class WhatsAppMessageSendRequest(BaseModel):
+    message: str = Field(min_length=1)

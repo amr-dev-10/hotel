@@ -76,6 +76,19 @@ export function useWhatsappMessages(hotelId: string, conversationId: string) {
   });
 }
 
+export function useSendWhatsappMessage(hotelId: string, conversationId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: { message: string }) =>
+      apiPost(`/hotels/${hotelId}/whatsapp/conversations/${conversationId}/messages`, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.whatsapp.messages(hotelId, conversationId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.whatsapp.conversations(hotelId) });
+    },
+  });
+}
+
 export function useWhatsappTemplates(hotelId: string) {
   return useQuery({
     queryKey: queryKeys.whatsapp.templates(hotelId),
