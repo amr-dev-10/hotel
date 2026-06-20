@@ -1,22 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Building2, Loader2, LogIn } from "lucide-react";
+import { Building2, Loader2, LogIn, ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { loginSchema, type LoginValues } from "@/features/auth/schemas/login.schema";
 import { api, apiErrorMessage } from "@/lib/api/client";
 import { useAuthStore } from "@/stores/auth.store";
 import type { ApiEnvelope, CurrentUser, TokenResponse } from "@/types/domain";
-import { loginSchema, type LoginValues } from "@/features/auth/schemas/login.schema";
 
 export function LoginForm() {
   const router = useRouter();
   const setSession = useAuthStore((state) => state.setSession);
+  const logout = useAuthStore((state) => state.logout);
   const [error, setError] = useState<string | null>(null);
   const form = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
@@ -28,6 +30,7 @@ export function LoginForm() {
 
   const onSubmit = form.handleSubmit(async (values) => {
     setError(null);
+    logout();
 
     try {
       const loginResponse = await api.post<ApiEnvelope<TokenResponse>>("/auth/login", values);
@@ -90,6 +93,13 @@ export function LoginForm() {
           Sign in
         </Button>
       </form>
+
+      <Button asChild type="button" variant="secondary">
+        <Link href="/platform/login">
+          <ShieldCheck />
+          Super Admin login
+        </Link>
+      </Button>
     </div>
   );
 }

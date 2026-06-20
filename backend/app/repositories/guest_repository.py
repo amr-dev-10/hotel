@@ -23,6 +23,20 @@ class GuestRepository(BaseRepository[Guest]):
             )
         ).scalar_one_or_none()
 
+    def find_by_phone(self, hotel_id: str, phone: str) -> Guest | None:
+        return self.db.execute(
+            select(Guest).where(
+                Guest.hotel_id == hotel_id,
+                or_(Guest.phone == phone, Guest.whatsapp_phone == phone),
+            ).order_by(Guest.created_at.desc())
+        ).scalars().first()
+
+    def find_by_phone_for_hotel(self, hotel_id: str, phone: str) -> Guest | None:
+        """Find most recent guest by phone or whatsapp_phone — used at reservation creation."""
+        if not phone:
+            return None
+        return self.find_by_phone(hotel_id, phone)
+
     def list_active(self, hotel_id: str) -> Sequence[Guest]:
         return self.db.execute(
             select(Guest).where(

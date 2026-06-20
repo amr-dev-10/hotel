@@ -259,6 +259,7 @@ class LiveChatService:
             WhatsAppMessage(
                 hotel_id=hotel_id,
                 conversation_id=conversation.id,
+                ticket_id=None,
                 direction="outbound",
                 message_type="text",
                 message_text=message,

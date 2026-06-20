@@ -30,12 +30,21 @@ class RoleUpdate(BaseModel):
     permission_codes: list[str] | None = None
 
 
+class RolePermissionsUpdate(BaseModel):
+    permission_codes: list[str] | None = None
+    permission_keys: list[str] | None = None
+
+    def requested_codes(self) -> list[str]:
+        return self.permission_keys if self.permission_keys is not None else (self.permission_codes or [])
+
+
 class RoleRead(ORMModel):
     id: str
     hotel_id: str
     name: str
     description: str | None = None
     is_system_role: bool
+    permissions: list[PermissionRead] = Field(default_factory=list)
 
 
 class UserRoleAssign(BaseModel):

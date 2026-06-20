@@ -13,6 +13,7 @@ from app.repositories.reservation_repository import (
 )
 from app.schemas.reservation import (
     ReservationCheckInRequest,
+    ReservationCancelRequest,
     ReservationCreate,
     ReservationGuestNew,
     ReservationGuestRead,
@@ -139,6 +140,26 @@ def check_out(
     reservation = ReservationService(db).check_out(hotel_id, reservation_id, current_user.id)
     return ok(ReservationRead.model_validate(reservation).model_dump())
 
+@router.get("/{reservation_id}/messages")
+def get_reservation_messages(
+    hotel_id: str,
+    reservation_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("ticket.view")),
+) -> dict:
+    from app.models.whatsapp import WhatsAppMessage
+    from app.schemas.whatsapp_account import WhatsAppMessageRead
+    from sqlalchemy import select
+    
+    messages = db.execute(
+        select(WhatsAppMessage).where(
+            WhatsAppMessage.hotel_id == hotel_id,
+            WhatsAppMessage.reservation_id == reservation_id,
+        ).order_by(WhatsAppMessage.created_at)
+    ).scalars().all()
+    
+    return ok([WhatsAppMessageRead.model_validate(msg).model_dump() for msg in messages])
+
 
 @router.post("/{reservation_id}/checkout")
 def checkout_alias(
@@ -148,6 +169,23 @@ def checkout_alias(
     current_user: User = Depends(require_permission("guest.checkout")),
 ) -> dict:
     reservation = ReservationService(db).check_out(hotel_id, reservation_id, current_user.id)
+    return ok(ReservationRead.model_validate(reservation).model_dump())
+
+
+@router.post("/{reservation_id}/cancel")
+def cancel_reservation(
+    hotel_id: str,
+    reservation_id: str,
+    payload: ReservationCancelRequest | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("reservation.cancel")),
+) -> dict:
+    reservation = ReservationService(db).cancel_reservation(
+        hotel_id,
+        reservation_id,
+        reason=payload.reason if payload else None,
+        actor_id=current_user.id,
+    )
     return ok(ReservationRead.model_validate(reservation).model_dump())
 
 

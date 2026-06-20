@@ -17,3 +17,6 @@ __pycache__/
 npm-debug.log*
 backend/uvicorn.pid
 backend/uvicorn.*.log
+.codex-run/
+.venv-win
+count_line_of_code.py

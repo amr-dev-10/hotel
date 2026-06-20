@@ -32,6 +32,8 @@ class Ticket(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     ticket_code: Mapped[str] = mapped_column(String(40), index=True)
     hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
     guest_id: Mapped[str | None] = mapped_column(ForeignKey("guests.id"))
+    reservation_id: Mapped[str | None] = mapped_column(ForeignKey("reservations.id"), index=True)
+    conversation_id: Mapped[str | None] = mapped_column(ForeignKey("whatsapp_conversations.id"), index=True)
     room_id: Mapped[str | None] = mapped_column(ForeignKey("rooms.id"))
     department_id: Mapped[str | None] = mapped_column(ForeignKey("departments.id"))
     assigned_to: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
@@ -39,7 +41,8 @@ class Ticket(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     type: Mapped[str] = mapped_column(String(40), default="Ticket")
     task_category: Mapped[str | None] = mapped_column(String(80), index=True)
     item_description: Mapped[str] = mapped_column(Text)
-    source: Mapped[str] = mapped_column(String(40), default="dashboard")
+    source: Mapped[str] = mapped_column(String(40), default="DASHBOARD")
+    followers: Mapped[list[str]] = mapped_column(JSON, default=list)
     priority: Mapped[int] = mapped_column(Integer, default=2)
     sla_due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -56,8 +59,8 @@ class TicketEvent(UUIDPrimaryKeyMixin, Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
-class ChatMessage(UUIDPrimaryKeyMixin, Base):
-    __tablename__ = "chat_messages"
+class TicketMessage(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "ticket_messages"
 
     hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
     ticket_id: Mapped[str] = mapped_column(ForeignKey("tickets.id"), index=True)

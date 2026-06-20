@@ -10,6 +10,7 @@ from app.schemas.rbac import (
     PermissionGroupRead,
     PermissionRead,
     RoleCreate,
+    RolePermissionsUpdate,
     RoleRead,
     RoleUpdate,
     UserRoleAssign,
@@ -25,6 +26,20 @@ def list_permissions(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("role.view")),
 ) -> dict:
+    RBACService(db).seed_permissions()
+    db.commit()
+    permissions = PermissionRepository(db).list_all()
+    return ok([PermissionRead.model_validate(item).model_dump() for item in permissions])
+
+
+@router.get("/permissions/all")
+def list_all_permissions(
+    hotel_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("role.view")),
+) -> dict:
+    RBACService(db).seed_permissions()
+    db.commit()
     permissions = PermissionRepository(db).list_all()
     return ok([PermissionRead.model_validate(item).model_dump() for item in permissions])
 
@@ -48,6 +63,21 @@ def list_roles(
 ) -> dict:
     roles = RoleRepository(db).list_for_hotel(hotel_id)
     return ok([RoleRead.model_validate(item).model_dump() for item in roles])
+
+
+@router.get("/{role_id}")
+def get_role(
+    hotel_id: str,
+    role_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("role.view")),
+) -> dict:
+    role = RoleRepository(db).get_for_hotel(hotel_id, role_id)
+    if not role:
+        from app.core.exceptions import not_found
+
+        raise not_found("Role not found")
+    return ok(RoleRead.model_validate(role).model_dump())
 
 
 @router.post("")
@@ -93,6 +123,23 @@ def update_role(
         payload.name,
         payload.description,
         payload.permission_codes,
+        current_user.id,
+    )
+    return ok(RoleRead.model_validate(role).model_dump())
+
+
+@router.put("/{role_id}/permissions")
+def replace_role_permissions(
+    hotel_id: str,
+    role_id: str,
+    payload: RolePermissionsUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("role.manage")),
+) -> dict:
+    role = RBACService(db).replace_role_permissions(
+        hotel_id,
+        role_id,
+        payload.requested_codes(),
         current_user.id,
     )
     return ok(RoleRead.model_validate(role).model_dump())

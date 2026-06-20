@@ -9,6 +9,7 @@ from app.models.base import utcnow
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models.user import User, UserSession
 from app.repositories.user_repository import UserRepository, UserSessionRepository
+from app.services.rbac_service import RBACService
 
 
 class AuthService:
@@ -29,13 +30,18 @@ class AuthService:
         device_info: str | None = None,
         ip_address: str | None = None,
     ) -> dict:
+        permissions = sorted(RBACService(self.db).permission_codes_for_user(user))
         token = create_access_token(
             subject=user.id,
             hotel_id=user.hotel_id,
             claims={
+                "scope": "hotel",
                 "email": user.email,
+                "user_type": user.user_type,
+                "staff_level": user.staff_level,
                 "is_hotel_owner": user.is_hotel_owner,
                 "department_id": user.department_id,
+                "permissions": permissions,
             },
         )
         refresh_token = self._create_refresh_session(user, device_info, ip_address)
@@ -69,6 +75,17 @@ class AuthService:
         self.db.commit()
 
     def logout_all(self, user: User) -> None:
+        now = utcnow()
+        for session in self.sessions.active_for_user(user.id):
+            session.revoked_at = now
+        self.db.commit()
+
+    def change_password(self, user: User, current_password: str, new_password: str) -> None:
+        if not verify_password(current_password, user.hashed_password):
+            raise bad_request("Current password is incorrect")
+        if verify_password(new_password, user.hashed_password):
+            raise bad_request("New password must be different from current password")
+        user.hashed_password = hash_password(new_password)
         now = utcnow()
         for session in self.sessions.active_for_user(user.id):
             session.revoked_at = now

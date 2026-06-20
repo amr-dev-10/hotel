@@ -10,16 +10,25 @@ export type AppAction =
   | "accept"
   | "assign"
   | "approve"
+  | "delete"
   | "export";
 
 export type AppSubject =
   | "all"
+  | "AI"
   | "Analytics"
+  | "Guest"
+  | "Hierarchy"
   | "Housekeeping"
+  | "HotelSettings"
   | "Reservation"
+  | "Role"
   | "Room"
   | "Staff"
-  | "Ticket";
+  | "Ticket"
+  | "User"
+  | "WhatsApp"
+  | "Workflow";
 
 export type AppAbility = MongoAbility<[AppAction, AppSubject]>;
 
@@ -36,16 +45,22 @@ export function buildAbility(user: CurrentUser | null): AppAbility {
     can("manage", "all");
   } else if (role.includes("supervisor")) {
     can(["view", "create", "accept", "assign", "approve"], "Ticket");
+    can(["view", "create", "edit"], "Guest");
     can(["view", "create", "edit"], "Housekeeping");
     can(["view", "edit"], "Reservation");
     can(["view", "edit"], "Room");
     can("view", "Analytics");
     can("view", "Staff");
+    can("view", "User");
+    can("view", "Hierarchy");
+    can("view", "WhatsApp");
   } else {
     can(["view", "accept", "create"], "Ticket");
+    can("view", "Guest");
     can(["view", "edit"], "Housekeeping");
     can("view", "Room");
     can("view", "Reservation");
+    can("view", "Hierarchy");
   }
 
   return build();

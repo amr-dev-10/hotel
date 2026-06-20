@@ -44,6 +44,7 @@ from app.models.ops import (
     Subscription,
 )
 from app.models.organization import Organization, OrganizationHotel, OrganizationUser
+from app.models.platform_admin import PlatformAdmin, PlatformSetting
 from app.models.rate_plan import RatePlan, RatePlanPeriod
 from app.models.rbac import Permission, PermissionGroup, Role, role_permissions, user_roles
 from app.models.reservation import Reservation, ReservationGuest, ReservationRoomType, StayRecord
@@ -52,7 +53,7 @@ from app.models.routing_rule import RoutingRule
 from app.models.room import Room, RoomType
 from app.models.saas import Feature, PlanFeature, UsageLimit
 from app.models.staff import EmployeeShift
-from app.models.ticket import ChatMessage, Ticket, TicketEvent, ticket_menu_items
+from app.models.ticket import Ticket, TicketEvent, TicketMessage, ticket_menu_items
 from app.models.task_type_sla import TaskTypeSLA
 from app.models.ticket_acceptance import TicketAcceptance
 from app.models.user import FCMToken, User, UserSession
@@ -77,7 +78,6 @@ __all__ = [
     "BotVersion",
     "Campaign",
     "CampaignDelivery",
-    "ChatMessage",
     "Department",
     "DepartmentConfig",
     "EmployeeShift",
@@ -118,6 +118,8 @@ __all__ = [
     "Payment",
     "PaymentTransaction",
     "PlanFeature",
+    "PlatformAdmin",
+    "PlatformSetting",
     "Permission",
     "PermissionGroup",
     "PurchaseOrder",
@@ -145,6 +147,7 @@ __all__ = [
     "Ticket",
     "TicketAcceptance",
     "TicketEvent",
+    "TicketMessage",
     "UsageLimit",
     "User",
     "UserSession",

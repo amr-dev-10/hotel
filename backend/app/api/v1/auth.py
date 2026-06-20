@@ -5,7 +5,13 @@ from app.api.dependencies import get_current_user
 from app.core.database import get_db
 from app.core.responses import ok
 from app.models.user import User
-from app.schemas.auth import CurrentUserRead, LoginRequest, LogoutRequest, RefreshTokenRequest
+from app.schemas.auth import (
+    CurrentUserRead,
+    LoginRequest,
+    LogoutRequest,
+    PasswordChangeRequest,
+    RefreshTokenRequest,
+)
 from app.services.auth_service import AuthService
 
 router = APIRouter()
@@ -42,6 +48,20 @@ def logout_all(
 ) -> dict:
     AuthService(db).logout_all(current_user)
     return ok({"logged_out": True})
+
+
+@router.post("/change-password")
+def change_password(
+    payload: PasswordChangeRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    AuthService(db).change_password(
+        current_user,
+        payload.current_password,
+        payload.new_password,
+    )
+    return ok({"password_changed": True})
 
 
 @router.get("/me")

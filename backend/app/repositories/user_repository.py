@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.user import User, UserSession
@@ -53,6 +53,35 @@ class UserRepository(BaseRepository[User]):
                 User.deleted_at.is_(None),
             )
         ).scalar_one_or_none()
+
+    def count_hotel_admins(self, hotel_id: str) -> int:
+        return self.db.execute(
+            select(func.count())
+            .select_from(User)
+            .where(
+                User.hotel_id == hotel_id,
+                User.is_active.is_(True),
+                User.deleted_at.is_(None),
+                or_(
+                    User.is_hotel_owner.is_(True),
+                    User.user_type == "HOTEL_ADMIN",
+                    User.staff_level == "admin",
+                ),
+            )
+        ).scalar_one()
+
+    def email_exists_for_other_user(self, hotel_id: str, email: str, user_id: str) -> bool:
+        return (
+            self.db.execute(
+                select(User.id).where(
+                    User.hotel_id == hotel_id,
+                    User.email == email,
+                    User.id != user_id,
+                    User.deleted_at.is_(None),
+                )
+            ).scalar_one_or_none()
+            is not None
+        )
 
     def find_by_staff_level(
         self,

@@ -5,12 +5,18 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   BedDouble,
+  Bot,
   CalendarDays,
   Gauge,
+  GitBranch,
   ListChecks,
   LogOut,
   Menu,
+  MessageCircle,
+  Network,
   Sparkles,
+  Shield,
+  UserCircle,
   Users,
 } from "lucide-react";
 
@@ -21,11 +27,23 @@ import { useAuthStore } from "@/stores/auth.store";
 const navItems = [
   { label: "Overview", href: "overview", icon: Gauge },
   { label: "Tickets", href: "tickets", icon: ListChecks },
+  { label: "Guests", href: "guests", icon: Users },
   { label: "Reservations", href: "reservations", icon: CalendarDays },
   { label: "Rooms", href: "rooms", icon: BedDouble },
   { label: "Housekeeping", href: "housekeeping", icon: Sparkles },
-  { label: "Staff", href: "settings/staff", icon: Users },
+  { label: "Hierarchy", href: "hierarchy", icon: Network },
+  { label: "WhatsApp", href: "whatsapp", icon: MessageCircle },
 ];
+
+const settingsNavItems = [
+  { label: "Profile", href: "settings/profile", icon: UserCircle },
+  { label: "Staff", href: "settings/staff", icon: Users },
+  { label: "Roles & Access", href: "settings/roles", icon: Shield },
+  { label: "Workflow", href: "settings/workflow", icon: GitBranch },
+  { label: "AI Configuration", href: "ai", icon: Bot },
+];
+
+const allNavItems = [...navItems, ...settingsNavItems];
 
 export function DashboardShell({
   hotelId,
@@ -66,7 +84,7 @@ export function DashboardShell({
   }, [currentUser?.hotel_id, hotelId, mounted, router, switchHotel, token]);
 
   const activeSection = useMemo(
-    () => navItems.find((item) => pathname?.includes(`/${item.href}`))?.label ?? "Dashboard",
+    () => allNavItems.find((item) => pathname?.includes(`/${item.href}`))?.label ?? "Dashboard",
     [pathname],
   );
 
@@ -78,7 +96,7 @@ export function DashboardShell({
     <div className="min-h-screen bg-[#f6f8fb] text-slate-950">
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 flex w-68 -translate-x-full flex-col border-r border-slate-200 bg-white transition-transform lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-40 flex w-[17rem] -translate-x-full flex-col border-r border-slate-200 bg-white transition-transform lg:translate-x-0",
           sidebarOpen && "translate-x-0",
         )}
       >
@@ -92,8 +110,34 @@ export function DashboardShell({
           </div>
         </div>
 
-        <nav className="grid gap-1 p-3">
+        <nav className="grid gap-1 overflow-y-auto p-3">
+          <p className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-normal text-slate-400">
+            Operations
+          </p>
           {navItems.map((item) => {
+            const Icon = item.icon;
+            const href = `/${hotelId}/${item.href}`;
+            const active = pathname === href || pathname?.startsWith(`${href}/`);
+
+            return (
+              <Link
+                className={cn(
+                  "flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-950",
+                  active && "bg-[#0F3D91] text-white hover:bg-[#0F3D91] hover:text-white",
+                )}
+                href={href}
+                key={item.href}
+                onClick={() => setSidebarOpen(false)}
+              >
+                <Icon className="size-4" />
+                {item.label}
+              </Link>
+            );
+          })}
+          <p className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-normal text-slate-400">
+            Settings
+          </p>
+          {settingsNavItems.map((item) => {
             const Icon = item.icon;
             const href = `/${hotelId}/${item.href}`;
             const active = pathname === href || pathname?.startsWith(`${href}/`);
@@ -144,7 +188,7 @@ export function DashboardShell({
         />
       ) : null}
 
-      <div className="lg:pl-68">
+      <div className="lg:pl-[17rem]">
         <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur lg:px-8">
           <div className="flex items-center gap-3">
             <Button

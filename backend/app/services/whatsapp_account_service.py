@@ -5,13 +5,15 @@ from app.core.vault import Vault
 from app.core.exceptions import bad_request, not_found
 from app.models.base import utcnow
 from app.models.whatsapp import WhatsAppAccount, WhatsAppTemplate
-from app.repositories.whatsapp_repository import WhatsAppAccountRepository, WhatsAppTemplateRepository
+from app.repositories.ticket_repository import TicketRepository
+from app.repositories.whatsapp_repository import WhatsAppAccountRepository, WhatsAppTemplateRepository, WhatsAppConversationRepository
 from app.schemas.whatsapp_account import (
     WhatsAppAccountCreate,
     WhatsAppOnboardingStart,
     WhatsAppOnboardingVerify,
     WhatsAppTemplateCreate,
     WhatsAppTestMessageRequest,
+    WhatsAppMessageSendRequest,
 )
 from app.services.audit_service import AuditService
 from app.services.whatsapp_ops_service import ConversationWindowService, WhatsAppHealthService
@@ -168,6 +170,66 @@ class WhatsAppAccountService:
         self.db.commit()
         self.db.refresh(account)
         return {"account": account, "send_result": result}
+
+    def send_conversation_message(
+        self,
+        hotel_id: str,
+        conversation_id: str,
+        message: str,
+        actor_id: str | None,
+        reservation_id: str | None = None,
+        ticket_id: str | None = None,
+    ) -> dict:
+        conversation = WhatsAppConversationRepository(self.db).get_for_hotel(hotel_id, conversation_id)
+        if not conversation:
+            raise not_found("Conversation not found")
+        if ticket_id:
+            ticket = TicketRepository(self.db).get_for_hotel(hotel_id, ticket_id)
+            if not ticket:
+                raise not_found("Ticket not found")
+            if ticket.conversation_id and ticket.conversation_id != conversation_id:
+                raise bad_request("Ticket is linked to another WhatsApp conversation")
+            
+        accounts = self.accounts.list_for_hotel(hotel_id, limit=1)
+        if not accounts:
+            raise bad_request("WhatsApp account not configured")
+        account = accounts[0]
+        
+        access_token = account.access_token or (
+            decrypt_secret(account.access_token_encrypted) if account.access_token_encrypted else None
+        )
+        result = WhatsAppService().send_text(
+            account.phone_number_id,
+            conversation.phone,
+            message,
+            access_token=access_token,
+        )
+        
+        from app.models.whatsapp import WhatsAppMessage
+        msg = WhatsAppMessage(
+            hotel_id=hotel_id,
+            conversation_id=conversation.id,
+            reservation_id=reservation_id,
+            ticket_id=ticket_id,
+            direction="outbound",
+            message_type="text",
+            message_text=message,
+            status="sent",
+            created_at=utcnow(),
+        )
+        self.db.add(msg)
+        conversation.last_message_at = utcnow()
+        
+        WhatsAppHealthService(self.db).record_sent(hotel_id, account.id, commit=False)
+        ConversationWindowService(self.db).track_message(
+            hotel_id,
+            conversation.phone,
+            category="service",
+            commit=False,
+        )
+        
+        self.db.commit()
+        return {"sent": True, "result": result}
 
     def update_account(
         self,

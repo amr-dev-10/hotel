@@ -64,6 +64,7 @@ class HotelService:
             email=payload.owner_email,
             hashed_password=AuthService.password_hash(payload.owner_password),
             job_role="Owner",
+            user_type="HOTEL_ADMIN",
             staff_level="admin",
             is_hotel_owner=True,
             is_active=True,

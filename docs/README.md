@@ -11,5 +11,6 @@ Architecture documents are versioned by folder so new designs can be added witho
 - `v4/` - definitive backend expansion with multi-guest reservations, inventory and purchase orders, restaurant/POS room-service folio posting, employee shifts, dynamic workflows, PostgreSQL RLS tenant context, knowledge document versions, WhatsApp onboarding/conversation windows, feature flags, and usage limits.
 - `v5/` - final additions for room availability and blocks, booking by room type, payment transaction stubs, job execution tracking, API rate limits, import/export jobs, guest consent enforcement, AI provider abstraction, and backup/DR planning.
 - `v5.1/` - operational hierarchy upgrade with staff reporting chains, ticket acceptance flow, task-type SLAs, escalation rules/logs, complaint fast-track routing, and AI settings management APIs.
+- `v5.2/` - account security and platform operations upgrade with profile password changes, platform user profile edits, platform subscription updates, and reservation soft cancellation.
 
 When a new design version is shared, add it as a new folder such as `v6/` and keep the earlier versions intact for comparison.

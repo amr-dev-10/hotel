@@ -46,6 +46,9 @@ export function TicketBoard({ hotelId }: { hotelId: string }) {
       q: searchParams.get("q") ?? "",
       stage: searchParams.get("stage") ?? "",
       priority: searchParams.get("priority") ?? "",
+      assigned_to: searchParams.get("assigned_to") ?? "",
+      department_key: searchParams.get("department_key") ?? "",
+      sla_status: searchParams.get("sla_status") ?? "",
     }),
     [searchParams],
   );
@@ -126,7 +129,7 @@ function BoardColumn({
     <section
       ref={setNodeRef}
       className={cn(
-        "min-w-72 rounded-md border border-slate-200 bg-slate-50 p-3 transition-colors",
+        "min-w-30 rounded-md border border-slate-200 bg-slate-50 p-3 transition-colors",
         isOver && "border-[#0F3D91] bg-[#0F3D91]/5",
       )}
     >
@@ -134,7 +137,7 @@ function BoardColumn({
         <h2 className="text-sm font-semibold">{title}</h2>
         <Badge variant="default">{tickets.length}</Badge>
       </div>
-      <div className="grid gap-3">
+      <div className="flex flex-col gap-3">
         {tickets.length ? (
           tickets.map((ticket) => <DraggableTicketCard key={ticket.id} ticket={ticket} />)
         ) : (

@@ -42,6 +42,10 @@ class ReservationUpdate(BaseModel):
     notes: str | None = None
 
 
+class ReservationCancelRequest(BaseModel):
+    reason: str | None = Field(default=None, max_length=500)
+
+
 class ReservationRead(ORMModel):
     id: str
     hotel_id: str
@@ -54,6 +58,9 @@ class ReservationRead(ORMModel):
     checkout_date: date
     source: str
     notes: str | None = None
+    cancelled_at: datetime | None = None
+    cancelled_by: str | None = None
+    cancellation_reason: str | None = None
 
 
 class ReservationGuestNew(BaseModel):

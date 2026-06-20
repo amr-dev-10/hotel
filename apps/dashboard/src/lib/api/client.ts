@@ -5,6 +5,9 @@ import type { ApiEnvelope } from "@/types/domain";
 export const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1",
   timeout: 15000,
+  headers: {
+    "ngrok-skip-browser-warning": "true",
+  },
 });
 
 api.interceptors.request.use((config) => {
@@ -49,6 +52,11 @@ export async function apiPatch<T, TPayload = unknown>(
   config?: AxiosRequestConfig,
 ) {
   const response = await api.patch<ApiEnvelope<T>>(url, payload, config);
+  return response.data.data;
+}
+
+export async function apiDelete<T>(url: string, config?: AxiosRequestConfig) {
+  const response = await api.delete<ApiEnvelope<T>>(url, config);
   return response.data.data;
 }
 

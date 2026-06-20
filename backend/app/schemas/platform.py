@@ -1,8 +1,12 @@
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
+from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 from app.schemas.common import ORMModel
+from app.schemas.hotel import HotelRead
+from app.schemas.user import UserRead
 
 
 class JobExecutionCreate(BaseModel):
@@ -91,3 +95,100 @@ class ImportJobRead(ORMModel):
     started_at: datetime | None = None
     completed_at: datetime | None = None
     created_at: datetime
+
+
+class PlatformLoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in_minutes: int
+
+
+class PlatformDashboardRead(BaseModel):
+    total_hotels: int
+    active_hotels: int
+    total_rooms: int
+    total_users: int
+    mrr: Decimal
+    whatsapp_usage: dict[str, int | float]
+
+
+class PlatformHotelCreate(BaseModel):
+    slug: str = Field(min_length=2, max_length=80)
+    name: str = Field(min_length=2, max_length=255)
+    owner_name: str = Field(min_length=2, max_length=255)
+    owner_email: EmailStr
+    owner_password: str = Field(min_length=8)
+    address: str | None = None
+    timezone: str = "UTC"
+    contact_phone: str | None = None
+    whatsapp_phone_number_id: str | None = None
+    subscription_tier: str = "starter"
+    seed_rooms: list[str] = Field(default_factory=list)
+
+
+class PlatformHotelSummary(ORMModel):
+    id: str
+    slug: str
+    name: str
+    subscription_tier: str
+    status: str
+    active_users: int
+    total_rooms: int
+    open_tickets: int
+    created_at: datetime
+
+
+class PlatformHotelCreateResponse(BaseModel):
+    hotel: HotelRead
+    owner: UserRead
+
+
+class PlatformUserSummary(ORMModel):
+    id: str
+    hotel_id: str
+    department_id: str | None = None
+    reports_to: str | None = None
+    name: str
+    email: EmailStr
+    user_type: str
+    staff_level: str | None = None
+    job_role: str | None = None
+    is_hotel_owner: bool
+    is_active: bool
+    is_on_duty: bool
+    created_at: datetime
+
+
+class PlatformSubscriptionSummary(ORMModel):
+    id: str
+    hotel_id: str
+    plan: str
+    status: str
+    billing_cycle: str
+    renewal_date: date | None = None
+    current_period_start: datetime | None = None
+    current_period_end: datetime | None = None
+    cancelled_at: datetime | None = None
+    created_at: datetime
+
+
+class PlatformSubscriptionUpdate(BaseModel):
+    plan: str | None = Field(default=None, min_length=2, max_length=40)
+    status: str | None = Field(default=None, min_length=2, max_length=40)
+    billing_cycle: str | None = Field(default=None, min_length=2, max_length=40)
+    renewal_date: date | None = None
+    current_period_start: datetime | None = None
+    current_period_end: datetime | None = None
+    cancelled_at: datetime | None = None
+
+
+class PlatformSettingRead(ORMModel):
+    key: str
+    value: Any
+    description: str | None = None
+    updated_by: str | None = None
+    updated_at: datetime
+
+
+class PlatformSettingsUpdate(BaseModel):
+    settings: dict[str, Any] = Field(default_factory=dict)

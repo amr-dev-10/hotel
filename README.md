@@ -1,6 +1,6 @@
 # Arcadia Hotel Platform Backend
 
-FastAPI backend for the Arcadia hotel management platform, currently upgraded through the v5.1 architecture shared in `docs/v5.1/`.
+FastAPI backend for the Arcadia hotel management platform, currently upgraded through the v5.2 platform/RBAC architecture.
 
 The backend follows the v5.1 principles:
 
@@ -11,6 +11,7 @@ The backend follows the v5.1 principles:
 - WhatsApp, Gemini, FCM, Redis, and Celery behind integration boundaries.
 - Config-driven WhatsApp bot flows stored in the database.
 - Dynamic hotel-defined RBAC with permission-enforced routes.
+- User type separation for platform admins, hotel admins, and hotel employees.
 - Reservation/PMS records separate from guest profile records.
 - Per-hotel WhatsApp accounts and persisted conversation history.
 - FAQ knowledge base before AI fallback.
@@ -40,8 +41,11 @@ The backend follows the v5.1 principles:
 - Payment gateway transactions are stubbed for later Razorpay/Stripe/UPI integration.
 - Import/export jobs, job execution tracking, API rate limits, consent enforcement, and AI provider abstraction are implemented.
 - Staff reporting hierarchy, ticket accept/reject flow, task-type SLAs, escalation rules/logs, fast-track routing, and hotel AI settings APIs are implemented.
+- Platform Super Admin APIs for dashboard metrics, hotels, users, subscriptions, and global settings.
 
 ## Quick Setup
+
+For the current Windows-native backend setup with `.venv-win`, Windows PostgreSQL, and WSL Redis, see `docs/windows-backend-db-setup.md`.
 
 ```bash
 cd /mnt/c/Users/Lenovo/Documents/Hotel\ Managment
@@ -89,6 +93,22 @@ Use these credentials in the dashboard at `http://localhost:3000/login`:
 
 The demo seed creates/reuses hotel slug `arcadia-demo`, resets the demo owner password, and inserts sample rooms, staff, guests, reservations, tickets, housekeeping tasks, and analytics snapshots. The endpoint is disabled when `ENVIRONMENT=production`.
 
+## Super Admin Bootstrap
+
+Create the first platform admin:
+
+```bash
+cd /mnt/c/Users/Lenovo/Documents/Hotel\ Managment
+. .venv/bin/activate
+PYTHONPATH=backend PLATFORM_ADMIN_PASSWORD=SecurePass123! python -m app.seeds.seed_platform_admin
+```
+
+Then log in through:
+
+```text
+POST /api/v1/platform/auth/login
+```
+
 ## Current API
 
 - `GET /health`
@@ -100,7 +120,15 @@ The demo seed creates/reuses hotel slug `arcadia-demo`, resets the demo owner pa
 - `/api/v1/orgs`
 - `/api/v1/hotels/{hotel_id}/users`
 - `/api/v1/hotels/{hotel_id}/roles`
+- `GET /api/v1/hotels/{hotel_id}/roles/permissions/all`
+- `PUT /api/v1/hotels/{hotel_id}/roles/{role_id}/permissions`
 - `/api/v1/hotels/{hotel_id}/users/{user_id}/roles`
+- `GET /api/v1/platform/dashboard`
+- `GET /api/v1/platform/hotels`
+- `POST /api/v1/platform/hotels`
+- `GET /api/v1/platform/users`
+- `GET /api/v1/platform/subscriptions`
+- `GET /api/v1/platform/platform-settings`
 - `/api/v1/hotels/{hotel_id}/room-types`
 - `/api/v1/hotels/{hotel_id}/rooms`
 - `/api/v1/hotels/{hotel_id}/departments`
@@ -184,4 +212,10 @@ The shared v1 files are preserved in:
 
 ## Migration Note
 
-Fresh development and test databases can be auto-created. Existing PostgreSQL databases need an Alembic migration for the v5.1 tables and new columns before running this code. Production should also add the PostgreSQL GiST exclusion constraint for overlapping `room_blocks`.
+Fresh development and test databases can be auto-created. Existing databases should run Alembic before starting the upgraded app:
+
+```bash
+alembic upgrade head
+```
+
+Production should also add the PostgreSQL GiST exclusion constraint for overlapping `room_blocks`.

@@ -61,13 +61,26 @@ class WhatsAppConversationRead(ORMModel):
     guest_id: str | None = None
     phone: str
     status: str
+    priority: str
+    assigned_staff_id: str | None = None
+    assigned_at: datetime | None = None
+    resolved_at: datetime | None = None
+    resolved_by: str | None = None
+    unread_count: int
     last_message_at: datetime | None = None
+
+class WhatsAppConversationUpdateRequest(BaseModel):
+    status: str | None = None
+    priority: str | None = None
+    assigned_staff_id: str | None = None
 
 
 class WhatsAppMessageRead(ORMModel):
     id: str
     hotel_id: str
     conversation_id: str
+    reservation_id: str | None = None
+    ticket_id: str | None = None
     direction: str
     message_type: str
     message_text: str | None = None
@@ -146,3 +159,9 @@ class ConversationWindowRead(ORMModel):
     message_count: int
     estimated_cost: float
     meta_conversation_id: str | None = None
+
+
+class WhatsAppMessageSendRequest(BaseModel):
+    message: str = Field(min_length=1)
+    reservation_id: str | None = None
+    ticket_id: str | None = None

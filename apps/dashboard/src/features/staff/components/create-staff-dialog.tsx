@@ -19,12 +19,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { apiErrorMessage } from "@/lib/api/client";
+import { useDepartments } from "@/features/departments/hooks/useDepartments";
 import { createStaffSchema, type CreateStaffValues } from "@/features/staff/schemas/create-staff.schema";
-import { useCreateStaff } from "@/features/staff/hooks/useStaff";
+import { useCreateStaff, useStaff } from "@/features/staff/hooks/useStaff";
 
 export function CreateStaffDialog({ hotelId }: { hotelId: string }) {
   const [open, setOpen] = useState(false);
   const createStaff = useCreateStaff(hotelId);
+  const departments = useDepartments(hotelId);
+  const staff = useStaff(hotelId);
   const form = useForm<CreateStaffValues>({
     resolver: zodResolver(createStaffSchema),
     defaultValues: {
@@ -89,14 +92,40 @@ export function CreateStaffDialog({ hotelId }: { hotelId: string }) {
             <div className="grid gap-2">
               <Label htmlFor="staff_level">Level</Label>
               <Select id="staff_level" {...form.register("staff_level")}>
-                <option value="attendant">Attendant</option>
-                <option value="supervisor">Supervisor</option>
+                <option value="admin">Admin</option>
                 <option value="manager">Manager</option>
+                <option value="supervisor">Supervisor</option>
+                <option value="attendant">Attendant</option>
               </Select>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="job_role">Job role</Label>
               <Input id="job_role" {...form.register("job_role")} />
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-2">
+              <Label htmlFor="department_id">Department</Label>
+              <Select id="department_id" {...form.register("department_id")}>
+                <option value="">Unassigned</option>
+                {(departments.data ?? []).map((department) => (
+                  <option key={department.id} value={department.id}>
+                    {department.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="reports_to">Reports to</Label>
+              <Select id="reports_to" {...form.register("reports_to")}>
+                <option value="">None</option>
+                {(staff.data ?? []).map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.name}
+                  </option>
+                ))}
+              </Select>
             </div>
           </div>
 

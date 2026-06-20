@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
 from app.schemas.common import ORMModel
 
@@ -21,6 +21,8 @@ class CurrentUserRead(ORMModel):
     department_id: str | None = None
     name: str
     email: EmailStr
+    user_type: str
+    staff_level: str | None = None
     job_role: str | None = None
     is_hotel_owner: bool
     is_on_duty: bool
@@ -33,3 +35,15 @@ class RefreshTokenRequest(BaseModel):
 
 class LogoutRequest(BaseModel):
     refresh_token: str | None = None
+
+
+class PasswordChangeRequest(BaseModel):
+    current_password: str = Field(min_length=1)
+    new_password: str = Field(min_length=8)
+    confirm_password: str = Field(min_length=8)
+
+    @model_validator(mode="after")
+    def passwords_match(self) -> "PasswordChangeRequest":
+        if self.new_password != self.confirm_password:
+            raise ValueError("New password and confirmation do not match")
+        return self

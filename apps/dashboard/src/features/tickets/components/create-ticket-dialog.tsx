@@ -33,6 +33,7 @@ export function CreateTicketDialog({ hotelId }: { hotelId: string }) {
     defaultValues: {
       department_key: "housekeeping",
       type: "Ticket",
+      source: "DASHBOARD",
       priority: 2,
       item_description: "",
       room_id: "",
@@ -44,8 +45,12 @@ export function CreateTicketDialog({ hotelId }: { hotelId: string }) {
     try {
       await createTicket.mutateAsync({
         ...values,
+        guest_id: values.guest_id || undefined,
+        reservation_id: values.reservation_id || undefined,
+        conversation_id: values.conversation_id || undefined,
         room_id: values.room_id || undefined,
         task_category: values.task_category || undefined,
+        source: values.source || "DASHBOARD",
       });
       toast.success("Ticket created");
       form.reset();
