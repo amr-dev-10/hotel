@@ -10,10 +10,10 @@ from app.repositories.guest_repository import GuestRepository
 from app.schemas.consent import GuestConsentRead, GuestConsentUpsert
 from app.schemas.guest import GuestCreate, GuestRead, GuestUpdate, TimelineEvent
 from app.services.consent_service import GuestConsentService
-from app.models.reservation import Reservation
+from app.models.reservation import Reservation, ReservationGuest
 from app.models.whatsapp import WhatsAppConversation, WhatsAppMessage
 from app.models.ticket import Ticket
-from sqlalchemy import select
+from sqlalchemy import select, or_
 
 router = APIRouter()
 
@@ -103,11 +103,30 @@ def get_guest_timeline(
 ) -> dict:
     events = []
     
-    # 1. Reservations
-    reservations = db.execute(
-        select(Reservation).where(Reservation.hotel_id == hotel_id, Reservation.guest_id == guest_id)
+    # 1. Reservations — find via direct guest_id OR via ReservationGuest join table
+    # This covers both reservation creation paths (direct guest_id and linked via join table)
+    via_join = db.execute(
+        select(ReservationGuest.reservation_id).where(
+            ReservationGuest.hotel_id == hotel_id,
+            ReservationGuest.guest_id == guest_id
+        )
     ).scalars().all()
+
+    reservations = db.execute(
+        select(Reservation).where(
+            Reservation.hotel_id == hotel_id,
+            or_(
+                Reservation.guest_id == guest_id,
+                Reservation.id.in_(via_join)
+            )
+        )
+    ).scalars().all()
+
+    seen_ids = set()
     for res in reservations:
+        if res.id in seen_ids:
+            continue
+        seen_ids.add(res.id)
         events.append(TimelineEvent(
             event_type="reservation",
             timestamp=res.created_at.isoformat(),
@@ -117,42 +136,83 @@ def get_guest_timeline(
             status=res.status,
             metadata={"checkin_date": res.checkin_date.isoformat(), "checkout_date": res.checkout_date.isoformat()}
         ))
-        
-    # 2. WhatsApp Messages
-    messages = db.execute(
-        select(WhatsAppMessage).join(WhatsAppConversation).where(
-            WhatsAppMessage.hotel_id == hotel_id,
-            WhatsAppConversation.guest_id == guest_id
-        )
-    ).scalars().all()
-    for msg in messages:
-        events.append(TimelineEvent(
-            event_type="whatsapp_message",
-            timestamp=msg.created_at.isoformat(),
-            id=msg.id,
-            title="WhatsApp Message",
-            description=msg.message_text or msg.message_type,
-            status=msg.status,
-            metadata={"direction": msg.direction}
-        ))
-        
-    # 3. Tickets
-    tickets = db.execute(
-        select(Ticket).where(Ticket.hotel_id == hotel_id, Ticket.guest_id == guest_id)
-    ).scalars().all()
-    for tkt in tickets:
-        events.append(TimelineEvent(
-            event_type="ticket",
-            timestamp=tkt.created_at.isoformat(),
-            id=tkt.id,
-            title=f"Ticket #{tkt.ticket_number}",
-            description=tkt.title,
-            status=tkt.status,
-            metadata={"priority": tkt.priority, "category": tkt.category}
-        ))
-        
+
     # Sort by timestamp descending
     events.sort(key=lambda x: x.timestamp, reverse=True)
     
     return ok([e.model_dump() for e in events])
+
+@router.get("/{guest_id}/conversation")
+def get_guest_conversation(
+    hotel_id: str,
+    guest_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("guest.view")),
+) -> dict:
+    from fastapi import HTTPException
+    
+    guest = db.execute(select(Guest).where(Guest.hotel_id == hotel_id, Guest.id == guest_id)).scalar_one_or_none()
+    if not guest:
+        raise HTTPException(status_code=404, detail="Guest not found")
+        
+    conversation = db.execute(
+        select(WhatsAppConversation).where(
+            WhatsAppConversation.hotel_id == hotel_id,
+            WhatsAppConversation.guest_id == guest_id
+        )
+    ).scalar_one_or_none()
+    
+    if not conversation:
+        phone = guest.whatsapp_phone or guest.phone
+        if not phone:
+            raise HTTPException(status_code=400, detail="Guest has no phone number to create WhatsApp conversation")
+            
+        # check if there's already a conversation with this phone number but no guest_id
+        conversation = db.execute(
+            select(WhatsAppConversation).where(
+                WhatsAppConversation.hotel_id == hotel_id,
+                WhatsAppConversation.phone == phone
+            )
+        ).scalar_one_or_none()
+        
+        if conversation:
+            conversation.guest_id = guest_id
+        else:
+            conversation = WhatsAppConversation(
+                hotel_id=hotel_id,
+                guest_id=guest_id,
+                phone=phone,
+                status="open",
+                unread_count=0
+            )
+            db.add(conversation)
+        
+        db.commit()
+        db.refresh(conversation)
+
+    # find active reservation for context
+    active_reservation_id = None
+    reservations = db.execute(
+        select(Reservation).where(
+            Reservation.hotel_id == hotel_id,
+            Reservation.guest_id == guest_id
+        ).order_by(Reservation.created_at.desc())
+    ).scalars().all()
+    
+    if reservations:
+        # Priority: Checked In > Pre Arrival > Most Recent
+        checked_in = next((r for r in reservations if r.status == "checked_in"), None)
+        if checked_in:
+            active_reservation_id = checked_in.id
+        else:
+            pre_arrival = next((r for r in reservations if r.status in ["pre_arrival", "booked", "confirmed"]), None)
+            if pre_arrival:
+                active_reservation_id = pre_arrival.id
+            else:
+                active_reservation_id = reservations[0].id
+                
+    return ok({
+        "conversation_id": conversation.id,
+        "reservation_id": active_reservation_id
+    })
 

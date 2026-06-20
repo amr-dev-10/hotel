@@ -23,8 +23,9 @@ import {
   useSendWhatsappMessage,
   useUpdateWhatsappConversation
 } from "@/features/whatsapp/hooks/useWhatsapp";
-import { useGuest } from "@/features/guests/hooks/useGuests";
+import { useGuest, useGuests, useGuestConversation } from "@/features/guests/hooks/useGuests";
 import { useTickets } from "@/features/tickets/hooks/useTickets";
+import { useReservation } from "@/features/reservations/hooks/useReservations";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,10 +37,23 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const activeConversationId = searchParams.get("c");
+  const guestQueryParam = searchParams.get("guest");
+  const reservationQueryParam = searchParams.get("reservation");
 
   const conversations = useWhatsappConversations(hotelId);
+  const allGuests = useGuests(hotelId);
+  const autoConversation = useGuestConversation(hotelId, (guestQueryParam && !activeConversationId) ? guestQueryParam : "");
+  const activeReservationId = reservationQueryParam || autoConversation.data?.reservation_id || "";
+  const reservationQuery = useReservation(hotelId, activeReservationId);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
+
+  useEffect(() => {
+    if (autoConversation.data?.conversation_id && !activeConversationId) {
+      router.replace(`/${hotelId}/whatsapp?c=${autoConversation.data.conversation_id}${activeReservationId ? `&reservation=${activeReservationId}` : ""}`);
+    }
+  }, [autoConversation.data, activeConversationId, router, hotelId, activeReservationId]);
 
   const filteredConversations = useMemo(() => {
     if (!conversations.data) return [];
@@ -171,7 +185,7 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
                 >
                   <div className="flex items-start justify-between">
                     <h3 className="flex items-center gap-2 truncate text-sm font-semibold">
-                      {conversation.phone}
+                      {conversation.guest_id ? (allGuests.data?.find((g) => g.id === conversation.guest_id)?.name || "Unknown Guest") : conversation.phone}
                       {isVIP && <Badge variant="destructive" className="h-4 text-[10px] px-1">VIP</Badge>}
                     </h3>
                     <span className="shrink-0 text-xs text-slate-500">
@@ -179,7 +193,7 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <p className="truncate text-xs text-slate-500">Guest {compactId(conversation.guest_id)}</p>
+                    <p className="truncate text-xs text-slate-500">{conversation.guest_id ? conversation.phone : "Unlinked"}</p>
                     {unread > 0 ? (
                       <span className="flex size-5 items-center justify-center rounded-full bg-[#0F3D91] text-[10px] font-bold text-white">
                         {unread}
@@ -320,93 +334,104 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
         )}
       </div>
 
-      {/* RIGHT PANE: GUEST CONTEXT */}
-      {activeConversationId && selectedConversation && (
-        <div className="w-1/4 min-w-[280px] border-l border-slate-200 bg-white overflow-y-auto">
-          {guestQuery.isLoading ? (
-            <div className="flex p-8 justify-center"><Loader2 className="animate-spin text-slate-400" /></div>
-          ) : (
-            <div className="p-5 flex flex-col gap-6">
-              
-              {/* Profile Card */}
-              <div className="text-center flex flex-col items-center">
-                <div className="flex size-20 items-center justify-center rounded-full bg-slate-100 text-3xl text-slate-400 mb-3 border border-slate-200">
-                  <User />
-                </div>
-                <h3 className="text-xl font-semibold">{guestQuery.data?.name || "Unknown Guest"}</h3>
-                <p className="text-sm text-slate-500 mt-1 flex items-center justify-center gap-1">
-                  <Phone className="size-3" /> {selectedConversation.phone}
-                </p>
-                <div className="flex gap-2 mt-3">
-                  <Badge variant="secondary">Walking</Badge>
-                  {((selectedConversation as any).priority === "high" || (selectedConversation as any).priority === "urgent") && (
-                    <Badge variant="destructive">VIP</Badge>
-                  )}
-                </div>
-                
-                <div className="flex gap-2 mt-4 w-full">
-                  <Button variant="outline" size="sm" className="flex-1 h-8 text-xs">Email</Button>
-                  <Button variant="outline" size="sm" className="flex-1 h-8 text-xs">Call</Button>
-                </div>
-              </div>
-
-              {/* Reservation Info */}
-              <div>
-                <h4 className="text-sm font-semibold text-slate-800 mb-3 flex items-center gap-2 border-b border-slate-100 pb-2">
-                  <MapPin className="size-4 text-slate-500" /> Reservation Info
-                </h4>
-                <div className="grid gap-2 text-sm">
-                  <div className="flex justify-between"><span className="text-slate-500">Room</span> <span className="font-medium">Unassigned</span></div>
-                  <div className="flex justify-between"><span className="text-slate-500">Check-in</span> <span>--</span></div>
-                  <div className="flex justify-between"><span className="text-slate-500">Check-out</span> <span>--</span></div>
-                  <div className="flex justify-between"><span className="text-slate-500">Status</span> <span>{titleCase(guestQuery.data?.status || "none")}</span></div>
-                </div>
-              </div>
-
-              {/* Open Tickets */}
-              <div>
-                <h4 className="text-sm font-semibold text-slate-800 mb-3 flex items-center gap-2 border-b border-slate-100 pb-2">
-                  <Ticket className="size-4 text-slate-500" /> Active Operations
-                </h4>
-                {ticketsQuery.isLoading ? (
-                  <Loader2 className="animate-spin size-4 text-slate-400" />
-                ) : !ticketsQuery.data?.length ? (
-                  <p className="text-xs text-slate-500">No active tickets for this guest.</p>
-                ) : (
-                  <div className="grid gap-2">
-                    {ticketsQuery.data.slice(0, 3).map(ticket => (
-                      <div key={ticket.id} className="text-xs border border-slate-100 rounded p-2 bg-slate-50">
-                        <div className="font-medium truncate">{ticket.item_description}</div>
-                        <div className="text-slate-500 flex justify-between mt-1">
-                          <span>{titleCase(ticket.department_key)}</span>
-                          <span className={ticket.priority === 3 ? 'text-red-500' : ''}>P{ticket.priority}</span>
-                        </div>
-                      </div>
-                    ))}
+      {/* RIGHT PANE: CONTEXT */}
+      <div className="flex w-[320px] flex-col border-l border-slate-200 bg-white">
+        {!activeConversationId || !selectedConversation ? (
+          <div className="flex h-full items-center justify-center p-4 text-center text-sm text-slate-400">
+            Select a conversation to view context
+          </div>
+        ) : (
+          <div className="flex-1 overflow-y-auto p-4 space-y-6">
+            
+            {/* 1. GUEST CARD */}
+            <div className="rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+              <div className="bg-[#0F3D91] p-4 text-white">
+                <div className="flex items-center gap-3">
+                  <div className="flex size-12 items-center justify-center rounded-full bg-white/20 text-xl font-semibold">
+                    {guestQuery.data?.name?.[0]?.toUpperCase() || <User className="size-6" />}
                   </div>
-                )}
-                <Button variant="link" size="sm" className="p-0 h-auto text-xs mt-2 text-[#0F3D91]">Create New Ticket</Button>
-              </div>
-
-              {/* Internal Notes */}
-              <div>
-                <h4 className="text-sm font-semibold text-slate-800 mb-3 flex items-center gap-2 border-b border-slate-100 pb-2">
-                  <AlertCircle className="size-4 text-slate-500" /> Internal Notes
-                </h4>
-                <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 shadow-sm">
-                  <p className="font-medium mb-1">Staff Only</p>
-                  <textarea 
-                    className="w-full bg-transparent outline-none resize-none placeholder:text-amber-700/50" 
-                    rows={3}
-                    placeholder="Add private notes about this guest here..."
-                  ></textarea>
+                  <div>
+                    <h3 className="font-semibold">{guestQuery.data?.name || selectedConversation.phone}</h3>
+                    {guestQuery.data?.phone && <p className="text-sm text-white/80">{guestQuery.data.phone}</p>}
+                  </div>
                 </div>
               </div>
-
+              <div className="p-4 bg-white grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-xs text-slate-500 uppercase font-semibold mb-1">Status</p>
+                  <Badge variant={guestQuery.data?.status === 'checked_in' ? 'green' : 'secondary'} className="text-[10px]">
+                    {guestQuery.data ? titleCase(guestQuery.data.status) : "Unknown"}
+                  </Badge>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 uppercase font-semibold mb-1">Lifetime</p>
+                  <p className="text-sm font-semibold text-slate-800">4 Stays</p>
+                </div>
+                <div className="col-span-2">
+                  <Button asChild variant="outline" className="w-full text-xs h-8">
+                    <Link href={`/${hotelId}/guests/${selectedConversation.guest_id || ""}`}>
+                      View Full Profile
+                    </Link>
+                  </Button>
+                </div>
+              </div>
             </div>
-          )}
-        </div>
-      )}
+
+            {/* 2. RESERVATION CONTEXT */}
+            {reservationQuery.isLoading ? (
+              <DataState isLoading />
+            ) : reservationQuery.data ? (
+              <div>
+                <h4 className="mb-2 text-xs font-bold uppercase text-slate-500 flex items-center gap-2"><MapPin className="size-4" /> Reservation Context</h4>
+                <div className="rounded-lg border border-slate-200 p-3 bg-blue-50/30">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-semibold text-slate-800">{reservationQuery.data.reservation_no}</span>
+                    <Badge variant={reservationQuery.data.status === 'checked_in' ? 'green' : 'blue'}>{titleCase(reservationQuery.data.status)}</Badge>
+                  </div>
+                  <div className="space-y-2 text-sm text-slate-600">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Room</span>
+                      <span className="font-medium text-slate-900">{reservationQuery.data.room_id ? compactId(reservationQuery.data.room_id) : "Unassigned"}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Stay</span>
+                      <span className="font-medium text-slate-900">{format(new Date(reservationQuery.data.checkin_date), "MMM d")} → {format(new Date(reservationQuery.data.checkout_date), "MMM d")}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Occupants</span>
+                      <span className="font-medium text-slate-900">{reservationQuery.data.adults} Adults, {reservationQuery.data.children} Children</span>
+                    </div>
+                    {reservationQuery.data.notes && (
+                      <div className="pt-1 mt-1 border-t border-slate-200">
+                        <span className="text-xs text-slate-500 block mb-1">Special Requests</span>
+                        <p className="text-xs font-medium text-slate-800">{reservationQuery.data.notes}</p>
+                      </div>
+                    )}
+                  </div>
+                  <Button asChild variant="secondary" className="w-full mt-3 h-8 text-xs bg-white">
+                    <Link href={`/${hotelId}/reservations/${reservationQuery.data.id}`}>
+                      Open Reservation
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+
+            {/* 3. INTERNAL NOTES */}
+            {guestQuery.data && (
+              <div>
+                <h4 className="mb-2 text-xs font-bold uppercase text-slate-500 flex items-center gap-2"><AlertCircle className="size-4" /> Internal Notes</h4>
+                <div className="rounded-lg border border-slate-200 p-3 bg-yellow-50/50">
+                  <p className="text-sm text-slate-700 whitespace-pre-wrap">
+                    {guestQuery.data.internal_notes || "No internal notes for this guest."}
+                  </p>
+                </div>
+              </div>
+            )}
+            
+          </div>
+        )}
+      </div>
     </div>
   );
 }

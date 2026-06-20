@@ -58,3 +58,12 @@ export function useGuestTimeline(hotelId: string, guestId: string) {
     enabled: Boolean(hotelId && guestId),
   });
 }
+
+export function useGuestConversation(hotelId: string, guestId: string) {
+  return useQuery({
+    queryKey: ["guestConversation", hotelId, guestId],
+    queryFn: () => apiGet<{ conversation_id: string; reservation_id: string | null }>(`/hotels/${hotelId}/guests/${guestId}/conversation`),
+    enabled: Boolean(hotelId && guestId),
+    staleTime: 0,
+  });
+}

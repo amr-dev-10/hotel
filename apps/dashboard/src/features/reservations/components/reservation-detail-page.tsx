@@ -138,6 +138,12 @@ export function ReservationDetailPage({
                 Cancel
               </Button>
             ) : null}
+            <Button asChild size="sm" type="button" variant="secondary" className="ml-2">
+              <Link href={`/${hotelId}/whatsapp?guest=${reservation.data.guest_id}&reservation=${reservationId}`}>
+                <MessageCircle className="mr-2 size-3" />
+                Open Communication
+              </Link>
+            </Button>
           </Can>
         </div>
       </div>
@@ -357,22 +363,51 @@ function ReservationCommunication({
       ) : !messages.data?.length ? (
         <DataState empty emptyTitle="No linked messages found for this reservation." />
       ) : (
-        <div className="grid max-h-[34rem] gap-3 overflow-y-auto pr-1">
-          {messages.data.map((message) => (
-            <div className="rounded-md border border-slate-200 bg-slate-50 p-3" key={message.id}>
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <Badge variant={message.direction === "outbound" ? "blue" : "green"}>
-                  {titleCase(message.direction)}
-                </Badge>
-                <span className="text-xs text-slate-500">
-                  {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
-                </span>
-              </div>
-              <p className="text-sm text-slate-800">
-                {message.message_text ?? titleCase(message.message_type)}
+        <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-3 gap-3 rounded-md bg-blue-50/50 p-3 border border-blue-100">
+            <div>
+              <p className="text-xs text-slate-500 uppercase font-semibold">Messages During Stay</p>
+              <p className="text-sm font-bold text-slate-800">{messages.data.length}</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 uppercase font-semibold">Last Contact</p>
+              <p className="text-sm font-bold text-slate-800">
+                {formatDistanceToNow(new Date(messages.data[0].created_at), { addSuffix: true })}
               </p>
             </div>
-          ))}
+            <div className="flex items-end justify-end">
+              <Button asChild size="sm" className="h-8 text-xs w-full bg-[#0F3D91] hover:bg-[#0F3D91]/90">
+                <Link href={`/${hotelId}/whatsapp?reservation=${reservationId}`}>
+                  <MessageCircle className="mr-2 size-3" />
+                  Open Thread
+                </Link>
+              </Button>
+            </div>
+            <div className="col-span-3 pt-2 border-t border-blue-100">
+              <p className="text-xs text-slate-500 uppercase font-semibold">Last Message</p>
+              <p className="text-sm font-medium text-slate-800 truncate">
+                {messages.data[0].message_text ?? titleCase(messages.data[0].message_type)}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid max-h-[26rem] gap-3 overflow-y-auto pr-1">
+            {messages.data.map((message) => (
+              <div className="rounded-md border border-slate-200 bg-slate-50 p-3" key={message.id}>
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <Badge variant={message.direction === "outbound" ? "blue" : "green"}>
+                    {titleCase(message.direction)}
+                  </Badge>
+                  <span className="text-xs text-slate-500">
+                    {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
+                  </span>
+                </div>
+                <p className="text-sm text-slate-800">
+                  {message.message_text ?? titleCase(message.message_type)}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </section>

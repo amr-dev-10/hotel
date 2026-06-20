@@ -99,7 +99,15 @@ export function GuestProfilePage({
             </div>
           </div>
         </div>
-        <Badge variant={guestStatusVariant(guest.data.status)}>{titleCase(guest.data.status)}</Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant={guestStatusVariant(guest.data.status)}>{titleCase(guest.data.status)}</Badge>
+          <Button asChild size="sm" variant="secondary">
+            <Link href={`/${hotelId}/whatsapp?guest=${guest.data.id}`}>
+              <MessageCircle className="mr-2 size-3" />
+              Open Communication
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <section className="grid gap-4 rounded-md border border-slate-200 bg-white p-4 lg:grid-cols-[1.3fr_0.7fr]">
@@ -180,8 +188,8 @@ function GuestTimeline({ hotelId, guestId }: { hotelId: string, guestId: string 
     <section className="grid gap-3 rounded-md border border-slate-200 bg-white p-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Clock className="size-4 text-[#0F3D91]" />
-          <h3 className="text-base font-semibold">Guest Timeline</h3>
+          <CalendarDays className="size-4 text-[#0F3D91]" />
+          <h3 className="text-base font-semibold">Reservation Timeline</h3>
         </div>
       </div>
       
@@ -190,15 +198,13 @@ function GuestTimeline({ hotelId, guestId }: { hotelId: string, guestId: string 
       ) : timeline.error ? (
         <DataState error={timeline.error} />
       ) : !timeline.data?.length ? (
-        <DataState empty emptyTitle="No timeline events." />
+        <DataState empty emptyTitle="No reservations found." />
       ) : (
         <div className="relative border-l border-slate-200 ml-3 mt-4 space-y-6 pb-4">
           {timeline.data.map((event) => (
             <div key={event.id} className="relative pl-6">
               <div className="absolute -left-2.5 top-1 flex size-5 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm text-slate-500">
-                {event.event_type === "reservation" && <CalendarDays className="size-3 text-blue-600" />}
-                {event.event_type === "whatsapp_message" && <MessageCircle className="size-3 text-green-600" />}
-                {event.event_type === "ticket" && <Ticket className="size-3 text-amber-600" />}
+                <CalendarDays className="size-3 text-blue-600" />
               </div>
               <div className="grid gap-1">
                 <div className="flex items-center gap-2">
