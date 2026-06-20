@@ -65,14 +65,21 @@ class WhatsAppConversationRead(ORMModel):
     assigned_staff_id: str | None = None
     assigned_at: datetime | None = None
     resolved_at: datetime | None = None
+    resolved_by: str | None = None
     unread_count: int
     last_message_at: datetime | None = None
+
+class WhatsAppConversationUpdateRequest(BaseModel):
+    status: str | None = None
+    priority: str | None = None
+    assigned_staff_id: str | None = None
 
 
 class WhatsAppMessageRead(ORMModel):
     id: str
     hotel_id: str
     conversation_id: str
+    reservation_id: str | None = None
     direction: str
     message_type: str
     message_text: str | None = None

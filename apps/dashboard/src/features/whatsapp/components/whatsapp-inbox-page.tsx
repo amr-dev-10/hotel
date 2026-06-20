@@ -20,10 +20,17 @@ import { cn, titleCase, compactId } from "@/lib/utils";
 import { 
   useWhatsappConversations, 
   useWhatsappMessages, 
-  useSendWhatsappMessage 
+  useSendWhatsappMessage,
+  useUpdateWhatsappConversation
 } from "@/features/whatsapp/hooks/useWhatsapp";
 import { useGuest } from "@/features/guests/hooks/useGuests";
 import { useTickets } from "@/features/tickets/hooks/useTickets";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
   const router = useRouter();
@@ -69,6 +76,7 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
   const ticketsQuery = useTickets(hotelId, selectedConversation?.guest_id ? { guest_id: selectedConversation.guest_id } : {});
 
   const sendMessage = useSendWhatsappMessage(hotelId, activeConversationId || "");
+  const updateConversation = useUpdateWhatsappConversation(hotelId, activeConversationId || "");
   const [text, setText] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -106,8 +114,11 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-slate-800">Inbox</h2>
             <div className="flex gap-1">
-              <Button asChild size="icon" variant="ghost" className="size-8">
-                <Link href={`/${hotelId}/whatsapp/templates`}><Settings className="size-4" /></Link>
+              <Button asChild title="Templates" size="icon" variant="ghost" className="size-8">
+                <Link href={`/${hotelId}/whatsapp/templates`}><FileText className="size-4" /></Link>
+              </Button>
+              <Button asChild title="Settings" size="icon" variant="ghost" className="size-8">
+                <Link href={`/${hotelId}/whatsapp/settings`}><Settings className="size-4" /></Link>
               </Button>
             </div>
           </div>
@@ -208,8 +219,46 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <Button size="sm" variant="outline" className="h-8 text-xs">Transfer</Button>
-                <Button size="sm" className="h-8 text-xs bg-green-600 hover:bg-green-700">Resolve</Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" variant="outline" className="h-8 text-xs">Priority</Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => updateConversation.mutate({ priority: "low" })}>Low</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => updateConversation.mutate({ priority: "normal" })}>Normal</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => updateConversation.mutate({ priority: "high" })}>High</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => updateConversation.mutate({ priority: "urgent" })}>Urgent</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" variant="outline" className="h-8 text-xs">Transfer</Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => updateConversation.mutate({ assigned_staff_id: "staff_1" })}>Assign to me</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => updateConversation.mutate({ assigned_staff_id: null })}>Unassign</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                {selectedConversation.status === "open" ? (
+                  <Button 
+                    size="sm" 
+                    className="h-8 text-xs bg-green-600 hover:bg-green-700"
+                    onClick={() => updateConversation.mutate({ status: "resolved" })}
+                  >
+                    Resolve
+                  </Button>
+                ) : (
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    className="h-8 text-xs"
+                    onClick={() => updateConversation.mutate({ status: "open" })}
+                  >
+                    Re-open
+                  </Button>
+                )}
               </div>
             </div>
 

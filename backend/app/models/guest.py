@@ -2,7 +2,7 @@ from datetime import date
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, String, UniqueConstraint
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -20,6 +20,7 @@ class Guest(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     check_in_date: Mapped[date | None] = mapped_column(Date)
     check_out_date: Mapped[date | None] = mapped_column(Date)
     status: Mapped[str] = mapped_column(String(40), default="checked_in")
+    internal_notes: Mapped[str | None] = mapped_column(Text)
 
 
 class GuestConsent(UUIDPrimaryKeyMixin, Base):

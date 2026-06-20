@@ -178,13 +178,18 @@ class BotService:
         messages: dict[str, str],
         replies: list[dict[str, Any]],
     ) -> None:
-        guest = self.guests.find_active_by_phone(hotel_id, session.phone)
+        guest = self.guests.find_by_phone(hotel_id, session.phone)
         if guest:
             session.guest_id = guest.id
-            session.room_id = self._current_room_id_for_guest(hotel_id, guest.id)
-            session.state = "active"
-            replies.append(self._text(messages.get("active_welcome", "Welcome, {guest_name}.").format(guest_name=guest.name)))
-            replies.append(self._main_menu(guest.name))
+            room_id = self._current_room_id_for_guest(hotel_id, guest.id)
+            if room_id:
+                session.room_id = room_id
+                session.state = "active"
+                replies.append(self._text(messages.get("active_welcome", "Welcome back, {guest_name}.").format(guest_name=guest.name)))
+                replies.append(self._main_menu(guest.name))
+            else:
+                session.state = "live_chat"
+                replies.append(self._text(f"Hello {guest.name}, welcome to {hotel_name}. A staff member will be with you shortly."))
             return
 
         session.state = "awaiting_name"
@@ -608,20 +613,37 @@ class BotService:
         session: WhatsAppSession,
         direction: str,
         message_type: str,
-        text: str | None,
+        text: str | None = None,
+        interactive_id: str | None = None,
     ) -> None:
         conversation = self.conversations.get_or_create(hotel_id, session.phone, session.guest_id)
-        self.db.add(
-            WhatsAppMessage(
-                hotel_id=hotel_id,
-                conversation_id=conversation.id,
-                direction=direction,
-                message_type=message_type,
-                message_text=text,
-                status="sent",
-                created_at=utcnow(),
-            )
+        if direction == "inbound" and conversation.status == "resolved":
+            conversation.status = "open"
+            conversation.resolved_at = None
+        
+        reservation_id = None
+        if session.guest_id:
+            res = self.reservations.db.execute(
+                select(Reservation).where(
+                    Reservation.hotel_id == hotel_id,
+                    Reservation.guest_id == session.guest_id,
+                    Reservation.status.in_(["checked_in", "pre_arrival"])
+                ).order_by(Reservation.checkin_date.desc())
+            ).scalars().first()
+            if res:
+                reservation_id = res.id
+
+        message = WhatsAppMessage(
+            hotel_id=hotel_id,
+            conversation_id=conversation.id,
+            reservation_id=reservation_id,
+            direction=direction,
+            message_type=message_type,
+            message_text=text,
+            status="received" if direction == "inbound" else "sent",
+            created_at=utcnow(),
         )
+        self.db.add(message)
         ConversationWindowService(self.db).track_message(
             hotel_id,
             session.phone,

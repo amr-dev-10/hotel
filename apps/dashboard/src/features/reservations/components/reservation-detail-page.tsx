@@ -35,11 +35,9 @@ import {
   useReservationFolios,
   useReservationGuests,
   useReservationStays,
+  useReservationMessages,
 } from "@/features/reservations/hooks/useReservations";
-import {
-  useWhatsappConversations,
-  useWhatsappMessages,
-} from "@/features/whatsapp/hooks/useWhatsapp";
+
 
 export function ReservationDetailPage({
   hotelId,
@@ -54,7 +52,6 @@ export function ReservationDetailPage({
   const reservationGuests = useReservationGuests(hotelId, reservationId);
   const stays = useReservationStays(hotelId, reservationId);
   const folios = useReservationFolios(hotelId, reservationId);
-  const conversations = useWhatsappConversations(hotelId);
   const checkIn = useCheckInReservation(hotelId);
   const checkOut = useCheckOutReservation(hotelId);
   const cancelReservation = useCancelReservation(hotelId);
@@ -62,19 +59,6 @@ export function ReservationDetailPage({
 
   const guest = reservation.data ? guests.data?.find((item) => item.id === reservation.data.guest_id) : null;
   const room = reservation.data ? rooms.data?.find((item) => item.id === reservation.data?.room_id) : null;
-  const conversation = useMemo(() => {
-    if (!reservation.data) {
-      return null;
-    }
-
-    return (
-      (conversations.data ?? []).find((item) => item.guest_id === reservation.data?.guest_id) ??
-      (conversations.data ?? []).find((item) =>
-        [guest?.whatsapp_phone, guest?.phone].filter(Boolean).includes(item.phone),
-      ) ??
-      null
-    );
-  }, [conversations.data, guest?.phone, guest?.whatsapp_phone, reservation.data]);
 
   async function handleCheckIn() {
     try {
@@ -104,12 +88,12 @@ export function ReservationDetailPage({
     }
   }
 
-  if (reservation.isLoading || guests.isLoading || rooms.isLoading || conversations.isLoading) {
+  if (reservation.isLoading || guests.isLoading || rooms.isLoading) {
     return <DataState isLoading />;
   }
 
-  if (reservation.error || guests.error || rooms.error || conversations.error) {
-    return <DataState error={reservation.error ?? guests.error ?? rooms.error ?? conversations.error} />;
+  if (reservation.error || guests.error || rooms.error) {
+    return <DataState error={reservation.error ?? guests.error ?? rooms.error} />;
   }
 
   if (!reservation.data) {
@@ -225,7 +209,7 @@ export function ReservationDetailPage({
 
       <div className="grid gap-5 xl:grid-cols-[1fr_0.9fr]">
         <StayHistory stays={stays.data ?? []} isLoading={stays.isLoading} error={stays.error} />
-        <ReservationCommunication conversation={conversation} hotelId={hotelId} />
+        <ReservationCommunication reservationId={reservationId} hotelId={hotelId} />
       </div>
 
       {reservation.data.notes ? (
@@ -350,13 +334,13 @@ function StayHistory({
 }
 
 function ReservationCommunication({
-  conversation,
+  reservationId,
   hotelId,
 }: {
-  conversation: WhatsAppConversation | null;
+  reservationId: string;
   hotelId: string;
 }) {
-  const messages = useWhatsappMessages(hotelId, conversation?.id ?? "");
+  const messages = useReservationMessages(hotelId, reservationId);
 
   return (
     <section className="grid gap-3 rounded-md border border-slate-200 bg-white p-4">
@@ -365,20 +349,13 @@ function ReservationCommunication({
           <MessageCircle className="size-4 text-[#0F3D91]" />
           <h3 className="text-base font-semibold">Communication Timeline</h3>
         </div>
-        {conversation ? (
-          <Button asChild size="sm" type="button" variant="secondary">
-            <Link href={`/${hotelId}/whatsapp/conversations/${conversation.id}`}>Open thread</Link>
-          </Button>
-        ) : null}
       </div>
-      {!conversation ? (
-        <DataState empty emptyTitle="No WhatsApp conversation recorded for this reservation guest." />
-      ) : messages.isLoading ? (
+      {messages.isLoading ? (
         <DataState isLoading />
       ) : messages.error ? (
         <DataState error={messages.error} />
       ) : !messages.data?.length ? (
-        <DataState empty emptyTitle="No messages in this conversation yet." />
+        <DataState empty emptyTitle="No linked messages found for this reservation." />
       ) : (
         <div className="grid max-h-[34rem] gap-3 overflow-y-auto pr-1">
           {messages.data.map((message) => (

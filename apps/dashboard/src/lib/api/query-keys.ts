@@ -6,11 +6,15 @@ export const queryKeys = {
   guests: (hotelId: string) => ["guests", hotelId] as const,
   guestConsent: (hotelId: string, guestId: string) =>
     ["guests", hotelId, guestId, "consent"] as const,
+  guestTimeline: (hotelId: string, guestId: string) =>
+    ["guests", hotelId, guestId, "timeline"] as const,
   reservations: (hotelId: string) => ["reservations", hotelId] as const,
   reservationDetail: (hotelId: string, reservationId: string) =>
     ["reservations", hotelId, reservationId] as const,
   reservationGuests: (hotelId: string, reservationId: string) =>
     ["reservations", hotelId, reservationId, "guests"] as const,
+  reservationMessages: (hotelId: string, reservationId: string) =>
+    ["reservations", hotelId, reservationId, "messages"] as const,
   reservationStays: (hotelId: string, reservationId: string) =>
     ["reservations", hotelId, reservationId, "stays"] as const,
   reservationFolios: (hotelId: string, reservationId: string) =>

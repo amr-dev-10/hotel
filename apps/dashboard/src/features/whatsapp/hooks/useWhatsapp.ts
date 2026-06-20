@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { apiGet, apiPost, apiPut } from "@/lib/api/client";
+import { apiGet, apiPatch, apiPost, apiPut } from "@/lib/api/client";
 import { queryKeys } from "@/lib/api/query-keys";
 import type {
   WhatsAppAccount,
@@ -54,6 +54,18 @@ export function useWhatsappHealth(hotelId: string) {
     queryKey: queryKeys.whatsapp.health(hotelId),
     queryFn: () => apiGet<WhatsAppHealth[]>(`/hotels/${hotelId}/whatsapp/health`),
     enabled: Boolean(hotelId),
+  });
+}
+
+export function useUpdateWhatsappConversation(hotelId: string, conversationId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: { status?: string; priority?: string; assigned_staff_id?: string | null }) =>
+      apiPatch<WhatsAppConversation>(`/hotels/${hotelId}/whatsapp/conversations/${conversationId}`, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.whatsapp.conversations(hotelId) });
+    },
   });
 }
 

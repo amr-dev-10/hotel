@@ -89,6 +89,7 @@ class WhatsAppConversation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     assigned_staff_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
     assigned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    resolved_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
     unread_count: Mapped[int] = mapped_column(Integer, default=0)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     last_message_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -100,6 +101,10 @@ class WhatsAppMessage(UUIDPrimaryKeyMixin, Base):
     hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
     conversation_id: Mapped[str] = mapped_column(
         ForeignKey("whatsapp_conversations.id"),
+        index=True,
+    )
+    reservation_id: Mapped[str | None] = mapped_column(
+        ForeignKey("reservations.id"),
         index=True,
     )
     direction: Mapped[str] = mapped_column(String(20))

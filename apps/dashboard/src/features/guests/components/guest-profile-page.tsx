@@ -11,14 +11,18 @@ import {
   Phone,
   ShieldCheck,
   UserRound,
+  FileText,
+  Clock,
+  Ticket
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { DataState } from "@/components/ui/data-state";
 import { compactId, titleCase } from "@/lib/utils";
 import type { Reservation, WhatsAppConversation } from "@/types/domain";
-import { useGuest, useGuestConsent } from "@/features/guests/hooks/useGuests";
+import { useGuest, useGuestConsent, useGuestTimeline, useUpdateGuest } from "@/features/guests/hooks/useGuests";
 import { useReservations } from "@/features/reservations/hooks/useReservations";
 import {
   useWhatsappConversations,
@@ -112,119 +116,107 @@ export function GuestProfilePage({
       </section>
 
       <div className="grid gap-5 xl:grid-cols-[1fr_0.9fr]">
-        <ReservationHistory hotelId={hotelId} reservations={guestReservations} />
-        <GuestCommunication hotelId={hotelId} conversation={conversation} />
-      </div>
+        <GuestTimeline hotelId={hotelId} guestId={guestId} />
+        
+        <div className="flex flex-col gap-5">
+          <section className="grid gap-3 rounded-md border border-slate-200 bg-white p-4">
+            <div className="flex items-center gap-2">
+              <FileText className="size-4 text-[#0F3D91]" />
+              <h3 className="text-base font-semibold">Internal Notes</h3>
+            </div>
+            <InternalNotes hotelId={hotelId} guestId={guestId} initialNotes={guest.data.internal_notes || ""} />
+          </section>
 
-      <section className="grid gap-3 rounded-md border border-slate-200 bg-white p-4">
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="size-4 text-[#0F3D91]" />
-          <h3 className="text-base font-semibold">Consent</h3>
+          <section className="grid gap-3 rounded-md border border-slate-200 bg-white p-4">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="size-4 text-[#0F3D91]" />
+              <h3 className="text-base font-semibold">Consent</h3>
+            </div>
+            {consent.isLoading ? (
+              <DataState isLoading />
+            ) : consent.error ? (
+              <DataState error={consent.error} />
+            ) : consent.data ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Metric label="WhatsApp" value={consent.data.whatsapp_opt_in ? "Opted in" : "No"} />
+                <Metric label="Marketing" value={consent.data.marketing_opt_in ? "Opted in" : "No"} />
+                <Metric label="Email" value={consent.data.email_opt_in ? "Opted in" : "No"} />
+                <Metric label="SMS" value={consent.data.sms_opt_in ? "Opted in" : "No"} />
+              </div>
+            ) : (
+              <DataState empty emptyTitle="No consent record yet." />
+            )}
+          </section>
         </div>
-        {consent.isLoading ? (
-          <DataState isLoading />
-        ) : consent.error ? (
-          <DataState error={consent.error} />
-        ) : consent.data ? (
-          <div className="grid gap-3 sm:grid-cols-4">
-            <Metric label="WhatsApp" value={consent.data.whatsapp_opt_in ? "Opted in" : "No"} />
-            <Metric label="Marketing" value={consent.data.marketing_opt_in ? "Opted in" : "No"} />
-            <Metric label="Email" value={consent.data.email_opt_in ? "Opted in" : "No"} />
-            <Metric label="SMS" value={consent.data.sms_opt_in ? "Opted in" : "No"} />
-          </div>
-        ) : (
-          <DataState empty emptyTitle="No consent record yet." />
-        )}
-      </section>
+      </div>
     </div>
   );
 }
 
-function ReservationHistory({
-  hotelId,
-  reservations,
-}: {
-  hotelId: string;
-  reservations: Reservation[];
-}) {
+function InternalNotes({ hotelId, guestId, initialNotes }: { hotelId: string, guestId: string, initialNotes: string }) {
+  const updateGuest = useUpdateGuest(hotelId, guestId);
+
   return (
-    <section className="grid gap-3 rounded-md border border-slate-200 bg-white p-4">
-      <div className="flex items-center gap-2">
-        <CalendarDays className="size-4 text-[#0F3D91]" />
-        <h3 className="text-base font-semibold">Reservation History</h3>
-      </div>
-      {!reservations.length ? (
-        <DataState empty emptyTitle="No reservations for this guest." />
-      ) : (
-        <div className="grid gap-2">
-          {reservations.map((reservation) => (
-            <Link
-              className="grid gap-2 rounded-md border border-slate-200 p-3 transition-colors hover:border-[#0F3D91]"
-              href={`/${hotelId}/reservations/${reservation.id}`}
-              key={reservation.id}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <p className="font-semibold">{reservation.reservation_no}</p>
-                <Badge variant={reservationStatusVariant(reservation.status)}>
-                  {titleCase(reservation.status)}
-                </Badge>
-              </div>
-              <p className="text-sm text-slate-500">
-                {formatDate(reservation.checkin_date)} to {formatDate(reservation.checkout_date)}
-              </p>
-            </Link>
-          ))}
-        </div>
-      )}
-    </section>
+    <div className="grid gap-2">
+      <Textarea 
+        defaultValue={initialNotes}
+        placeholder="Add private notes about this guest..."
+        className="min-h-[120px] text-sm"
+        onBlur={(e) => {
+          if (e.target.value !== initialNotes) {
+            updateGuest.mutate({ internal_notes: e.target.value });
+          }
+        }}
+      />
+      <p className="text-xs text-slate-500">Notes are auto-saved when you click away.</p>
+    </div>
   );
 }
 
-function GuestCommunication({
-  conversation,
-  hotelId,
-}: {
-  conversation: WhatsAppConversation | null;
-  hotelId: string;
-}) {
-  const messages = useWhatsappMessages(hotelId, conversation?.id ?? "");
+function GuestTimeline({ hotelId, guestId }: { hotelId: string, guestId: string }) {
+  const timeline = useGuestTimeline(hotelId, guestId);
 
   return (
     <section className="grid gap-3 rounded-md border border-slate-200 bg-white p-4">
-      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <MessageCircle className="size-4 text-[#0F3D91]" />
-          <h3 className="text-base font-semibold">Communication History</h3>
+          <Clock className="size-4 text-[#0F3D91]" />
+          <h3 className="text-base font-semibold">Guest Timeline</h3>
         </div>
-        {conversation ? (
-          <Button asChild size="sm" type="button" variant="secondary">
-            <Link href={`/${hotelId}/whatsapp/conversations/${conversation.id}`}>Open thread</Link>
-          </Button>
-        ) : null}
       </div>
-      {!conversation ? (
-        <DataState empty emptyTitle="No WhatsApp conversation recorded for this guest." />
-      ) : messages.isLoading ? (
+      
+      {timeline.isLoading ? (
         <DataState isLoading />
-      ) : messages.error ? (
-        <DataState error={messages.error} />
-      ) : !messages.data?.length ? (
-        <DataState empty emptyTitle="No messages in this conversation yet." />
+      ) : timeline.error ? (
+        <DataState error={timeline.error} />
+      ) : !timeline.data?.length ? (
+        <DataState empty emptyTitle="No timeline events." />
       ) : (
-        <div className="grid max-h-[34rem] gap-3 overflow-y-auto pr-1">
-          {messages.data.map((message) => (
-            <div className="rounded-md border border-slate-200 bg-slate-50 p-3" key={message.id}>
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <Badge variant={message.direction === "outbound" ? "blue" : "green"}>
-                  {titleCase(message.direction)}
-                </Badge>
-                <span className="text-xs text-slate-500">
-                  {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
-                </span>
+        <div className="relative border-l border-slate-200 ml-3 mt-4 space-y-6 pb-4">
+          {timeline.data.map((event) => (
+            <div key={event.id} className="relative pl-6">
+              <div className="absolute -left-2.5 top-1 flex size-5 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm text-slate-500">
+                {event.event_type === "reservation" && <CalendarDays className="size-3 text-blue-600" />}
+                {event.event_type === "whatsapp_message" && <MessageCircle className="size-3 text-green-600" />}
+                {event.event_type === "ticket" && <Ticket className="size-3 text-amber-600" />}
               </div>
-              <p className="text-sm text-slate-800">
-                {message.message_text ?? titleCase(message.message_type)}
-              </p>
+              <div className="grid gap-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold">{event.title}</span>
+                  {event.status && <Badge variant="secondary" className="h-4 text-[10px] uppercase">{event.status}</Badge>}
+                  <span className="text-xs text-slate-400 ml-auto">
+                    {format(new Date(event.timestamp), "MMM d, h:mm a")}
+                  </span>
+                </div>
+                <p className="text-sm text-slate-600">{event.description}</p>
+                {event.metadata && Object.keys(event.metadata).length > 0 && (
+                  <div className="mt-1 flex gap-2 text-xs text-slate-500">
+                    {Object.entries(event.metadata).map(([k, v]) => (
+                      <span key={k} className="bg-slate-100 px-1.5 py-0.5 rounded">{k}: {v as string}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           ))}
         </div>
@@ -232,6 +224,8 @@ function GuestCommunication({
     </section>
   );
 }
+
+
 
 function Detail({
   icon: Icon,

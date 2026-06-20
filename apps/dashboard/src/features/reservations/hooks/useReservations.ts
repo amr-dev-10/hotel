@@ -29,6 +29,14 @@ export function useReservationGuests(hotelId: string, reservationId: string) {
   });
 }
 
+export function useReservationMessages(hotelId: string, reservationId: string) {
+  return useQuery({
+    queryKey: queryKeys.reservationMessages(hotelId, reservationId),
+    queryFn: () => apiGet<any[]>(`/hotels/${hotelId}/reservations/${reservationId}/messages`),
+    enabled: Boolean(hotelId && reservationId),
+  });
+}
+
 export function useReservationStays(hotelId: string, reservationId: string) {
   return useQuery({
     queryKey: queryKeys.reservationStays(hotelId, reservationId),

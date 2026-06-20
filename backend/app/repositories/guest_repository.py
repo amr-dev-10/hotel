@@ -23,6 +23,14 @@ class GuestRepository(BaseRepository[Guest]):
             )
         ).scalar_one_or_none()
 
+    def find_by_phone(self, hotel_id: str, phone: str) -> Guest | None:
+        return self.db.execute(
+            select(Guest).where(
+                Guest.hotel_id == hotel_id,
+                or_(Guest.phone == phone, Guest.whatsapp_phone == phone),
+            ).order_by(Guest.created_at.desc())
+        ).scalars().first()
+
     def list_active(self, hotel_id: str) -> Sequence[Guest]:
         return self.db.execute(
             select(Guest).where(

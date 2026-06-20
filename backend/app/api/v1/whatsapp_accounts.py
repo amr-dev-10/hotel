@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.api.dependencies import require_permission
 from app.core.database import get_db
 from app.core.responses import ok
+from app.models.base import utcnow
 from app.models.user import User
 from app.repositories.whatsapp_repository import (
     ConversationWindowRepository,
@@ -16,6 +17,7 @@ from app.schemas.whatsapp_account import (
     WhatsAppAccountCreate,
     WhatsAppAccountRead,
     WhatsAppConversationRead,
+    WhatsAppConversationUpdateRequest,
     WhatsAppHealthRead,
     WhatsAppMessageRead,
     WhatsAppMessageSendRequest,
@@ -189,6 +191,42 @@ def list_conversations(
 ) -> dict:
     conversations = WhatsAppConversationRepository(db).list_for_hotel(hotel_id)
     return ok([WhatsAppConversationRead.model_validate(item).model_dump() for item in conversations])
+
+
+@router.patch("/conversations/{conversation_id}")
+def update_conversation(
+    hotel_id: str,
+    conversation_id: str,
+    payload: WhatsAppConversationUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("ticket.assign")),
+) -> dict:
+    repo = WhatsAppConversationRepository(db)
+    conversation = repo.get(conversation_id)
+    if not conversation or conversation.hotel_id != hotel_id:
+        return {"error": "Not found"}
+
+    if payload.status:
+        conversation.status = payload.status
+        if payload.status == "resolved":
+            conversation.resolved_at = utcnow()
+            conversation.resolved_by = current_user.id
+        elif payload.status == "open":
+            conversation.resolved_at = None
+            conversation.resolved_by = None
+    
+    if payload.priority:
+        conversation.priority = payload.priority
+        
+    if payload.assigned_staff_id is not None:
+        if payload.assigned_staff_id != conversation.assigned_staff_id:
+            conversation.assigned_staff_id = payload.assigned_staff_id
+            conversation.assigned_at = utcnow() if payload.assigned_staff_id else None
+
+    db.commit()
+    db.refresh(conversation)
+    return ok(WhatsAppConversationRead.model_validate(conversation).model_dump())
+
 
 
 @router.get("/health")
