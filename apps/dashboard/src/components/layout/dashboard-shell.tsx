@@ -15,12 +15,14 @@ import {
   Menu,
   MessageCircle,
   Network,
+  ScrollText,
   Sparkles,
   Shield,
   ShieldAlert,
   UserCircle,
   Users,
   Utensils,
+  type LucideIcon,
 } from "lucide-react";
 
 import { DispatchAlert } from "@/components/dispatch-alert";
@@ -30,7 +32,14 @@ import { useWebSocket } from "@/hooks/useWebSocket";
 import { cn, titleCase } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth.store";
 
-const navItems = [
+type NavItem = {
+  label: string;
+  href: string;
+  icon: LucideIcon;
+  adminOnly?: boolean;
+};
+
+const navItems: NavItem[] = [
   { label: "Overview", href: "overview", icon: Gauge },
   { label: "Tickets", href: "tickets", icon: ListChecks },
   { label: "Escalations", href: "escalations", icon: ShieldAlert },
@@ -44,15 +53,14 @@ const navItems = [
   { label: "WhatsApp", href: "whatsapp", icon: MessageCircle },
 ];
 
-const settingsNavItems = [
+const settingsNavItems: NavItem[] = [
   { label: "Profile", href: "settings/profile", icon: UserCircle },
   { label: "Staff", href: "settings/staff", icon: Users },
   { label: "Roles & Access", href: "settings/roles", icon: Shield },
   { label: "Workflow", href: "settings/workflow", icon: GitBranch },
+  { label: "Audit Logs", href: "settings/audit", icon: ScrollText, adminOnly: true },
   { label: "AI Configuration", href: "ai", icon: Bot },
 ];
-
-const allNavItems = [...navItems, ...settingsNavItems];
 
 export function DashboardShell({
   hotelId,
@@ -70,6 +78,17 @@ export function DashboardShell({
   const [mounted, setMounted] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   useWebSocket(hotelId);
+
+  const isHotelAdmin = Boolean(
+    currentUser?.is_hotel_owner ||
+      currentUser?.user_type === "HOTEL_ADMIN" ||
+      currentUser?.staff_level?.toLowerCase() === "admin",
+  );
+  const visibleSettingsNavItems = useMemo(
+    () => settingsNavItems.filter((item) => !item.adminOnly || isHotelAdmin),
+    [isHotelAdmin],
+  );
+  const allNavItems = useMemo(() => [...navItems, ...visibleSettingsNavItems], [visibleSettingsNavItems]);
 
   useEffect(() => {
     setMounted(true);
@@ -95,7 +114,7 @@ export function DashboardShell({
 
   const activeSection = useMemo(
     () => allNavItems.find((item) => pathname?.includes(`/${item.href}`))?.label ?? "Dashboard",
-    [pathname],
+    [allNavItems, pathname],
   );
 
   if (!mounted) {
@@ -147,7 +166,7 @@ export function DashboardShell({
           <p className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-normal text-slate-400">
             Settings
           </p>
-          {settingsNavItems.map((item) => {
+          {visibleSettingsNavItems.map((item) => {
             const Icon = item.icon;
             const href = `/${hotelId}/${item.href}`;
             const active = pathname === href || pathname?.startsWith(`${href}/`);

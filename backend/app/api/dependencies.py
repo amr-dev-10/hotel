@@ -60,6 +60,25 @@ def require_permission(permission_code: str):
     return dependency
 
 
+def require_hotel_admin(
+    hotel_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> User:
+    ensure_hotel_access(hotel_id, current_user)
+    set_tenant_context(db, hotel_id)
+
+    is_admin = (
+        current_user.is_hotel_owner
+        or current_user.user_type == "HOTEL_ADMIN"
+        or (current_user.staff_level or "").lower() == "admin"
+    )
+    if not is_admin:
+        raise forbidden("Hotel admin access required")
+
+    return current_user
+
+
 def require_any_permission(*permission_codes: str):
     def dependency(
         hotel_id: str,

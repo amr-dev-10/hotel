@@ -10,6 +10,8 @@ export const queryKeys = {
     ["guests", hotelId, guestId, "timeline"] as const,
   reservations: (hotelId: string) => ["reservations", hotelId] as const,
   notifications: (hotelId: string) => ["notifications", hotelId] as const,
+  auditLogs: (hotelId: string, filters?: Record<string, string | number | undefined>) =>
+    ["audit-logs", hotelId, filters ?? {}] as const,
   fnb: {
     categories: (hotelId: string) => ["fnb", hotelId, "categories"] as const,
     items: (hotelId: string, categoryId?: string) => ["fnb", hotelId, "items", categoryId ?? "all"] as const,

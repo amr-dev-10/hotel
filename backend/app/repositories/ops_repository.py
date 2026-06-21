@@ -27,6 +27,38 @@ class AuditLogRepository(BaseRepository[AuditLog]):
     def __init__(self, db: Session) -> None:
         super().__init__(db, AuditLog)
 
+    def list_for_hotel(
+        self,
+        hotel_id: str,
+        limit: int = 100,
+        cursor: str | None = None,
+        action: str | None = None,
+        entity: str | None = None,
+        user_id: str | None = None,
+        search: str | None = None,
+    ) -> Sequence[AuditLog]:
+        statement = select(AuditLog).where(AuditLog.hotel_id == hotel_id)
+        if cursor:
+            statement = statement.where(AuditLog.id > cursor)
+        if action:
+            statement = statement.where(AuditLog.action == action)
+        if entity:
+            statement = statement.where(AuditLog.entity == entity)
+        if user_id:
+            statement = statement.where(AuditLog.user_id == user_id)
+        if search:
+            pattern = f"%{search.strip()}%"
+            statement = statement.where(
+                or_(
+                    AuditLog.action.ilike(pattern),
+                    AuditLog.entity.ilike(pattern),
+                    AuditLog.entity_id.ilike(pattern),
+                    AuditLog.user_id.ilike(pattern),
+                    AuditLog.ip_address.ilike(pattern),
+                )
+            )
+        return self.db.execute(statement.order_by(AuditLog.created_at.desc()).limit(limit)).scalars().all()
+
 
 class NotificationRepository(BaseRepository[Notification]):
     def __init__(self, db: Session) -> None:

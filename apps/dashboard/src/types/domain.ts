@@ -689,3 +689,17 @@ export interface AppNotification {
   read_at: string | null;
   created_at: string;
 }
+
+export interface AuditLog {
+  id: string;
+  hotel_id: string;
+  user_id: string | null;
+  action: string;
+  entity: string;
+  entity_id: string | null;
+  payload: Record<string, unknown>;
+  old_payload: Record<string, unknown>;
+  new_payload: Record<string, unknown>;
+  ip_address: string | null;
+  created_at: string;
+}
