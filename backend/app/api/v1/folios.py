@@ -24,6 +24,7 @@ from app.schemas.folio import (
     RefundRead,
     TaxConfigCreate,
     TaxConfigRead,
+    TaxConfigUpdate,
 )
 from app.services.folio_service import FolioService
 from app.services.payment_gateway_service import PaymentGatewayService
@@ -151,3 +152,41 @@ def create_tax_config(
 ) -> dict:
     tax = FolioService(db).create_tax_config(hotel_id, payload, current_user.id)
     return ok(TaxConfigRead.model_validate(tax).model_dump())
+
+
+@tax_router.patch("/{tax_id}")
+def update_tax_config(
+    hotel_id: str,
+    tax_id: str,
+    payload: TaxConfigUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("hotel.settings.manage")),
+) -> dict:
+    from app.core.exceptions import not_found
+
+    repo = TaxConfigRepository(db)
+    tax = repo.get_for_hotel(hotel_id, tax_id)
+    if not tax:
+        raise not_found("Tax config not found")
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(tax, field, value)
+    repo.commit(tax)
+    return ok(TaxConfigRead.model_validate(tax).model_dump())
+
+
+@tax_router.delete("/{tax_id}")
+def delete_tax_config(
+    hotel_id: str,
+    tax_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("hotel.settings.manage")),
+) -> dict:
+    from app.core.exceptions import not_found
+
+    repo = TaxConfigRepository(db)
+    tax = repo.get_for_hotel(hotel_id, tax_id)
+    if not tax:
+        raise not_found("Tax config not found")
+    tax.is_active = False
+    repo.commit(tax)
+    return ok({"deleted": True})

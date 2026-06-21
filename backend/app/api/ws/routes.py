@@ -87,6 +87,28 @@ async def ticket_updates_v3(websocket: WebSocket) -> None:
         db.close()
 
 
+@router.websocket("/ws/orders")
+async def order_updates_v3(websocket: WebSocket) -> None:
+    await websocket.accept()
+    db = SessionLocal()
+    auth = await _authenticate_websocket(websocket, db, "restaurant.manage")
+    if not auth:
+        db.close()
+        return
+    hotel_id, _ = auth
+    channel = f"hotel:{hotel_id}:orders"
+    manager.active.setdefault(channel, []).append(websocket)
+    try:
+        await websocket.send_json({"event": "connected", "topic": "orders"})
+        while True:
+            data = await websocket.receive_json()
+            await manager.broadcast(channel, data)
+    except WebSocketDisconnect:
+        manager.disconnect(channel, websocket)
+    finally:
+        db.close()
+
+
 @router.websocket("/ws/chat")
 async def chat_updates_v3(websocket: WebSocket) -> None:
     await websocket.accept()

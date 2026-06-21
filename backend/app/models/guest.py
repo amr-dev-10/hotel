@@ -37,3 +37,16 @@ class GuestConsent(UUIDPrimaryKeyMixin, Base):
     consented_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     ip_address: Mapped[str | None] = mapped_column(String(80))
+
+
+class GuestPortalToken(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "guest_portal_tokens"
+
+    hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
+    guest_id: Mapped[str] = mapped_column(ForeignKey("guests.id"), index=True)
+    reservation_id: Mapped[str] = mapped_column(ForeignKey("reservations.id"), index=True)
+    room_id: Mapped[str | None] = mapped_column(ForeignKey("rooms.id"))
+    token_hash: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

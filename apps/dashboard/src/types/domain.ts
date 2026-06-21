@@ -287,6 +287,15 @@ export interface Folio {
   closed_at: string | null;
 }
 
+export interface TaxConfig {
+  id: string;
+  hotel_id: string;
+  name: string;
+  rate_percent: string | number;
+  applies_to: string;
+  is_active: boolean;
+}
+
 export interface Room {
   id: string;
   hotel_id: string;
@@ -296,6 +305,81 @@ export interface Room {
   floor: string | null;
   status: string;
   notes: string | null;
+}
+
+export interface MenuCategory {
+  id: string;
+  hotel_id: string;
+  name: string;
+  type: string;
+  display_order: number;
+  is_active: boolean;
+}
+
+export interface MenuItem {
+  id: string;
+  hotel_id: string;
+  category_id: string;
+  name: string;
+  price: string | number;
+  description: string | null;
+  description_short: string | null;
+  dietary_tags: string[];
+  image_url: string | null;
+  is_available: boolean;
+  display_order: number;
+  tax_config_ids: string[];
+}
+
+export interface RestaurantOrder {
+  id: string;
+  hotel_id: string;
+  order_number: string;
+  source: string;
+  table_id: string | null;
+  guest_id: string | null;
+  room_id: string | null;
+  ticket_id: string | null;
+  folio_id: string | null;
+  ordered_by_guest: boolean;
+  status: string;
+  subtotal: string | number;
+  tax: string | number;
+  total: string | number;
+  special_instructions: string | null;
+  taken_by: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export interface RestaurantOrderItem {
+  id: string;
+  hotel_id: string;
+  order_id: string;
+  menu_item_id: string;
+  quantity: number;
+  unit_price: string | number;
+  item_total: string | number;
+  status: string;
+  notes: string | null;
+}
+
+export interface RestaurantOrderDetail {
+  order: RestaurantOrder;
+  items: RestaurantOrderItem[];
+}
+
+export interface GuestPortalProfile {
+  guest: Guest;
+  reservation: Reservation;
+  room_number: string | null;
+}
+
+export interface GuestPortalSession {
+  access_token: string;
+  token_type: "bearer";
+  expires_in_minutes: number;
+  profile: GuestPortalProfile;
 }
 
 export interface HousekeepingTask {

@@ -10,6 +10,21 @@ export const queryKeys = {
     ["guests", hotelId, guestId, "timeline"] as const,
   reservations: (hotelId: string) => ["reservations", hotelId] as const,
   notifications: (hotelId: string) => ["notifications", hotelId] as const,
+  fnb: {
+    categories: (hotelId: string) => ["fnb", hotelId, "categories"] as const,
+    items: (hotelId: string, categoryId?: string) => ["fnb", hotelId, "items", categoryId ?? "all"] as const,
+    taxes: (hotelId: string) => ["fnb", hotelId, "taxes"] as const,
+    orders: (hotelId: string, filters?: Record<string, string | undefined>) =>
+      ["fnb", hotelId, "orders", filters ?? {}] as const,
+    order: (hotelId: string, orderId: string) => ["fnb", hotelId, "orders", orderId] as const,
+  },
+  guestPortal: {
+    profile: () => ["guest-portal", "profile"] as const,
+    categories: () => ["guest-portal", "categories"] as const,
+    items: (categoryId?: string) => ["guest-portal", "items", categoryId ?? "all"] as const,
+    orders: () => ["guest-portal", "orders"] as const,
+    requests: () => ["guest-portal", "requests"] as const,
+  },
   reservationDetail: (hotelId: string, reservationId: string) =>
     ["reservations", hotelId, reservationId] as const,
   reservationGuests: (hotelId: string, reservationId: string) =>

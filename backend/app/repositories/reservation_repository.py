@@ -3,7 +3,9 @@ from collections.abc import Sequence
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.models.guest import Guest
 from app.models.reservation import Reservation, ReservationGuest, ReservationRoomType, StayRecord
+from app.models.room import Room
 from app.repositories.base import BaseRepository
 
 
@@ -18,6 +20,26 @@ class ReservationRepository(BaseRepository[Reservation]):
                 Reservation.reservation_no == reservation_no,
             )
         ).scalar_one_or_none()
+
+    def find_active_for_guest_room(
+        self,
+        hotel_id: str,
+        room_number: str,
+    ) -> list[tuple[Reservation, Guest, Room]]:
+        return list(
+            self.db.execute(
+                select(Reservation, Guest, Room)
+                .join(Guest, Guest.id == Reservation.guest_id)
+                .join(Room, Room.id == Reservation.room_id)
+                .where(
+                    Reservation.hotel_id == hotel_id,
+                    Reservation.deleted_at.is_(None),
+                    Room.room_number == room_number,
+                    Reservation.status.in_(("booked", "confirmed", "checked_in", "in_house")),
+                )
+                .order_by(Reservation.checkin_date.desc())
+            ).all()
+        )
 
 
 class ReservationGuestRepository(BaseRepository[ReservationGuest]):

@@ -1,4 +1,4 @@
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from uuid import uuid4
 
 from sqlalchemy.orm import Session
@@ -7,6 +7,7 @@ from app.core.exceptions import not_found
 from app.models.base import utcnow
 from app.models.restaurant import RestaurantOrder, RestaurantOrderItem, RestaurantTable
 from app.repositories.folio_repository import FolioRepository
+from app.repositories.folio_repository import TaxConfigRepository
 from app.repositories.menu_repository import MenuItemRepository
 from app.repositories.restaurant_repository import (
     RestaurantOrderItemRepository,
@@ -18,6 +19,7 @@ from app.schemas.restaurant import RestaurantOrderCreate, RestaurantOrderStatusU
 from app.schemas.ticket import TicketCreate
 from app.services.audit_service import AuditService
 from app.services.folio_service import FolioService
+from app.services.notification_service import NotificationService
 from app.services.ticket_service import TicketService
 
 
@@ -29,6 +31,8 @@ class RestaurantService:
         self.order_items = RestaurantOrderItemRepository(db)
         self.menu_items = MenuItemRepository(db)
         self.folios = FolioRepository(db)
+        self.taxes = TaxConfigRepository(db)
+        self.notifications = NotificationService()
 
     def create_table(
         self,
@@ -50,6 +54,7 @@ class RestaurantService:
         actor_id: str | None,
     ) -> RestaurantOrder:
         subtotal = Decimal("0")
+        calculated_tax = Decimal("0")
         prepared_items = []
         for item_payload in payload.items:
             menu_item = self.menu_items.get_for_hotel(hotel_id, item_payload.menu_item_id)
@@ -57,11 +62,17 @@ class RestaurantService:
                 raise not_found("Menu item not found")
             unit_price = Decimal(item_payload.unit_price if item_payload.unit_price is not None else menu_item.price)
             item_total = unit_price * Decimal(item_payload.quantity)
+            item_tax = self._calculate_item_tax(hotel_id, item_payload.menu_item_id, item_total)
             subtotal += item_total
+            calculated_tax += item_tax
             prepared_items.append((item_payload, unit_price, item_total))
-        total = subtotal + Decimal(payload.tax)
+        tax_total = Decimal(payload.tax or calculated_tax)
+        if tax_total == Decimal("0") and calculated_tax:
+            tax_total = calculated_tax
+        tax_total = self._money(tax_total)
+        total = self._money(subtotal + tax_total)
         folio_id = payload.folio_id
-        if not folio_id and payload.source in {"room_service", "whatsapp"} and payload.guest_id:
+        if not folio_id and payload.source in {"room_service", "whatsapp", "guest_portal"} and payload.guest_id:
             folio = self.folios.get_open_for_guest(hotel_id, payload.guest_id)
             folio_id = folio.id if folio else None
         order = RestaurantOrder(
@@ -73,8 +84,9 @@ class RestaurantService:
             room_id=payload.room_id,
             ticket_id=payload.ticket_id,
             folio_id=folio_id,
+            ordered_by_guest=payload.ordered_by_guest,
             subtotal=subtotal,
-            tax=payload.tax,
+            tax=tax_total,
             total=total,
             special_instructions=payload.special_instructions,
             taken_by=actor_id,
@@ -104,7 +116,7 @@ class RestaurantService:
                     description=f"Room Service - {order.order_number}",
                     quantity=1,
                     unit_price=subtotal,
-                    tax_amount=payload.tax,
+                    tax_amount=tax_total,
                     total_amount=total,
                 ),
                 posted_by=actor_id,
@@ -128,6 +140,7 @@ class RestaurantService:
         AuditService(self.db).log(hotel_id, "restaurant.order.created", "restaurant_order", order.id, actor_id)
         self.db.commit()
         self.db.refresh(order)
+        self._publish_order_event(order, "restaurant.order.created")
         return order
 
     def update_status(
@@ -141,7 +154,7 @@ class RestaurantService:
         if not order:
             raise not_found("Restaurant order not found")
         order.status = payload.status
-        if payload.status in {"served", "billed", "cancelled"} and not order.completed_at:
+        if payload.status in {"served", "billed", "cancelled", "delivered"} and not order.completed_at:
             order.completed_at = utcnow()
         AuditService(self.db).log(
             hotel_id,
@@ -153,7 +166,33 @@ class RestaurantService:
         )
         self.db.commit()
         self.db.refresh(order)
+        self._publish_order_event(order, "restaurant.order.status_changed")
         return order
 
     def _order_number(self) -> str:
         return f"ORD-{utcnow().strftime('%Y%m%d%H%M%S')}-{uuid4().hex[:4].upper()}"
+
+    def _calculate_item_tax(self, hotel_id: str, menu_item_id: str, item_total: Decimal) -> Decimal:
+        taxes = self.menu_items.tax_configs_for_item(hotel_id, menu_item_id)
+        if not taxes:
+            taxes = self.taxes.active_for_type(hotel_id, "food")
+        rate = sum((Decimal(tax.rate_percent) for tax in taxes), Decimal("0")) / Decimal("100")
+        return self._money(item_total * rate)
+
+    def _money(self, value: Decimal) -> Decimal:
+        return Decimal(value).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    def _publish_order_event(self, order: RestaurantOrder, event: str) -> None:
+        self.notifications.publish_order_event(
+            order.hotel_id,
+            {
+                "event": event,
+                "order_id": order.id,
+                "order_number": order.order_number,
+                "status": order.status,
+                "source": order.source,
+                "guest_id": order.guest_id,
+                "room_id": order.room_id,
+                "total": str(order.total),
+            },
+        )

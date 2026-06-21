@@ -23,6 +23,12 @@ class NotificationService:
     def publish_ticket_event(self, hotel_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         return self.publish(f"hotel:{hotel_id}:tickets", payload)
 
+    def publish_order_event(self, hotel_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        channel = f"hotel:{hotel_id}:orders"
+        result = self.publish(channel, payload)
+        result["websocket_dispatched"] = self._broadcast_in_process(channel, payload)
+        return result
+
     def publish_user_notification(
         self,
         hotel_id: str,

@@ -127,6 +127,13 @@ class TaxConfigCreate(BaseModel):
     is_active: bool = True
 
 
+class TaxConfigUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    rate_percent: Decimal | None = None
+    applies_to: str | None = None
+    is_active: bool | None = None
+
+
 class TaxConfigRead(ORMModel):
     id: str
     hotel_id: str

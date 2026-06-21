@@ -7,6 +7,7 @@ import {
   BedDouble,
   Bot,
   CalendarDays,
+  ChefHat,
   Gauge,
   GitBranch,
   ListChecks,
@@ -19,6 +20,7 @@ import {
   ShieldAlert,
   UserCircle,
   Users,
+  Utensils,
 } from "lucide-react";
 
 import { DispatchAlert } from "@/components/dispatch-alert";
@@ -35,6 +37,8 @@ const navItems = [
   { label: "Guests", href: "guests", icon: Users },
   { label: "Reservations", href: "reservations", icon: CalendarDays },
   { label: "Rooms", href: "rooms", icon: BedDouble },
+  { label: "F&B", href: "fnb", icon: Utensils },
+  { label: "Kitchen", href: "kitchen", icon: ChefHat },
   { label: "Housekeeping", href: "housekeeping", icon: Sparkles },
   { label: "Hierarchy", href: "hierarchy", icon: Network },
   { label: "WhatsApp", href: "whatsapp", icon: MessageCircle },

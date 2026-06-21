@@ -12,6 +12,7 @@ from app.repositories.restaurant_repository import (
 )
 from app.schemas.restaurant import (
     RestaurantOrderCreate,
+    RestaurantOrderDetail,
     RestaurantOrderItemRead,
     RestaurantOrderRead,
     RestaurantOrderStatusUpdate,
@@ -47,10 +48,20 @@ def create_table(
 @router.get("/orders")
 def list_orders(
     hotel_id: str,
+    status: str | None = None,
+    source: str | None = None,
+    guest_id: str | None = None,
+    room_id: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("restaurant.manage")),
 ) -> dict:
-    orders = RestaurantOrderRepository(db).list_for_hotel(hotel_id)
+    orders = RestaurantOrderRepository(db).list_filtered(
+        hotel_id,
+        status=status,
+        source=source,
+        guest_id=guest_id,
+        room_id=room_id,
+    )
     return ok([RestaurantOrderRead.model_validate(item).model_dump() for item in orders])
 
 
@@ -63,6 +74,26 @@ def create_order(
 ) -> dict:
     order = RestaurantService(db).create_order(hotel_id, payload, current_user.id)
     return ok(RestaurantOrderRead.model_validate(order).model_dump())
+
+
+@router.get("/orders/{order_id}")
+def get_order(
+    hotel_id: str,
+    order_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("restaurant.manage")),
+) -> dict:
+    from app.core.exceptions import not_found
+
+    order = RestaurantOrderRepository(db).get_for_hotel(hotel_id, order_id)
+    if not order:
+        raise not_found("Restaurant order not found")
+    items = RestaurantOrderItemRepository(db).list_for_order(hotel_id, order.id)
+    detail = RestaurantOrderDetail(
+        order=RestaurantOrderRead.model_validate(order),
+        items=[RestaurantOrderItemRead.model_validate(item) for item in items],
+    )
+    return ok(detail.model_dump())
 
 
 @router.get("/orders/{order_id}/items")

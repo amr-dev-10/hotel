@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -31,6 +31,7 @@ class RestaurantOrder(UUIDPrimaryKeyMixin, Base):
     room_id: Mapped[str | None] = mapped_column(ForeignKey("rooms.id"))
     ticket_id: Mapped[str | None] = mapped_column(ForeignKey("tickets.id"))
     folio_id: Mapped[str | None] = mapped_column(ForeignKey("guest_folios.id"))
+    ordered_by_guest: Mapped[bool] = mapped_column(Boolean, default=False)
     status: Mapped[str] = mapped_column(String(40), default="received", index=True)
     subtotal: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=0)
     tax: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=0)

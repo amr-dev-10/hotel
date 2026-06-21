@@ -5,7 +5,7 @@ from app.models.department import Department
 from app.models.escalation import EscalationLog, EscalationRule
 from app.models.feedback import Feedback
 from app.models.folio import FolioItem, GuestFolio, Payment, PaymentTransaction, Refund, TaxConfig
-from app.models.guest import Guest, GuestConsent
+from app.models.guest import Guest, GuestConsent, GuestPortalToken
 from app.models.hotel import Hotel
 from app.models.inventory import (
     InventoryItem,
@@ -25,7 +25,7 @@ from app.models.knowledge import (
     ServiceForm,
     ServiceFormField,
 )
-from app.models.menu import MenuCategory, MenuItem
+from app.models.menu import MenuCategory, MenuItem, menu_item_taxes
 from app.models.ops import (
     AnalyticsSnapshot,
     ApiRateLimit,
@@ -91,6 +91,7 @@ __all__ = [
     "Guest",
     "GuestConsent",
     "GuestFolio",
+    "GuestPortalToken",
     "HotelSecret",
     "Hotel",
     "HotelFAQ",
@@ -165,5 +166,6 @@ __all__ = [
     "WorkflowTransition",
     "role_permissions",
     "ticket_menu_items",
+    "menu_item_taxes",
     "user_roles",
 ]
