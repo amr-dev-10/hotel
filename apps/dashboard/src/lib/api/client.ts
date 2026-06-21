@@ -2,12 +2,17 @@ import axios, { type AxiosRequestConfig } from "axios";
 
 import type { ApiEnvelope } from "@/types/domain";
 
+const apiBaseURL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api/v1";
+const defaultHeaders = apiBaseURL.includes("ngrok")
+  ? {
+      "ngrok-skip-browser-warning": "true",
+    }
+  : undefined;
+
 export const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1",
+  baseURL: apiBaseURL,
   timeout: 15000,
-  headers: {
-    "ngrok-skip-browser-warning": "true",
-  },
+  headers: defaultHeaders,
 });
 
 api.interceptors.request.use((config) => {

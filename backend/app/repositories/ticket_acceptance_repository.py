@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import false, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.base import utcnow
@@ -55,6 +55,40 @@ class TicketAcceptanceRepository(BaseRepository[TicketAcceptance]):
                 TicketAcceptance.response == "pending",
             )
         ).scalars().all()
+
+    def list_pending_for_hotel(
+        self,
+        hotel_id: str,
+        user_id: str | None = None,
+        department_id: str | None = None,
+        include_all: bool = False,
+        limit: int = 100,
+    ) -> Sequence[tuple[TicketAcceptance, Ticket]]:
+        statement = (
+            select(TicketAcceptance, Ticket)
+            .join(Ticket, Ticket.id == TicketAcceptance.ticket_id)
+            .where(
+                Ticket.hotel_id == hotel_id,
+                Ticket.deleted_at.is_(None),
+                TicketAcceptance.response == "pending",
+            )
+        )
+        if not include_all:
+            visibility = []
+            if user_id:
+                visibility.extend(
+                    [
+                        TicketAcceptance.offered_to == user_id,
+                        Ticket.assigned_to == user_id,
+                    ]
+                )
+            if department_id:
+                visibility.append(Ticket.department_id == department_id)
+            if visibility:
+                statement = statement.where(or_(*visibility))
+            else:
+                statement = statement.where(false())
+        return self.db.execute(statement.order_by(TicketAcceptance.offered_at.desc()).limit(limit)).all()
 
     def cancel_pending(
         self,

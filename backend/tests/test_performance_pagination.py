@@ -24,6 +24,43 @@ def _bootstrap(client: TestClient) -> tuple[str, dict[str, str]]:
     return data["hotel"]["id"], {"Authorization": f"Bearer {data['access_token']}"}
 
 
+def _department_id(client: TestClient, hotel_id: str, headers: dict[str, str], key: str) -> str:
+    response = client.get(f"/api/v1/hotels/{hotel_id}/departments", headers=headers)
+    assert response.status_code == 200
+    return next(item["id"] for item in response.json()["data"] if item["key"] == key)
+
+
+def _room_id(client: TestClient, hotel_id: str, headers: dict[str, str], room_number: str) -> str:
+    response = client.get(f"/api/v1/hotels/{hotel_id}/rooms", headers=headers)
+    assert response.status_code == 200
+    return next(item["id"] for item in response.json()["data"] if item["room_number"] == room_number)
+
+
+def _create_staff(
+    client: TestClient,
+    hotel_id: str,
+    headers: dict[str, str],
+    department_id: str,
+    name: str,
+) -> str:
+    suffix = uuid4().hex[:8]
+    response = client.post(
+        f"/api/v1/hotels/{hotel_id}/users",
+        headers=headers,
+        json={
+            "name": name,
+            "email": f"{name.lower().replace(' ', '-')}-{suffix}@example.com",
+            "password": "secretpass123",
+            "department_id": department_id,
+            "staff_level": "attendant",
+            "job_role": "Attendant",
+            "is_on_duty": True,
+        },
+    )
+    assert response.status_code == 200
+    return response.json()["data"]["id"]
+
+
 def test_guest_list_cursor_metadata_and_server_search() -> None:
     with TestClient(app) as client:
         hotel_id, headers = _bootstrap(client)
@@ -114,3 +151,52 @@ def test_reservation_list_includes_guest_context_and_ticket_detail_is_direct() -
         detail = client.get(f"/api/v1/hotels/{hotel_id}/tickets/{ticket_id}", headers=headers)
         assert detail.status_code == 200
         assert detail.json()["data"]["item_description"] == "Performance faucet leak"
+
+
+def test_ticket_list_labels_and_pending_acceptance_escalation_view() -> None:
+    with TestClient(app) as client:
+        hotel_id, headers = _bootstrap(client)
+        department_id = _department_id(client, hotel_id, headers, "housekeeping")
+        room_id = _room_id(client, hotel_id, headers, "901")
+        attendant_id = _create_staff(client, hotel_id, headers, department_id, "Performance Attendant")
+
+        ticket = client.post(
+            f"/api/v1/hotels/{hotel_id}/tickets",
+            headers=headers,
+            json={
+                "department_id": department_id,
+                "assigned_to": attendant_id,
+                "room_id": room_id,
+                "task_category": "towel_request",
+                "item_description": "Need towel from WhatsApp context",
+                "source": "WHATSAPP",
+                "priority": 2,
+            },
+        )
+        assert ticket.status_code == 200
+        ticket_id = ticket.json()["data"]["id"]
+        assert ticket.json()["data"]["assigned_to_name"] == "Performance Attendant"
+        assert ticket.json()["data"]["room_number"] == "901"
+
+        tickets = client.get(
+            f"/api/v1/hotels/{hotel_id}/tickets",
+            headers=headers,
+            params={"q": "towel from WhatsApp"},
+        )
+        assert tickets.status_code == 200
+        row = tickets.json()["data"][0]
+        assert row["id"] == ticket_id
+        assert row["assigned_to_name"] == "Performance Attendant"
+        assert row["room_number"] == "901"
+
+        escalations = client.get(
+            f"/api/v1/hotels/{hotel_id}/tickets/escalations",
+            headers=headers,
+            params={"scope": "all"},
+        )
+        assert escalations.status_code == 200
+        escalation = next(item for item in escalations.json()["data"] if item["ticket_id"] == ticket_id)
+        assert escalation["reason"] == "pending_acceptance"
+        assert escalation["escalated_to_name"] == "Performance Attendant"
+        assert escalation["ticket"]["assigned_to_name"] == "Performance Attendant"
+        assert escalation["ticket"]["room_number"] == "901"

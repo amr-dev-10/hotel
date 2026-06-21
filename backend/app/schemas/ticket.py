@@ -56,6 +56,10 @@ class TicketRead(ORMModel):
     room_id: str | None = None
     department_id: str | None = None
     assigned_to: str | None = None
+    assigned_to_name: str | None = None
+    room_number: str | None = None
+    guest_name: str | None = None
+    reservation_no: str | None = None
     stage: str
     type: str
     task_category: str | None = None
@@ -83,7 +87,9 @@ class EscalatedTicketRead(BaseModel):
     rule_id: str
     escalation_level: int
     escalated_from: str | None = None
+    escalated_from_name: str | None = None
     escalated_to: str | None = None
+    escalated_to_name: str | None = None
     reason: str
     notes: str | None = None
     escalated_at: datetime

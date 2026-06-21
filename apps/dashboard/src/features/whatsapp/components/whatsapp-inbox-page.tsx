@@ -15,7 +15,17 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { DataState } from "@/components/ui/data-state";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { apiErrorMessage } from "@/lib/api/client";
 import { cn, titleCase, compactId } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth.store";
 import { 
@@ -34,6 +44,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { Ticket as TicketRecord } from "@/types/domain";
+
+type QuickTicketConfig = {
+  label: string;
+  department_key: "front_office" | "housekeeping" | "engineering" | "food_beverage";
+  task_category: string;
+  priority: number;
+  type?: "Ticket" | "Complaint" | "Food Order";
+  customDescription?: boolean;
+};
 
 export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
   const router = useRouter();
@@ -106,6 +125,10 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
   const sendMessage = useSendWhatsappMessage(hotelId, activeConversationId || "");
   const updateConversation = useUpdateWhatsappConversation(hotelId, activeConversationId || "");
   const [text, setText] = useState("");
+  const [quickTicketDraft, setQuickTicketDraft] = useState<{
+    config: QuickTicketConfig;
+    description: string;
+  } | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -121,27 +144,36 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
     try {
       await sendMessage.mutateAsync({ message: text, reservation_id: activeReservationId || undefined });
       setText("");
-    } catch (error) {
+    } catch {
       toast.error("Failed to send message");
     }
   }
 
-  async function handleQuickTicket(config: {
-    label: string;
-    department_key: "front_office" | "housekeeping" | "engineering" | "food_beverage";
-    task_category: string;
-    priority: number;
-    type?: "Ticket" | "Complaint" | "Food Order";
-    prompt?: boolean;
-  }) {
+  function handleQuickTicket(config: QuickTicketConfig) {
     if (!selectedConversation) {
       return;
     }
-    const baseDescription = `${config.label} request from WhatsApp${guestQuery.data?.name ? ` for ${guestQuery.data.name}` : ""}`;
-    const description = config.prompt
-      ? window.prompt("Ticket description", baseDescription)
-      : baseDescription;
+    const baseDescription = quickTicketDescription(config);
+
+    if (config.customDescription) {
+      setQuickTicketDraft({ config, description: baseDescription });
+      return;
+    }
+
+    void submitQuickTicket(config, baseDescription);
+  }
+
+  function quickTicketDescription(config: QuickTicketConfig) {
+    return `${config.label} request from WhatsApp${guestQuery.data?.name ? ` for ${guestQuery.data.name}` : ""}`;
+  }
+
+  async function submitQuickTicket(config: QuickTicketConfig, description: string) {
+    if (!selectedConversation) {
+      return;
+    }
+
     if (!description?.trim()) {
+      toast.error("Ticket description is required");
       return;
     }
 
@@ -159,8 +191,9 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
         item_description: description.trim().slice(0, 255),
       });
       toast.success("Ticket created");
+      setQuickTicketDraft(null);
     } catch (error) {
-      toast.error("Failed to create ticket");
+      toast.error(apiErrorMessage(error));
     }
   }
 
@@ -174,7 +207,59 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
   const mineCount = conversations.data?.filter(c => Boolean(currentUser?.id) && c.assigned_staff_id === currentUser?.id).length || 0;
 
   return (
-    <div className="flex h-[85vh] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+    <>
+      <Dialog open={Boolean(quickTicketDraft)} onOpenChange={(open) => (!open ? setQuickTicketDraft(null) : undefined)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Create WhatsApp Ticket</DialogTitle>
+            <DialogDescription>
+              Review the request before routing it to the front office team.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form
+            className="grid gap-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!quickTicketDraft) {
+                return;
+              }
+              void submitQuickTicket(quickTicketDraft.config, quickTicketDraft.description);
+            }}
+          >
+            <div className="grid gap-2">
+              <Label htmlFor="quick-ticket-description">Description</Label>
+              <Textarea
+                autoFocus
+                id="quick-ticket-description"
+                maxLength={255}
+                value={quickTicketDraft?.description ?? ""}
+                onChange={(event) =>
+                  setQuickTicketDraft((draft) =>
+                    draft ? { ...draft, description: event.target.value } : draft,
+                  )
+                }
+              />
+              <div className="flex items-center justify-between gap-3 text-xs text-slate-500">
+                <span>Linked to this WhatsApp conversation.</span>
+                <span>{quickTicketDraft?.description.length ?? 0}/255</span>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="secondary" onClick={() => setQuickTicketDraft(null)}>
+                Cancel
+              </Button>
+              <Button disabled={createTicket.isPending || !quickTicketDraft?.description.trim()} type="submit">
+                {createTicket.isPending ? <Loader2 className="animate-spin" /> : <TicketIcon />}
+                Create Ticket
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <div className="flex h-[85vh] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
       
       {/* LEFT PANE: CONVERSATION LIST */}
       <div className="flex w-1/4 min-w-[300px] flex-col border-r border-slate-200 bg-slate-50/50">
@@ -488,7 +573,7 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
                       department_key: "front_office",
                       task_category: "guest_request",
                       priority: 2,
-                      prompt: true,
+                      customDescription: true,
                     })
                   }
                 >
@@ -602,7 +687,8 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 

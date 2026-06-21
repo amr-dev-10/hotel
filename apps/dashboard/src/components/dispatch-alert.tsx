@@ -105,7 +105,10 @@ export function DispatchAlert({ hotelId }: { hotelId: string }) {
       </div>
 
       <div className="mt-4 grid grid-cols-3 gap-2 text-xs text-slate-500">
-        <Info label="Room" value={compactId(activeDispatch.ticket.room_id)} />
+        <Info
+          label="Room"
+          value={activeDispatch.ticket.room_number ? `Room ${activeDispatch.ticket.room_number}` : compactId(activeDispatch.ticket.room_id)}
+        />
         <Info label="Priority" value={`P${activeDispatch.ticket.priority}`} />
         <Info label="Source" value={activeDispatch.ticket.source} />
       </div>

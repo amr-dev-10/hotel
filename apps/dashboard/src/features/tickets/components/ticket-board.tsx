@@ -200,7 +200,7 @@ function TicketCard({ ticket, isDragging }: { ticket: Ticket; isDragging: boolea
         </span>
         <span className="flex items-center gap-2">
           <UserCheck className="size-3.5" />
-          {compactId(ticket.assigned_to)}
+          {ticket.assigned_to_name ?? compactId(ticket.assigned_to)}
         </span>
       </div>
     </article>

@@ -36,6 +36,7 @@ export function useGuests(hotelId: string, filters: GuestFilters = {}) {
       return meta?.has_more ? meta.next_cursor : undefined;
     },
     enabled: Boolean(hotelId),
+    staleTime: 30_000,
   });
 
   return {

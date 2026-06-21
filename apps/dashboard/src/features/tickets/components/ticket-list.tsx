@@ -118,14 +118,14 @@ function TicketRow({ hotelId, ticket }: { hotelId: string; ticket: Ticket }) {
       <td className="px-4 py-3 text-slate-600">
         <span className="inline-flex items-center gap-2">
           <UserCheck className="size-4 text-slate-400" />
-          {compactId(ticket.assigned_to)}
+          {ticketAssigneeLabel(ticket)}
         </span>
       </td>
       <td className="px-4 py-3 text-slate-600">
         <div className="grid gap-1">
           <span className="inline-flex items-center gap-2">
             <Hotel className="size-4 text-slate-400" />
-            {compactId(ticket.room_id)}
+            {ticketContextLabel(ticket)}
           </span>
           <span className="inline-flex items-center gap-2">
             <MessageSquare className="size-4 text-slate-400" />
@@ -174,7 +174,7 @@ function MobileTicketCard({ hotelId, ticket }: { hotelId: string; ticket: Ticket
         </span>
         <span className="flex items-center gap-2">
           <UserCheck className="size-3.5" />
-          {compactId(ticket.assigned_to)}
+          {ticketAssigneeLabel(ticket)}
         </span>
       </div>
     </article>
@@ -230,4 +230,21 @@ function normalizeStage(stage: string) {
     return "approved";
   }
   return stage;
+}
+
+function ticketAssigneeLabel(ticket: Ticket) {
+  return ticket.assigned_to_name ?? compactId(ticket.assigned_to);
+}
+
+function ticketContextLabel(ticket: Ticket) {
+  if (ticket.room_number) {
+    return `Room ${ticket.room_number}`;
+  }
+  if (ticket.reservation_no) {
+    return ticket.reservation_no;
+  }
+  if (ticket.guest_name) {
+    return ticket.guest_name;
+  }
+  return compactId(ticket.room_id ?? ticket.reservation_id ?? ticket.guest_id);
 }

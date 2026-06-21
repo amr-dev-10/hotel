@@ -28,6 +28,7 @@ import {
 import { DispatchAlert } from "@/components/dispatch-alert";
 import { NotificationBell } from "@/components/notification-bell";
 import { Button } from "@/components/ui/button";
+import { useRouteHotelId } from "@/hooks/useRouteHotelId";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { cn, titleCase } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth.store";
@@ -63,14 +64,15 @@ const settingsNavItems: NavItem[] = [
 ];
 
 export function DashboardShell({
-  hotelId,
+  hotelId: hotelIdProp,
   children,
 }: {
-  hotelId: string;
+  hotelId?: string;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const hotelId = useRouteHotelId(hotelIdProp);
   const token = useAuthStore((state) => state.token);
   const currentUser = useAuthStore((state) => state.currentUser);
   const switchHotel = useAuthStore((state) => state.switchHotel);

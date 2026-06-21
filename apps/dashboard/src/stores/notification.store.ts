@@ -12,8 +12,10 @@ export interface DispatchTicket {
   stage: string;
   priority: number;
   room_id: string | null;
+  room_number?: string | null;
   department_id: string | null;
   assigned_to: string | null;
+  assigned_to_name?: string | null;
   source: string;
   reservation_id: string | null;
   conversation_id: string | null;

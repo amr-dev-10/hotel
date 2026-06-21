@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.exceptions import bad_request, not_found
 from app.models.base import utcnow
 from app.models.escalation import EscalationLog, EscalationRule
+from app.models.room import Room
 from app.models.ticket import Ticket
 from app.models.ticket_acceptance import TicketAcceptance
 from app.models.user import User
@@ -383,6 +384,18 @@ class DispatchService:
         return self.slas.get_sla_config(ticket.hotel_id, ticket.department_id, ticket.task_category).accept_timeout_minutes
 
     def _ticket_payload(self, ticket: Ticket) -> dict:
+        room = (
+            self.db.query(Room)
+            .filter(
+                Room.id == ticket.room_id,
+                Room.hotel_id == ticket.hotel_id,
+                Room.deleted_at.is_(None),
+            )
+            .first()
+            if ticket.room_id
+            else None
+        )
+        assignee = self.users.get_active(ticket.assigned_to) if ticket.assigned_to else None
         return {
             "id": ticket.id,
             "hotel_id": ticket.hotel_id,
@@ -391,8 +404,10 @@ class DispatchService:
             "stage": ticket.stage,
             "priority": ticket.priority,
             "room_id": ticket.room_id,
+            "room_number": room.room_number if room else None,
             "department_id": ticket.department_id,
             "assigned_to": ticket.assigned_to,
+            "assigned_to_name": assignee.name if assignee else None,
             "source": ticket.source,
             "reservation_id": ticket.reservation_id,
             "conversation_id": ticket.conversation_id,

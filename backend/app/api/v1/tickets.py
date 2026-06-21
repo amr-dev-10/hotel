@@ -1,10 +1,15 @@
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import require_permission
 from app.core.database import get_db
 from app.core.exceptions import bad_request, not_found
 from app.core.responses import ok
+from app.models.guest import Guest
+from app.models.reservation import Reservation
+from app.models.room import Room
+from app.models.ticket import Ticket
 from app.models.user import User
 from app.repositories.escalation_repository import EscalationLogRepository
 from app.repositories.ticket_acceptance_repository import TicketAcceptanceRepository
@@ -13,9 +18,7 @@ from app.repositories.whatsapp_repository import WhatsAppConversationRepository
 from app.schemas.ticket import (
     TicketAcceptanceRead,
     TicketCreate,
-    TicketDetail,
     EscalatedTicketRead,
-    TicketListItem,
     TicketMessageCreate,
     TicketMessageRead,
     TicketRejectRequest,
@@ -64,8 +67,9 @@ def list_tickets(
         )
     except ValueError:
         raise bad_request("Invalid pagination cursor") from None
+    ticket_context = _ticket_context(db, hotel_id, list(page.items))
     return ok(
-        [TicketListItem.model_validate(item).model_dump() for item in page.items],
+        [_ticket_read(item, ticket_context).model_dump() for item in page.items],
         meta={"next_cursor": page.next_cursor, "has_more": page.has_more, "limit": page.limit},
     )
 
@@ -78,7 +82,7 @@ def create_ticket(
     current_user: User = Depends(require_permission("ticket.create")),
 ) -> dict:
     ticket = TicketService(db).create_ticket(hotel_id, payload, actor_id=current_user.id)
-    return ok(TicketRead.model_validate(ticket).model_dump())
+    return ok(_ticket_read(ticket, _ticket_context(db, hotel_id, [ticket])).model_dump())
 
 
 @router.get("/escalations")
@@ -102,11 +106,35 @@ def list_escalated_tickets(
             or current_user.user_type == "HOTEL_ADMIN"
             or current_user.staff_level == "admin"
         )
-    rows = EscalationLogRepository(db).list_for_hotel(
+    rows = list(
+        EscalationLogRepository(db).list_for_hotel(
+            hotel_id,
+            user_id=current_user.id,
+            department_id=None if scope == "mine" else current_user.department_id,
+            include_all=include_all,
+        )
+    )
+    pending_rows = list(
+        TicketAcceptanceRepository(db).list_pending_for_hotel(
+            hotel_id,
+            user_id=current_user.id,
+            department_id=None if scope == "mine" else current_user.department_id,
+            include_all=include_all,
+        )
+    )
+    logged_ticket_ids = {ticket.id for _, ticket in rows}
+    pending_rows = [(acceptance, ticket) for acceptance, ticket in pending_rows if ticket.id not in logged_ticket_ids]
+    ticket_context = _ticket_context(
+        db,
         hotel_id,
-        user_id=current_user.id,
-        department_id=None if scope == "mine" else current_user.department_id,
-        include_all=include_all,
+        [ticket for _, ticket in rows] + [ticket for _, ticket in pending_rows],
+    )
+    user_names = _user_names(
+        db,
+        hotel_id,
+        [log.escalated_from for log, _ in rows]
+        + [log.escalated_to for log, _ in rows]
+        + [acceptance.offered_to for acceptance, _ in pending_rows],
     )
     items = [
         EscalatedTicketRead(
@@ -115,14 +143,33 @@ def list_escalated_tickets(
             rule_id=log.rule_id,
             escalation_level=log.escalation_level,
             escalated_from=log.escalated_from,
+            escalated_from_name=user_names.get(log.escalated_from or ""),
             escalated_to=log.escalated_to,
+            escalated_to_name=user_names.get(log.escalated_to or ""),
             reason=log.reason,
             notes=log.notes,
             escalated_at=log.created_at,
-            ticket=TicketRead.model_validate(ticket),
+            ticket=_ticket_read(ticket, ticket_context),
         ).model_dump()
         for log, ticket in rows
     ]
+    items.extend(
+        EscalatedTicketRead(
+            escalation_id=f"acceptance:{acceptance.id}",
+            ticket_id=ticket.id,
+            rule_id=acceptance.id,
+            escalation_level=0,
+            escalated_from=None,
+            escalated_from_name=None,
+            escalated_to=acceptance.offered_to,
+            escalated_to_name=user_names.get(acceptance.offered_to),
+            reason="pending_acceptance",
+            notes=None,
+            escalated_at=acceptance.offered_at,
+            ticket=_ticket_read(ticket, ticket_context),
+        ).model_dump()
+        for acceptance, ticket in pending_rows
+    )
     return ok(items)
 
 
@@ -136,7 +183,7 @@ def get_ticket(
     ticket = TicketRepository(db).get_for_hotel(hotel_id, ticket_id)
     if not ticket:
         raise not_found("Ticket not found")
-    return ok(TicketDetail.model_validate(ticket).model_dump())
+    return ok(_ticket_read(ticket, _ticket_context(db, hotel_id, [ticket])).model_dump())
 
 
 @router.get("/{ticket_id}/messages")
@@ -315,3 +362,83 @@ def list_ticket_escalations(
         raise not_found("Ticket not found")
     rows = EscalationLogRepository(db).list_for_ticket(ticket_id)
     return ok([EscalationLogRead.model_validate(item).model_dump() for item in rows])
+
+
+def _ticket_read(ticket: Ticket, ticket_context: dict[str, dict[str, str | None]]) -> TicketRead:
+    return TicketRead.model_validate(ticket).model_copy(update=ticket_context.get(ticket.id, {}))
+
+
+def _ticket_context(db: Session, hotel_id: str, tickets: list[Ticket]) -> dict[str, dict[str, str | None]]:
+    if not tickets:
+        return {}
+
+    user_names = _user_names(db, hotel_id, [ticket.assigned_to for ticket in tickets])
+    room_numbers = _room_numbers(db, hotel_id, [ticket.room_id for ticket in tickets])
+    guest_names = _guest_names(db, hotel_id, [ticket.guest_id for ticket in tickets])
+    reservation_numbers = _reservation_numbers(db, hotel_id, [ticket.reservation_id for ticket in tickets])
+
+    return {
+        ticket.id: {
+            "assigned_to_name": user_names.get(ticket.assigned_to or ""),
+            "room_number": room_numbers.get(ticket.room_id or ""),
+            "guest_name": guest_names.get(ticket.guest_id or ""),
+            "reservation_no": reservation_numbers.get(ticket.reservation_id or ""),
+        }
+        for ticket in tickets
+    }
+
+
+def _user_names(db: Session, hotel_id: str, user_ids: list[str | None]) -> dict[str, str]:
+    ids = {user_id for user_id in user_ids if user_id}
+    if not ids:
+        return {}
+    rows = db.execute(
+        select(User.id, User.name).where(
+            User.hotel_id == hotel_id,
+            User.id.in_(ids),
+            User.deleted_at.is_(None),
+        )
+    ).all()
+    return {user_id: name for user_id, name in rows}
+
+
+def _room_numbers(db: Session, hotel_id: str, room_ids: list[str | None]) -> dict[str, str]:
+    ids = {room_id for room_id in room_ids if room_id}
+    if not ids:
+        return {}
+    rows = db.execute(
+        select(Room.id, Room.room_number).where(
+            Room.hotel_id == hotel_id,
+            Room.id.in_(ids),
+            Room.deleted_at.is_(None),
+        )
+    ).all()
+    return {room_id: room_number for room_id, room_number in rows}
+
+
+def _guest_names(db: Session, hotel_id: str, guest_ids: list[str | None]) -> dict[str, str]:
+    ids = {guest_id for guest_id in guest_ids if guest_id}
+    if not ids:
+        return {}
+    rows = db.execute(
+        select(Guest.id, Guest.name).where(
+            Guest.hotel_id == hotel_id,
+            Guest.id.in_(ids),
+            Guest.deleted_at.is_(None),
+        )
+    ).all()
+    return {guest_id: name for guest_id, name in rows}
+
+
+def _reservation_numbers(db: Session, hotel_id: str, reservation_ids: list[str | None]) -> dict[str, str]:
+    ids = {reservation_id for reservation_id in reservation_ids if reservation_id}
+    if not ids:
+        return {}
+    rows = db.execute(
+        select(Reservation.id, Reservation.reservation_no).where(
+            Reservation.hotel_id == hotel_id,
+            Reservation.id.in_(ids),
+            Reservation.deleted_at.is_(None),
+        )
+    ).all()
+    return {reservation_id: reservation_no for reservation_id, reservation_no in rows}

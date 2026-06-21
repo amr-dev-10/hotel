@@ -2,14 +2,10 @@ import type { ReactNode } from "react";
 
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 
-export default async function HotelLayout({
+export default function HotelLayout({
   children,
-  params,
 }: {
   children: ReactNode;
-  params: Promise<{ hotelId: string }>;
 }) {
-  const { hotelId } = await params;
-
-  return <DashboardShell hotelId={hotelId}>{children}</DashboardShell>;
+  return <DashboardShell>{children}</DashboardShell>;
 }

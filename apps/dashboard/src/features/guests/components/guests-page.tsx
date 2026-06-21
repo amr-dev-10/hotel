@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { Mail, MessageCircle, Phone, Search, UserRound } from "lucide-react";
@@ -11,17 +11,21 @@ import { DataState } from "@/components/ui/data-state";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Can } from "@/lib/auth/can";
+import { useRouteHotelId } from "@/hooks/useRouteHotelId";
 import { compactId, titleCase } from "@/lib/utils";
 import type { Guest } from "@/types/domain";
 import { CreateGuestDialog } from "@/features/guests/components/create-guest-dialog";
 import { useGuests } from "@/features/guests/hooks/useGuests";
 
-export function GuestsPage({ hotelId }: { hotelId: string }) {
+export function GuestsPage({ hotelId: hotelIdProp }: { hotelId?: string }) {
+  const hotelId = useRouteHotelId(hotelIdProp);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
+  const debouncedSearch = useDebouncedValue(search.trim(), 300);
   const guests = useGuests(hotelId, {
-    q: search.trim() || undefined,
+    q: debouncedSearch || undefined,
     status: status === "all" ? undefined : status,
+    limit: 50,
   });
   const filteredGuests = guests.data ?? [];
 
@@ -194,4 +198,16 @@ function formatDate(value: string | null) {
   }
 
   return format(new Date(value), "dd MMM yyyy");
+}
+
+function useDebouncedValue<T>(value: T, delayMs: number) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => setDebouncedValue(value), delayMs);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [delayMs, value]);
+
+  return debouncedValue;
 }

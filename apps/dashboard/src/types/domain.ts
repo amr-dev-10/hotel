@@ -128,6 +128,10 @@ export interface Ticket {
   room_id: string | null;
   department_id: string | null;
   assigned_to: string | null;
+  assigned_to_name?: string | null;
+  room_number?: string | null;
+  guest_name?: string | null;
+  reservation_no?: string | null;
   stage: string;
   type: string;
   task_category: string | null;
@@ -197,7 +201,9 @@ export interface EscalatedTicket {
   rule_id: string;
   escalation_level: number;
   escalated_from: string | null;
+  escalated_from_name?: string | null;
   escalated_to: string | null;
+  escalated_to_name?: string | null;
   reason: string;
   notes: string | null;
   escalated_at: string;

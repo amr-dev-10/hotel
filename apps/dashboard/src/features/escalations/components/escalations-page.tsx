@@ -85,7 +85,9 @@ function EscalationCard({ hotelId, item }: { hotelId: string; item: EscalatedTic
     <article className="grid gap-4 rounded-md border border-slate-200 bg-white p-4 shadow-sm xl:grid-cols-[1fr_auto] xl:items-center">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant={item.escalation_level >= 3 ? "rose" : "amber"}>Level {item.escalation_level}</Badge>
+          <Badge variant={item.escalation_level >= 3 ? "rose" : "amber"}>
+            {item.escalation_level > 0 ? `Level ${item.escalation_level}` : "Pending accept"}
+          </Badge>
           <Badge variant={item.ticket.priority >= 4 ? "rose" : "blue"}>P{item.ticket.priority}</Badge>
           <Badge>{titleCase(item.ticket.stage)}</Badge>
           <span className="text-xs text-slate-500">
@@ -96,9 +98,9 @@ function EscalationCard({ hotelId, item }: { hotelId: string; item: EscalatedTic
         <p className="mt-1 line-clamp-2 text-sm text-slate-600">{item.ticket.item_description}</p>
         <div className="mt-3 grid gap-2 text-xs text-slate-500 sm:grid-cols-4">
           <Detail label="Reason" value={titleCase(item.reason)} />
-          <Detail label="Assigned" value={compactId(item.ticket.assigned_to)} />
-          <Detail label="Escalated to" value={compactId(item.escalated_to)} />
-          <Detail label="Room" value={compactId(item.ticket.room_id)} />
+          <Detail label="Assigned" value={item.ticket.assigned_to_name ?? compactId(item.ticket.assigned_to)} />
+          <Detail label="Escalated to" value={item.escalated_to_name ?? compactId(item.escalated_to)} />
+          <Detail label="Room" value={item.ticket.room_number ? `Room ${item.ticket.room_number}` : compactId(item.ticket.room_id)} />
         </div>
       </div>
       <div className="flex flex-wrap gap-2 xl:justify-end">

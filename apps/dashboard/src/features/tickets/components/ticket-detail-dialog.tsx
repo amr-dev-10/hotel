@@ -46,9 +46,9 @@ export function TicketDetailDialog({ hotelId, tickets }: { hotelId: string; tick
             <section className="grid gap-3 sm:grid-cols-2">
               <Detail label="Stage" value={titleCase(ticket.stage)} />
               <Detail label="Priority" value={`P${ticket.priority}`} />
-              <Detail label="Assigned" value={compactId(ticket.assigned_to)} />
-              <Detail label="Room" value={compactId(ticket.room_id)} />
-              <Detail label="Reservation" value={compactId(ticket.reservation_id)} />
+              <Detail label="Assigned" value={ticket.assigned_to_name ?? compactId(ticket.assigned_to)} />
+              <Detail label="Room" value={ticket.room_number ? `Room ${ticket.room_number}` : compactId(ticket.room_id)} />
+              <Detail label="Reservation" value={ticket.reservation_no ?? compactId(ticket.reservation_id)} />
               <Detail label="Conversation" value={compactId(ticket.conversation_id)} />
               <Detail label="Source" value={titleCase(ticket.source)} />
               <Detail label="Created" value={format(new Date(ticket.created_at), "dd MMM, HH:mm")} />
