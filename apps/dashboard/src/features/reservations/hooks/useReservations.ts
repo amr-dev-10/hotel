@@ -1,9 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { apiGet, apiPost } from "@/lib/api/client";
+import { apiGet, apiPost, apiPut } from "@/lib/api/client";
 import { queryKeys } from "@/lib/api/query-keys";
 import type { Folio, Reservation, ReservationGuest, StayRecord, WhatsAppMessage } from "@/types/domain";
 import type { CreateReservationValues } from "@/features/reservations/schemas/create-reservation.schema";
+
+export type ReservationUpdatePayload = {
+  room_id?: string | null;
+  rate_plan_id?: string | null;
+  status?: string | null;
+  checkin_date?: string | null;
+  checkout_date?: string | null;
+  source?: string | null;
+  notes?: string | null;
+};
 
 export function useReservations(hotelId: string) {
   return useQuery({
@@ -63,6 +73,20 @@ export function useCreateReservation(hotelId: string) {
     mutationFn: (payload: CreateReservationValues) =>
       apiPost<Reservation>(`/hotels/${hotelId}/reservations`, payload),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.reservations(hotelId) }),
+  });
+}
+
+export function useUpdateReservation(hotelId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ reservationId, payload }: { reservationId: string; payload: ReservationUpdatePayload }) =>
+      apiPut<Reservation>(`/hotels/${hotelId}/reservations/${reservationId}`, payload),
+    onSuccess: (_reservation, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.reservations(hotelId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.reservationDetail(hotelId, variables.reservationId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.reservationStays(hotelId, variables.reservationId) });
+    },
   });
 }
 

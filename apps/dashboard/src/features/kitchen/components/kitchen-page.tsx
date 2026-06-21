@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
 import { useRestaurantOrders, useUpdateOrderStatus } from "@/features/fnb/hooks/useFnb";
+import { useRooms } from "@/features/rooms/hooks/useRooms";
 import { queryKeys } from "@/lib/api/query-keys";
 import { money, titleCase } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
@@ -24,7 +25,9 @@ const columns = [
 export function KitchenPage({ hotelId }: { hotelId: string }) {
   const orders = useRestaurantOrders(hotelId);
   const updateStatus = useUpdateOrderStatus(hotelId);
+  const rooms = useRooms(hotelId);
   useKitchenSocket(hotelId);
+  const roomMap = useMemo(() => new Map((rooms.data ?? []).map((room) => [room.id, room.room_number])), [rooms.data]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, RestaurantOrder[]>();
@@ -72,6 +75,7 @@ export function KitchenPage({ hotelId }: { hotelId: string }) {
                   <KitchenOrderCard
                     key={order.id}
                     order={order}
+                    roomLabel={order.room_id ? `Room ${roomMap.get(order.room_id) ?? order.room_id.slice(0, 8)}` : "Table/POS"}
                     onMove={(status) => updateStatus.mutate({ orderId: order.id, status })}
                   />
                 ))
@@ -88,7 +92,7 @@ export function KitchenPage({ hotelId }: { hotelId: string }) {
   );
 }
 
-function KitchenOrderCard({ order, onMove }: { order: RestaurantOrder; onMove: (status: string) => void }) {
+function KitchenOrderCard({ order, roomLabel, onMove }: { order: RestaurantOrder; roomLabel: string; onMove: (status: string) => void }) {
   const nextStatus = nextKitchenStatus(order.status);
   return (
     <article className="grid gap-3 rounded-md border border-slate-200 bg-white p-3 shadow-sm">
@@ -104,7 +108,7 @@ function KitchenOrderCard({ order, onMove }: { order: RestaurantOrder; onMove: (
       </div>
       <div className="grid gap-1 text-xs text-slate-500">
         <span>Total: <strong className="text-slate-800">{money(order.total)}</strong></span>
-        <span>Room: <strong className="text-slate-800">{order.room_id ? order.room_id.slice(0, 8) : "Table/POS"}</strong></span>
+        <span>Room: <strong className="text-slate-800">{roomLabel}</strong></span>
       </div>
       {order.special_instructions ? (
         <p className="rounded-md bg-amber-50 p-2 text-xs text-amber-900">{order.special_instructions}</p>

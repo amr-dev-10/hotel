@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { format, formatDistanceToNow } from "date-fns";
 import {
@@ -10,9 +10,11 @@ import {
   CalendarDays,
   CreditCard,
   History,
+  Loader2,
   LogIn,
   LogOut,
   MessageCircle,
+  Pencil,
   UserRound,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -20,10 +22,21 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { Can } from "@/lib/auth/can";
 import { apiErrorMessage } from "@/lib/api/client";
 import { compactId, money, titleCase } from "@/lib/utils";
-import type { Folio, StayRecord, WhatsAppConversation } from "@/types/domain";
+import type { Folio, Reservation, Room, StayRecord } from "@/types/domain";
 import { useGuests } from "@/features/guests/hooks/useGuests";
 import { useRooms } from "@/features/rooms/hooks/useRooms";
 import { CancelReservationDialog } from "@/features/reservations/components/cancel-reservation-dialog";
@@ -36,6 +49,7 @@ import {
   useReservationGuests,
   useReservationStays,
   useReservationMessages,
+  useUpdateReservation,
 } from "@/features/reservations/hooks/useReservations";
 
 
@@ -55,7 +69,9 @@ export function ReservationDetailPage({
   const checkIn = useCheckInReservation(hotelId);
   const checkOut = useCheckOutReservation(hotelId);
   const cancelReservation = useCancelReservation(hotelId);
+  const updateReservation = useUpdateReservation(hotelId);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   const guest = reservation.data ? guests.data?.find((item) => item.id === reservation.data.guest_id) : null;
   const room = reservation.data ? rooms.data?.find((item) => item.id === reservation.data?.room_id) : null;
@@ -138,6 +154,10 @@ export function ReservationDetailPage({
                 Cancel
               </Button>
             ) : null}
+            <Button size="sm" type="button" variant="secondary" onClick={() => setEditDialogOpen(true)}>
+              <Pencil />
+              Edit
+            </Button>
             <Button asChild size="sm" type="button" variant="secondary" className="ml-2">
               <Link href={`/${hotelId}/whatsapp?guest=${reservation.data.guest_id}&reservation=${reservationId}`}>
                 <MessageCircle className="mr-2 size-3" />
@@ -214,7 +234,7 @@ export function ReservationDetailPage({
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[1fr_0.9fr]">
-        <StayHistory stays={stays.data ?? []} isLoading={stays.isLoading} error={stays.error} />
+        <StayHistory stays={stays.data ?? []} rooms={rooms.data ?? []} isLoading={stays.isLoading} error={stays.error} />
         <ReservationCommunication reservationId={reservationId} hotelId={hotelId} />
       </div>
 
@@ -232,7 +252,150 @@ export function ReservationDetailPage({
         onConfirm={handleCancel}
         onOpenChange={setCancelDialogOpen}
       />
+      <EditReservationDialog
+        isPending={updateReservation.isPending}
+        open={editDialogOpen}
+        reservation={reservation.data}
+        rooms={rooms.data ?? []}
+        onOpenChange={setEditDialogOpen}
+        onSubmit={async (payload) => {
+          try {
+            await updateReservation.mutateAsync({ reservationId, payload });
+            toast.success("Reservation updated");
+            setEditDialogOpen(false);
+          } catch (error) {
+            toast.error(apiErrorMessage(error));
+          }
+        }}
+      />
     </div>
+  );
+}
+
+function EditReservationDialog({
+  isPending,
+  open,
+  reservation,
+  rooms,
+  onOpenChange,
+  onSubmit,
+}: {
+  isPending: boolean;
+  open: boolean;
+  reservation: Reservation;
+  rooms: Room[];
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (payload: {
+    room_id: string | null;
+    status: string;
+    checkin_date: string;
+    checkout_date: string;
+    source: string;
+    notes: string | null;
+  }) => Promise<void>;
+}) {
+  const [roomId, setRoomId] = useState(reservation.room_id ?? "");
+  const [status, setStatus] = useState(reservation.status);
+  const [checkinDate, setCheckinDate] = useState(toDateInput(reservation.checkin_date));
+  const [checkoutDate, setCheckoutDate] = useState(toDateInput(reservation.checkout_date));
+  const [source, setSource] = useState(reservation.source);
+  const [notes, setNotes] = useState(reservation.notes ?? "");
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    setRoomId(reservation.room_id ?? "");
+    setStatus(reservation.status);
+    setCheckinDate(toDateInput(reservation.checkin_date));
+    setCheckoutDate(toDateInput(reservation.checkout_date));
+    setSource(reservation.source);
+    setNotes(reservation.notes ?? "");
+  }, [open, reservation]);
+
+  async function save(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await onSubmit({
+      room_id: roomId || null,
+      status,
+      checkin_date: checkinDate,
+      checkout_date: checkoutDate,
+      source,
+      notes: notes.trim() || null,
+    });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Edit reservation</DialogTitle>
+          <DialogDescription>Update stay dates, room, source, status, and notes.</DialogDescription>
+        </DialogHeader>
+        <form className="grid gap-4" onSubmit={save}>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FormField label="Room">
+              <Select value={roomId} onChange={(event) => setRoomId(event.target.value)}>
+                <option value="">Assign later</option>
+                {roomId && !rooms.some((roomItem) => roomItem.id === roomId) ? (
+                  <option value={roomId}>Room {compactId(roomId)}</option>
+                ) : null}
+                {rooms.map((roomItem) => (
+                  <option key={roomItem.id} value={roomItem.id}>
+                    {roomItem.room_number} {roomItem.room_type ? `- ${roomItem.room_type}` : ""}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+            <FormField label="Status">
+              <Select value={status} onChange={(event) => setStatus(event.target.value)}>
+                <option value="booked">Booked</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="checked_in">Checked in</option>
+                <option value="checked_out">Checked out</option>
+                <option value="cancelled">Cancelled</option>
+              </Select>
+            </FormField>
+            <FormField label="Check-in">
+              <Input required type="date" value={checkinDate} onChange={(event) => setCheckinDate(event.target.value)} />
+            </FormField>
+            <FormField label="Check-out">
+              <Input required type="date" value={checkoutDate} onChange={(event) => setCheckoutDate(event.target.value)} />
+            </FormField>
+            <FormField label="Source">
+              <Select value={source} onChange={(event) => setSource(event.target.value)}>
+                <option value="walk_in">Walk-in</option>
+                <option value="direct">Direct</option>
+                <option value="ota">OTA</option>
+                <option value="corporate">Corporate</option>
+                <option value="whatsapp">WhatsApp</option>
+              </Select>
+            </FormField>
+          </div>
+          <FormField label="Notes">
+            <Textarea value={notes} onChange={(event) => setNotes(event.target.value)} />
+          </FormField>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button disabled={isPending} type="submit">
+              {isPending ? <Loader2 className="animate-spin" /> : <Pencil />}
+              Save
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function FormField({ children, label }: { children: React.ReactNode; label: string }) {
+  return (
+    <label className="grid gap-1.5">
+      <Label>{label}</Label>
+      {children}
+    </label>
   );
 }
 
@@ -299,12 +462,16 @@ function PaymentSummary({
 function StayHistory({
   error,
   isLoading,
+  rooms,
   stays,
 }: {
   error: unknown;
   isLoading: boolean;
+  rooms: Room[];
   stays: StayRecord[];
 }) {
+  const roomMap = new Map(rooms.map((room) => [room.id, room.room_number]));
+
   return (
     <section className="grid gap-3 rounded-md border border-slate-200 bg-white p-4">
       <div className="flex items-center gap-2">
@@ -322,7 +489,7 @@ function StayHistory({
           {stays.map((stay) => (
             <div className="grid gap-2 rounded-md border border-slate-200 p-3" key={stay.id}>
               <div className="flex items-center justify-between gap-3">
-                <p className="font-medium">Room {compactId(stay.room_id)}</p>
+                <p className="font-medium">Room {stay.room_id ? roomMap.get(stay.room_id) ?? compactId(stay.room_id) : "Unassigned"}</p>
                 <Badge variant={stay.actual_checkout ? "teal" : "green"}>
                   {stay.actual_checkout ? "Checked out" : "In stay"}
                 </Badge>
@@ -471,4 +638,11 @@ function formatDateTime(value: string | null) {
   }
 
   return format(new Date(value), "dd MMM yyyy, HH:mm");
+}
+
+function toDateInput(value: string | null) {
+  if (!value) {
+    return "";
+  }
+  return value.slice(0, 10);
 }

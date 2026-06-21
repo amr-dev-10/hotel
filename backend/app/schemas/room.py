@@ -46,6 +46,15 @@ class RoomCreate(BaseModel):
     notes: str | None = None
 
 
+class RoomUpdate(BaseModel):
+    room_number: str | None = Field(default=None, min_length=1, max_length=40)
+    room_type_id: str | None = None
+    room_type: str | None = None
+    floor: str | None = None
+    status: str | None = None
+    notes: str | None = None
+
+
 class RoomRead(ORMModel):
     id: str
     hotel_id: str

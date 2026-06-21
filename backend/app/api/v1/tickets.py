@@ -18,6 +18,7 @@ from app.schemas.ticket import (
     TicketRejectRequest,
     TicketRead,
     TicketStageUpdate,
+    TicketUpdate,
 )
 from app.schemas.v51 import EscalationLogRead
 from app.schemas.whatsapp_account import WhatsAppMessageRead
@@ -176,6 +177,18 @@ def update_ticket_stage(
         actor_id=current_user.id,
         actor=current_user,
     )
+    return ok(TicketRead.model_validate(ticket).model_dump())
+
+
+@router.patch("/{ticket_id}")
+def update_ticket(
+    hotel_id: str,
+    ticket_id: str,
+    payload: TicketUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("ticket.assign")),
+) -> dict:
+    ticket = TicketService(db).update_ticket(hotel_id, ticket_id, payload, actor_id=current_user.id)
     return ok(TicketRead.model_validate(ticket).model_dump())
 
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { format, formatDistanceToNowStrict } from "date-fns";
 import {
@@ -14,6 +14,7 @@ import {
   MessageCircle,
   MessagesSquare,
   Paperclip,
+  Pencil,
   RotateCcw,
   Send,
   ShieldCheck,
@@ -26,12 +27,27 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Can } from "@/lib/auth/can";
 import { apiErrorMessage } from "@/lib/api/client";
 import { cn, compactId, titleCase } from "@/lib/utils";
-import { useWhatsappMessages } from "@/features/whatsapp/hooks/useWhatsapp";
-import type { TicketTimelineItem, WhatsAppMessage } from "@/types/domain";
+import { useDepartments } from "@/features/departments/hooks/useDepartments";
+import { useGuests } from "@/features/guests/hooks/useGuests";
+import { useReservations } from "@/features/reservations/hooks/useReservations";
+import { useRooms } from "@/features/rooms/hooks/useRooms";
+import { useStaff } from "@/features/staff/hooks/useStaff";
+import { useWhatsappConversations, useWhatsappMessages } from "@/features/whatsapp/hooks/useWhatsapp";
+import type { Department, Guest, Reservation, Room, StaffUser, Ticket, TicketTimelineItem, WhatsAppMessage } from "@/types/domain";
 import {
   useAcceptTicket,
   useApproveTicket,
@@ -45,6 +61,7 @@ import {
   useTicketGuestMessages,
   useTicketTimeline,
   useTickets,
+  useUpdateTicket,
 } from "@/features/tickets/hooks/useTickets";
 
 type CommunicationTab = "internal" | "ticket-chat" | "whatsapp-history";
@@ -62,11 +79,18 @@ export function TicketFullPage({
   const escalations = useTicketEscalations(hotelId, ticketId);
   const timeline = useTicketTimeline(hotelId, ticketId);
   const guestMessages = useTicketGuestMessages(hotelId, ticketId);
+  const departments = useDepartments(hotelId);
+  const guests = useGuests(hotelId);
+  const reservations = useReservations(hotelId);
+  const rooms = useRooms(hotelId);
+  const staff = useStaff(hotelId);
+  const conversations = useWhatsappConversations(hotelId);
   const acceptTicket = useAcceptTicket(hotelId);
   const rejectTicket = useRejectTicket(hotelId);
   const completeTicket = useCompleteTicket(hotelId);
   const approveTicket = useApproveTicket(hotelId);
   const reopenTicket = useReopenTicket(hotelId);
+  const updateTicket = useUpdateTicket(hotelId);
   const createTicketMessage = useCreateTicketMessage(hotelId, ticketId);
   const ticket = tickets.data?.find((item) => item.id === ticketId);
   const whatsappHistory = useWhatsappMessages(hotelId, ticket?.conversation_id ?? "");
@@ -75,6 +99,16 @@ export function TicketFullPage({
   const [reopenNote, setReopenNote] = useState("");
   const [discussionMessage, setDiscussionMessage] = useState("");
   const [guestReply, setGuestReply] = useState("");
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const departmentMap = useMemo(() => new Map((departments.data ?? []).map((department) => [department.id, department.name])), [departments.data]);
+  const guestMap = useMemo(() => new Map((guests.data ?? []).map((guest) => [guest.id, guest.name])), [guests.data]);
+  const reservationMap = useMemo(() => new Map((reservations.data ?? []).map((reservation) => [reservation.id, reservation.reservation_no])), [reservations.data]);
+  const roomMap = useMemo(() => new Map((rooms.data ?? []).map((room) => [room.id, room.room_number])), [rooms.data]);
+  const staffMap = useMemo(() => new Map((staff.data ?? []).map((user) => [user.id, user.name])), [staff.data]);
+  const conversationMap = useMemo(
+    () => new Map((conversations.data ?? []).map((conversation) => [conversation.id, conversation.phone])),
+    [conversations.data],
+  );
 
   async function runAction(action: () => Promise<unknown>, label: string) {
     try {
@@ -170,6 +204,12 @@ export function TicketFullPage({
               Complete
             </Button>
           </Can>
+          <Can I="assign" a="Ticket">
+            <Button disabled={updateTicket.isPending} type="button" variant="secondary" onClick={() => setEditDialogOpen(true)}>
+              <Pencil />
+              Edit
+            </Button>
+          </Can>
           <Can I="approve" a="Ticket">
             <Button disabled={busy} type="button" onClick={() => runAction(() => approveTicket.mutateAsync(ticket.id), "Ticket approved")}>
               {approveTicket.isPending ? <Loader2 className="animate-spin" /> : <ShieldCheck />}
@@ -236,9 +276,9 @@ export function TicketFullPage({
           <SidePanel icon={<FileText />} title="Ticket Details">
             <div className="grid gap-2">
               <Detail label="SLA" value={ticket.sla_due_at ? formatDistanceToNowStrict(new Date(ticket.sla_due_at), { addSuffix: true }) : "Not set"} />
-              <Detail label="Assigned to" value={compactId(ticket.assigned_to)} />
-              <Detail label="Department" value={compactId(ticket.department_id)} />
-              <Detail label="Room" value={compactId(ticket.room_id)} />
+              <Detail label="Assigned to" value={ticket.assigned_to ? staffMap.get(ticket.assigned_to) ?? compactId(ticket.assigned_to) : "Unassigned"} />
+              <Detail label="Department" value={ticket.department_id ? departmentMap.get(ticket.department_id) ?? compactId(ticket.department_id) : "Unassigned"} />
+              <Detail label="Room" value={ticket.room_id ? `Room ${roomMap.get(ticket.room_id) ?? compactId(ticket.room_id)}` : "No room"} />
               <Detail label="Source" value={titleCase(ticket.source)} />
               <Detail label="Created" value={format(new Date(ticket.created_at), "dd MMM yyyy, HH:mm")} />
             </div>
@@ -248,7 +288,7 @@ export function TicketFullPage({
             {(ticket.followers ?? []).length ? (
               <div className="flex flex-wrap gap-2">
                 {(ticket.followers ?? []).map((follower) => (
-                  <Badge key={follower} variant="blue">{compactId(follower)}</Badge>
+                  <Badge key={follower} variant="blue">{staffMap.get(follower) ?? compactId(follower)}</Badge>
                 ))}
               </div>
             ) : (
@@ -258,9 +298,9 @@ export function TicketFullPage({
 
           <SidePanel icon={<LinkIcon />} title="Related Records">
             <div className="grid gap-2">
-              <Detail label="Guest" value={compactId(ticket.guest_id)} />
-              <Detail label="Reservation" value={compactId(ticket.reservation_id)} />
-              <Detail label="Conversation" value={compactId(ticket.conversation_id)} />
+              <Detail label="Guest" value={ticket.guest_id ? guestMap.get(ticket.guest_id) ?? compactId(ticket.guest_id) : "No guest"} />
+              <Detail label="Reservation" value={ticket.reservation_id ? reservationMap.get(ticket.reservation_id) ?? compactId(ticket.reservation_id) : "No reservation"} />
+              <Detail label="Conversation" value={ticket.conversation_id ? `WhatsApp ${conversationMap.get(ticket.conversation_id) ?? compactId(ticket.conversation_id)}` : "No conversation"} />
             </div>
           </SidePanel>
 
@@ -304,7 +344,7 @@ export function TicketFullPage({
           >
             {(acceptances.data ?? []).map((item) => (
               <div className="rounded bg-slate-50 p-3 text-sm" key={item.id}>
-                <p className="font-medium">{compactId(item.offered_to)}</p>
+                <p className="font-medium">{staffMap.get(item.offered_to) ?? compactId(item.offered_to)}</p>
                 <p className="text-slate-500">
                   {titleCase(item.response)} in {item.expire_after_minutes} min window
                 </p>
@@ -326,8 +366,265 @@ export function TicketFullPage({
           </HistoryPanel>
         </aside>
       </section>
+      <EditTicketDialog
+        departments={departments.data ?? []}
+        guests={guests.data ?? []}
+        isPending={updateTicket.isPending}
+        open={editDialogOpen}
+        reservations={reservations.data ?? []}
+        rooms={rooms.data ?? []}
+        staff={staff.data ?? []}
+        ticket={ticket}
+        onOpenChange={setEditDialogOpen}
+        onSubmit={async (payload) => {
+          try {
+            await updateTicket.mutateAsync({ ticketId: ticket.id, payload });
+            toast.success("Ticket updated");
+            setEditDialogOpen(false);
+          } catch (error) {
+            toast.error(apiErrorMessage(error));
+          }
+        }}
+      />
     </div>
   );
+}
+
+function EditTicketDialog({
+  departments,
+  guests,
+  isPending,
+  open,
+  reservations,
+  rooms,
+  staff,
+  ticket,
+  onOpenChange,
+  onSubmit,
+}: {
+  departments: Department[];
+  guests: Guest[];
+  isPending: boolean;
+  open: boolean;
+  reservations: Reservation[];
+  rooms: Room[];
+  staff: StaffUser[];
+  ticket: Ticket;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (payload: {
+    guest_id: string | null;
+    reservation_id: string | null;
+    conversation_id: string | null;
+    room_id: string | null;
+    department_id: string | null;
+    assigned_to: string | null;
+    type: string;
+    task_category: string | null;
+    item_description: string;
+    source: string;
+    followers: string[];
+    priority: number;
+  }) => Promise<void>;
+}) {
+  const [description, setDescription] = useState(ticket.item_description);
+  const [type, setType] = useState(ticket.type);
+  const [taskCategory, setTaskCategory] = useState(ticket.task_category ?? "");
+  const [source, setSource] = useState(ticket.source);
+  const [priority, setPriority] = useState(String(ticket.priority));
+  const [guestId, setGuestId] = useState(ticket.guest_id ?? "");
+  const [reservationId, setReservationId] = useState(ticket.reservation_id ?? "");
+  const [conversationId, setConversationId] = useState(ticket.conversation_id ?? "");
+  const [roomId, setRoomId] = useState(ticket.room_id ?? "");
+  const [departmentId, setDepartmentId] = useState(ticket.department_id ?? "");
+  const [assignedTo, setAssignedTo] = useState(ticket.assigned_to ?? "");
+  const [followers, setFollowers] = useState((ticket.followers ?? []).join(", "));
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    setDescription(ticket.item_description);
+    setType(ticket.type);
+    setTaskCategory(ticket.task_category ?? "");
+    setSource(ticket.source);
+    setPriority(String(ticket.priority));
+    setGuestId(ticket.guest_id ?? "");
+    setReservationId(ticket.reservation_id ?? "");
+    setConversationId(ticket.conversation_id ?? "");
+    setRoomId(ticket.room_id ?? "");
+    setDepartmentId(ticket.department_id ?? "");
+    setAssignedTo(ticket.assigned_to ?? "");
+    setFollowers((ticket.followers ?? []).join(", "));
+  }, [open, ticket]);
+
+  async function save(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await onSubmit({
+      guest_id: optionalId(guestId),
+      reservation_id: optionalId(reservationId),
+      conversation_id: optionalId(conversationId),
+      room_id: optionalId(roomId),
+      department_id: optionalId(departmentId),
+      assigned_to: optionalId(assignedTo),
+      type,
+      task_category: taskCategory.trim() || null,
+      item_description: description.trim(),
+      source,
+      followers: followers
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean),
+      priority: Number(priority || 2),
+    });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Edit ticket</DialogTitle>
+          <DialogDescription>Update ticket details, assignment, priority, and related records.</DialogDescription>
+        </DialogHeader>
+        <form className="grid gap-4" onSubmit={save}>
+          <TicketFormField label="Description">
+            <Textarea required value={description} onChange={(event) => setDescription(event.target.value)} />
+          </TicketFormField>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <TicketFormField label="Type">
+              <Select value={type} onChange={(event) => setType(event.target.value)}>
+                <option value="Ticket">Ticket</option>
+                <option value="Complaint">Complaint</option>
+                <option value="Food Order">Food Order</option>
+              </Select>
+            </TicketFormField>
+            <TicketFormField label="Priority">
+              <Select value={priority} onChange={(event) => setPriority(event.target.value)}>
+                <option value="1">P1</option>
+                <option value="2">P2</option>
+                <option value="3">P3</option>
+                <option value="4">P4</option>
+                <option value="5">P5</option>
+              </Select>
+            </TicketFormField>
+            <TicketFormField label="Source">
+              <Select value={source} onChange={(event) => setSource(event.target.value)}>
+                <option value="DASHBOARD">Dashboard</option>
+                <option value="WHATSAPP">WhatsApp</option>
+                <option value="PORTAL">Guest Portal</option>
+                <option value="STAFF">Staff</option>
+                <option value="PHONE">Phone</option>
+                <option value="EMAIL">Email</option>
+                <option value="WALK_IN">Walk-in</option>
+              </Select>
+            </TicketFormField>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <TicketFormField label="Department">
+              <Select value={departmentId} onChange={(event) => setDepartmentId(event.target.value)}>
+                <option value="">No department</option>
+                {departmentId && !departments.some((department) => department.id === departmentId) ? (
+                  <option value={departmentId}>Department {compactId(departmentId)}</option>
+                ) : null}
+                {departments.map((department) => (
+                  <option key={department.id} value={department.id}>
+                    {department.name}
+                  </option>
+                ))}
+              </Select>
+            </TicketFormField>
+            <TicketFormField label="Assigned to">
+              <Select value={assignedTo} onChange={(event) => setAssignedTo(event.target.value)}>
+                <option value="">Unassigned</option>
+                {assignedTo && !staff.some((user) => user.id === assignedTo) ? (
+                  <option value={assignedTo}>User {compactId(assignedTo)}</option>
+                ) : null}
+                {staff.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.name}
+                  </option>
+                ))}
+              </Select>
+            </TicketFormField>
+            <TicketFormField label="Task category">
+              <Input value={taskCategory} onChange={(event) => setTaskCategory(event.target.value)} />
+            </TicketFormField>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <TicketFormField label="Guest">
+              <Select value={guestId} onChange={(event) => setGuestId(event.target.value)}>
+                <option value="">No guest</option>
+                {guestId && !guests.some((guest) => guest.id === guestId) ? (
+                  <option value={guestId}>Guest {compactId(guestId)}</option>
+                ) : null}
+                {guests.map((guest) => (
+                  <option key={guest.id} value={guest.id}>
+                    {guest.name}
+                  </option>
+                ))}
+              </Select>
+            </TicketFormField>
+            <TicketFormField label="Reservation">
+              <Select value={reservationId} onChange={(event) => setReservationId(event.target.value)}>
+                <option value="">No reservation</option>
+                {reservationId && !reservations.some((reservation) => reservation.id === reservationId) ? (
+                  <option value={reservationId}>Reservation {compactId(reservationId)}</option>
+                ) : null}
+                {reservations.map((reservation) => (
+                  <option key={reservation.id} value={reservation.id}>
+                    {reservation.reservation_no}
+                  </option>
+                ))}
+              </Select>
+            </TicketFormField>
+            <TicketFormField label="Room">
+              <Select value={roomId} onChange={(event) => setRoomId(event.target.value)}>
+                <option value="">No room</option>
+                {roomId && !rooms.some((room) => room.id === roomId) ? (
+                  <option value={roomId}>Room {compactId(roomId)}</option>
+                ) : null}
+                {rooms.map((room) => (
+                  <option key={room.id} value={room.id}>
+                    {room.room_number} {room.room_type ? `- ${room.room_type}` : ""}
+                  </option>
+                ))}
+              </Select>
+            </TicketFormField>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <TicketFormField label="Conversation ID">
+              <Input value={conversationId} onChange={(event) => setConversationId(event.target.value)} />
+            </TicketFormField>
+            <TicketFormField label="Followers">
+              <Input placeholder="user-id-1, user-id-2" value={followers} onChange={(event) => setFollowers(event.target.value)} />
+            </TicketFormField>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button disabled={isPending || description.trim().length < 2} type="submit">
+              {isPending ? <Loader2 className="animate-spin" /> : <Pencil />}
+              Save
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function TicketFormField({ children, label }: { children: React.ReactNode; label: string }) {
+  return (
+    <label className="grid gap-1.5">
+      <Label>{label}</Label>
+      {children}
+    </label>
+  );
+}
+
+function optionalId(value: string) {
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
 }
 
 function TabButton({

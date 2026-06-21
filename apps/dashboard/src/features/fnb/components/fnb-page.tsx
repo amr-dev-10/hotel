@@ -316,7 +316,15 @@ export function FnBPage({ hotelId }: { hotelId: string }) {
         />
       ) : null}
 
-      {section === "orders" ? <OrdersPage hotelId={hotelId} openOrderDrawer={setOrderDrawer} /> : null}
+      {section === "orders" ? (
+        <OrdersPage
+          closeOrderForm={() => setOrderDrawer(null)}
+          hotelId={hotelId}
+          items={items.data ?? []}
+          openOrderDrawer={setOrderDrawer}
+          orderForm={orderDrawer}
+        />
+      ) : null}
 
       <ItemDrawer
         categories={categories.data ?? []}
@@ -337,12 +345,6 @@ export function FnBPage({ hotelId }: { hotelId: string }) {
         dialog={taxDialog}
         onClose={() => setTaxDialog(null)}
         updateTax={(taxId, payload) => updateTax.mutateAsync({ taxId, payload })}
-      />
-      <OrderDrawer
-        drawer={orderDrawer}
-        hotelId={hotelId}
-        items={items.data ?? []}
-        onClose={() => setOrderDrawer(null)}
       />
     </div>
   );
@@ -1175,14 +1177,24 @@ function TaxManagement({
 }
 
 function OrdersPage({
+  closeOrderForm,
   hotelId,
+  items,
   openOrderDrawer,
+  orderForm,
 }: {
+  closeOrderForm: () => void;
   hotelId: string;
+  items: MenuItem[];
   openOrderDrawer: (drawer: OrderDrawerState) => void;
+  orderForm: OrderDrawerState | null;
 }) {
   const orders = useRestaurantOrders(hotelId);
   const updateStatus = useUpdateOrderStatus(hotelId);
+  const rooms = useRooms(hotelId);
+  const guests = useGuests(hotelId);
+  const roomMap = useMemo(() => new Map((rooms.data ?? []).map((room) => [room.id, room.room_number])), [rooms.data]);
+  const guestMap = useMemo(() => new Map((guests.data ?? []).map((guest) => [guest.id, guest.name])), [guests.data]);
   const grouped = useMemo(() => {
     const map = new Map<string, RestaurantOrder[]>();
     for (const status of orderColumns) {
@@ -1209,6 +1221,9 @@ function OrdersPage({
           </Button>
         </div>
       </div>
+      {orderForm ? (
+        <OrderFormView drawer={orderForm} hotelId={hotelId} items={items} onClose={closeOrderForm} />
+      ) : null}
       {orders.isLoading ? <DataState isLoading /> : null}
       {orders.error ? <DataState error={orders.error} /> : null}
       <div className="grid gap-4 xl:grid-cols-5">
@@ -1226,6 +1241,8 @@ function OrdersPage({
                     key={order.id}
                     onEdit={() => openOrderDrawer({ mode: "edit", order })}
                     order={order}
+                    roomLabel={order.room_id ? `Room ${roomMap.get(order.room_id) ?? compactId(order.room_id)}` : "Table/POS"}
+                    guestLabel={order.guest_id ? guestMap.get(order.guest_id) ?? compactId(order.guest_id) : "Walk-in"}
                     onStatus={(nextStatus) => updateStatus.mutate({ orderId: order.id, status: nextStatus })}
                   />
                 ))
@@ -1243,22 +1260,26 @@ function OrdersPage({
 }
 
 function OrderCard({
+  guestLabel,
   onEdit,
   order,
+  roomLabel,
   onStatus,
 }: {
+  guestLabel: string;
   onEdit: () => void;
   order: RestaurantOrder;
+  roomLabel: string;
   onStatus: (status: string) => void;
 }) {
   return (
     <article className="grid gap-3 rounded-md border border-slate-200 bg-white p-3 shadow-sm">
       <div>
         <h5 className="text-sm font-semibold">Order #{order.order_number}</h5>
-        <p className="mt-1 text-xs text-slate-500">Room {order.room_id ? compactId(order.room_id) : "Table/POS"}</p>
+        <p className="mt-1 text-xs text-slate-500">{roomLabel}</p>
       </div>
       <div className="grid gap-1 text-xs text-slate-500">
-        <span>Guest: {order.guest_id ? compactId(order.guest_id) : "Walk-in"}</span>
+        <span>Guest: {guestLabel}</span>
         <span>{order.special_instructions || "No special instructions"}</span>
       </div>
       <div className="flex items-center justify-between gap-3">
@@ -1312,7 +1333,7 @@ type OrderForm = {
   special_instructions: string;
 };
 
-function OrderDrawer({
+function OrderFormView({
   drawer,
   hotelId,
   items,
@@ -1453,17 +1474,15 @@ function OrderDrawer({
   }
 
   return (
-    <>
-      <button aria-label="Close order drawer" className="fixed inset-0 z-40 bg-slate-950/30" type="button" onClick={onClose} />
-      <aside className="fixed inset-y-0 right-0 z-50 grid w-full max-w-2xl content-start gap-4 overflow-y-auto border-l border-slate-200 bg-white p-5 shadow-xl">
+    <section className="grid gap-4 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Order detail</p>
+            <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Order form</p>
             <h3 className="mt-1 text-lg font-semibold">
               {drawer.mode === "edit" ? `Order #${drawer.order.order_number}` : "Staff order"}
             </h3>
           </div>
-          <Button aria-label="Close drawer" size="icon" type="button" variant="ghost" onClick={onClose}>
+          <Button aria-label="Close order form" size="icon" type="button" variant="ghost" onClick={onClose}>
             <X />
           </Button>
         </div>
@@ -1607,8 +1626,7 @@ function OrderDrawer({
             {drawer.mode === "edit" ? "Save Order" : "Create Order"}
           </Button>
         </form>
-      </aside>
-    </>
+      </section>
   );
 }
 

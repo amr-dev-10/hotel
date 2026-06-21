@@ -5,6 +5,17 @@ import { queryKeys } from "@/lib/api/query-keys";
 import type { Guest, GuestConsent, GuestTimelineEvent } from "@/types/domain";
 import type { CreateGuestValues } from "@/features/guests/schemas/create-guest.schema";
 
+export type GuestUpdatePayload = {
+  name?: string;
+  phone?: string | null;
+  whatsapp_phone?: string | null;
+  email?: string | null;
+  check_in_date?: string | null;
+  check_out_date?: string | null;
+  status?: string;
+  internal_notes?: string | null;
+};
+
 export function useGuests(hotelId: string) {
   return useQuery({
     queryKey: queryKeys.guests(hotelId),
@@ -43,7 +54,7 @@ export function useUpdateGuest(hotelId: string, guestId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (payload: { internal_notes?: string | null }) =>
+    mutationFn: (payload: GuestUpdatePayload) =>
       apiPatch<Guest>(`/hotels/${hotelId}/guests/${guestId}`, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.guests(hotelId) });

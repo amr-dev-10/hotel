@@ -14,6 +14,22 @@ import type { CreateTicketValues } from "@/features/tickets/schemas/create-ticke
 
 type TicketFilters = Record<string, string | undefined>;
 
+export type TicketUpdatePayload = {
+  guest_id?: string | null;
+  reservation_id?: string | null;
+  conversation_id?: string | null;
+  room_id?: string | null;
+  department_id?: string | null;
+  department_key?: string | null;
+  assigned_to?: string | null;
+  type?: string;
+  task_category?: string | null;
+  item_description?: string;
+  source?: string;
+  followers?: string[];
+  priority?: number;
+};
+
 export function useTickets(hotelId: string, filters: TicketFilters) {
   return useQuery({
     queryKey: queryKeys.tickets.list(hotelId, filters),
@@ -161,6 +177,19 @@ export function useUpdateTicketStage(hotelId: string) {
     mutationFn: ({ ticketId, stage }: { ticketId: string; stage: string }) =>
       apiPatch<Ticket>(`/hotels/${hotelId}/tickets/${ticketId}/stage`, { stage }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.tickets.all(hotelId) }),
+  });
+}
+
+export function useUpdateTicket(hotelId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ ticketId, payload }: { ticketId: string; payload: TicketUpdatePayload }) =>
+      apiPatch<Ticket>(`/hotels/${hotelId}/tickets/${ticketId}`, payload),
+    onSuccess: (_ticket, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.tickets.all(hotelId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.tickets.timeline(hotelId, variables.ticketId) });
+    },
   });
 }
 

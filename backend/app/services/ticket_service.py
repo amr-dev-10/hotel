@@ -8,6 +8,7 @@ from app.core.exceptions import bad_request, not_found
 from app.models.guest import Guest
 from app.models.reservation import Reservation
 from app.models.base import utcnow
+from app.models.room import Room
 from app.models.ticket import Ticket, TicketEvent, TicketMessage
 from app.models.user import User
 from app.models.whatsapp import WhatsAppConversation
@@ -19,7 +20,7 @@ from app.repositories.ticket_acceptance_repository import TicketAcceptanceReposi
 from app.repositories.ticket_repository import TicketMessageRepository, TicketRepository
 from app.repositories.user_repository import UserRepository
 from app.repositories.workflow_repository import WorkflowDefinitionRepository, WorkflowStateRepository
-from app.schemas.ticket import TicketCreate, TicketMessageCreate, TicketTimelineItem
+from app.schemas.ticket import TicketCreate, TicketMessageCreate, TicketTimelineItem, TicketUpdate
 from app.schemas.ops import NotificationCreate
 from app.services.audit_service import AuditService
 from app.services.hierarchy_service import HierarchyService
@@ -447,6 +448,71 @@ class TicketService:
         )
         return ticket
 
+    def update_ticket(
+        self,
+        hotel_id: str,
+        ticket_id: str,
+        payload: TicketUpdate,
+        actor_id: str | None = None,
+    ) -> Ticket:
+        ticket = self.tickets.get_for_hotel(hotel_id, ticket_id)
+        if not ticket:
+            raise not_found("Ticket not found")
+
+        changes = payload.model_dump(exclude_unset=True)
+        if "department_key" in changes:
+            department_key = changes.pop("department_key")
+            if department_key:
+                department = self.departments.get_by_key(hotel_id, department_key)
+                if not department:
+                    raise not_found("Department not found")
+                changes["department_id"] = department.id
+
+        self._validate_update_context(hotel_id, changes)
+        if "source" in changes and changes["source"]:
+            changes["source"] = self._normalize_source(changes["source"])
+        if "followers" in changes and changes["followers"] is not None:
+            changes["followers"] = list(dict.fromkeys(changes["followers"]))
+
+        old_payload = {
+            "guest_id": ticket.guest_id,
+            "reservation_id": ticket.reservation_id,
+            "conversation_id": ticket.conversation_id,
+            "room_id": ticket.room_id,
+            "department_id": ticket.department_id,
+            "assigned_to": ticket.assigned_to,
+            "type": ticket.type,
+            "task_category": ticket.task_category,
+            "item_description": ticket.item_description,
+            "source": ticket.source,
+            "followers": ticket.followers,
+            "priority": ticket.priority,
+        }
+        for key, value in changes.items():
+            setattr(ticket, key, value)
+
+        self.tickets.add_event(ticket, "updated", {"changes": changes}, actor_id=actor_id)
+        self.audit.log(
+            hotel_id,
+            "ticket.updated",
+            "ticket",
+            ticket.id,
+            actor_id,
+            old_payload=old_payload,
+            new_payload=changes,
+        )
+        self.db.commit()
+        self.db.refresh(ticket)
+        self.notifications.publish_ticket_event(
+            hotel_id,
+            {
+                "event": "ticket.updated",
+                "ticket_id": ticket.id,
+                "changes": list(changes.keys()),
+            },
+        )
+        return ticket
+
     def _sla_minutes(self, hotel_id: str, department_key: str) -> int:
         department = self.departments.get_by_key(hotel_id, department_key)
         if department:
@@ -488,6 +554,35 @@ class TicketService:
             )
         ).scalar_one_or_none():
             raise not_found("WhatsApp conversation not found")
+
+    def _validate_update_context(self, hotel_id: str, changes: dict) -> None:
+        if changes.get("guest_id") and not self.db.execute(
+            select(Guest.id).where(Guest.hotel_id == hotel_id, Guest.id == changes["guest_id"])
+        ).scalar_one_or_none():
+            raise not_found("Guest not found")
+        if changes.get("reservation_id") and not self.db.execute(
+            select(Reservation.id).where(
+                Reservation.hotel_id == hotel_id,
+                Reservation.id == changes["reservation_id"],
+                Reservation.deleted_at.is_(None),
+            )
+        ).scalar_one_or_none():
+            raise not_found("Reservation not found")
+        if changes.get("conversation_id") and not self.db.execute(
+            select(WhatsAppConversation.id).where(
+                WhatsAppConversation.hotel_id == hotel_id,
+                WhatsAppConversation.id == changes["conversation_id"],
+            )
+        ).scalar_one_or_none():
+            raise not_found("WhatsApp conversation not found")
+        if changes.get("room_id") and not self.db.execute(
+            select(Room.id).where(Room.hotel_id == hotel_id, Room.id == changes["room_id"], Room.deleted_at.is_(None))
+        ).scalar_one_or_none():
+            raise not_found("Room not found")
+        if changes.get("department_id") and not self.departments.get_for_hotel(hotel_id, changes["department_id"]):
+            raise not_found("Department not found")
+        if changes.get("assigned_to") and not self.users.get_for_hotel(hotel_id, changes["assigned_to"]):
+            raise not_found("Assigned user not found")
 
     def _normalize_source(self, source: str) -> str:
         normalized = source.strip()

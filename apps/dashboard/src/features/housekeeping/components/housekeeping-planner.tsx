@@ -16,16 +16,22 @@ import { compactId, titleCase } from "@/lib/utils";
 import type { HousekeepingTask } from "@/types/domain";
 import { useHousekeeping, useUpdateHousekeeping } from "@/features/housekeeping/hooks/useHousekeeping";
 import { useRooms } from "@/features/rooms/hooks/useRooms";
+import { useStaff } from "@/features/staff/hooks/useStaff";
 
 export function HousekeepingPlanner({ hotelId }: { hotelId: string }) {
   const housekeeping = useHousekeeping(hotelId);
   const rooms = useRooms(hotelId);
+  const staff = useStaff(hotelId);
   const updateTask = useUpdateHousekeeping(hotelId);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
   const roomMap = useMemo(
     () => new Map((rooms.data ?? []).map((room) => [room.id, room.room_number])),
     [rooms.data],
+  );
+  const staffMap = useMemo(
+    () => new Map((staff.data ?? []).map((user) => [user.id, user.name])),
+    [staff.data],
   );
 
   const events = useMemo(
@@ -105,7 +111,10 @@ export function HousekeepingPlanner({ hotelId }: { hotelId: string }) {
                     <p className="text-sm font-semibold">
                       Room {roomMap.get(task.room_id) ?? compactId(task.room_id)}
                     </p>
-                    <p className="text-xs text-slate-500">{titleCase(task.task_type)}</p>
+                    <p className="text-xs text-slate-500">
+                      {titleCase(task.task_type)}
+                      {task.assigned_to ? ` - ${staffMap.get(task.assigned_to) ?? compactId(task.assigned_to)}` : ""}
+                    </p>
                   </div>
                   <Badge variant={taskStatusVariant(task.status)}>{titleCase(task.status)}</Badge>
                 </div>
@@ -123,7 +132,7 @@ export function HousekeepingPlanner({ hotelId }: { hotelId: string }) {
             <div className="mt-4 grid gap-3 text-sm">
               <Detail label="Room" value={roomMap.get(selectedTask.room_id) ?? compactId(selectedTask.room_id)} />
               <Detail label="Task" value={titleCase(selectedTask.task_type)} />
-              <Detail label="Assigned" value={compactId(selectedTask.assigned_to)} />
+              <Detail label="Assigned" value={selectedTask.assigned_to ? staffMap.get(selectedTask.assigned_to) ?? compactId(selectedTask.assigned_to) : "Unassigned"} />
               <Detail label="Priority" value={`P${selectedTask.priority}`} />
             </div>
             <div className="mt-4 grid gap-2 sm:grid-cols-3">

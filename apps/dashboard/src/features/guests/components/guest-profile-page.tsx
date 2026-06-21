@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { format, formatDistanceToNow } from "date-fns";
 import {
@@ -13,15 +13,30 @@ import {
   UserRound,
   FileText,
   Clock,
+  Loader2,
+  Pencil,
   Ticket
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { DataState } from "@/components/ui/data-state";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Can } from "@/lib/auth/can";
+import { apiErrorMessage } from "@/lib/api/client";
 import { compactId, titleCase } from "@/lib/utils";
-import type { Reservation, WhatsAppConversation } from "@/types/domain";
+import type { Guest, Reservation, WhatsAppConversation } from "@/types/domain";
 import { useGuest, useGuestConsent, useGuestTimeline, useUpdateGuest } from "@/features/guests/hooks/useGuests";
 import { useReservations } from "@/features/reservations/hooks/useReservations";
 import {
@@ -40,6 +55,8 @@ export function GuestProfilePage({
   const reservations = useReservations(hotelId);
   const consent = useGuestConsent(hotelId, guestId);
   const conversations = useWhatsappConversations(hotelId);
+  const updateGuest = useUpdateGuest(hotelId, guestId);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   const guestReservations = useMemo(
     () => (reservations.data ?? []).filter((reservation) => reservation.guest_id === guestId),
@@ -95,12 +112,20 @@ export function GuestProfilePage({
             </div>
             <div>
               <h2 className="text-xl font-semibold">{guest.data.name}</h2>
-              <p className="text-sm text-slate-500">{compactId(guest.data.id)}</p>
+              <div className="mt-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600">
+                Guest DB ID: {guest.data.id}
+              </div>
             </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <Badge variant={guestStatusVariant(guest.data.status)}>{titleCase(guest.data.status)}</Badge>
+          <Can I="edit" a="Guest">
+            <Button size="sm" type="button" variant="secondary" onClick={() => setEditDialogOpen(true)}>
+              <Pencil />
+              Edit
+            </Button>
+          </Can>
           <Button asChild size="sm" variant="secondary">
             <Link href={`/${hotelId}/whatsapp?guest=${guest.data.id}`}>
               <MessageCircle className="mr-2 size-3" />
@@ -157,7 +182,149 @@ export function GuestProfilePage({
           </section>
         </div>
       </div>
+      <EditGuestDialog
+        guest={guest.data}
+        isPending={updateGuest.isPending}
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        onSubmit={async (payload) => {
+          try {
+            await updateGuest.mutateAsync(payload);
+            toast.success("Guest updated");
+            setEditDialogOpen(false);
+          } catch (error) {
+            toast.error(apiErrorMessage(error));
+          }
+        }}
+      />
     </div>
+  );
+}
+
+function EditGuestDialog({
+  guest,
+  isPending,
+  open,
+  onOpenChange,
+  onSubmit,
+}: {
+  guest: Guest;
+  isPending: boolean;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (payload: {
+    name: string;
+    phone: string | null;
+    whatsapp_phone: string | null;
+    email: string | null;
+    check_in_date: string | null;
+    check_out_date: string | null;
+    status: string;
+    internal_notes: string | null;
+  }) => Promise<void>;
+}) {
+  const [name, setName] = useState(guest.name);
+  const [phone, setPhone] = useState(guest.phone ?? "");
+  const [whatsappPhone, setWhatsappPhone] = useState(guest.whatsapp_phone ?? "");
+  const [email, setEmail] = useState(guest.email ?? "");
+  const [checkInDate, setCheckInDate] = useState(toDateInput(guest.check_in_date));
+  const [checkOutDate, setCheckOutDate] = useState(toDateInput(guest.check_out_date));
+  const [status, setStatus] = useState(guest.status);
+  const [internalNotes, setInternalNotes] = useState(guest.internal_notes ?? "");
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    setName(guest.name);
+    setPhone(guest.phone ?? "");
+    setWhatsappPhone(guest.whatsapp_phone ?? "");
+    setEmail(guest.email ?? "");
+    setCheckInDate(toDateInput(guest.check_in_date));
+    setCheckOutDate(toDateInput(guest.check_out_date));
+    setStatus(guest.status);
+    setInternalNotes(guest.internal_notes ?? "");
+  }, [guest, open]);
+
+  async function save(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await onSubmit({
+      name,
+      phone: phone.trim() || null,
+      whatsapp_phone: whatsappPhone.trim() || null,
+      email: email.trim() || null,
+      check_in_date: checkInDate || null,
+      check_out_date: checkOutDate || null,
+      status,
+      internal_notes: internalNotes.trim() || null,
+    });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit guest</DialogTitle>
+          <DialogDescription>Update guest profile, contact, stay dates, and private notes.</DialogDescription>
+        </DialogHeader>
+        <form className="grid gap-4" onSubmit={save}>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FormField label="Name">
+              <Input required value={name} onChange={(event) => setName(event.target.value)} />
+            </FormField>
+            <FormField label="Status">
+              <Select value={status} onChange={(event) => setStatus(event.target.value)}>
+                <option value="checked_in">Checked in</option>
+                <option value="reserved">Reserved</option>
+                <option value="pre_arrival">Pre-arrival</option>
+                <option value="checked_out">Checked out</option>
+                <option value="inactive">Inactive</option>
+              </Select>
+            </FormField>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <FormField label="Phone">
+              <Input value={phone} onChange={(event) => setPhone(event.target.value)} />
+            </FormField>
+            <FormField label="WhatsApp">
+              <Input value={whatsappPhone} onChange={(event) => setWhatsappPhone(event.target.value)} />
+            </FormField>
+            <FormField label="Email">
+              <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
+            </FormField>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FormField label="Check-in">
+              <Input type="date" value={checkInDate} onChange={(event) => setCheckInDate(event.target.value)} />
+            </FormField>
+            <FormField label="Check-out">
+              <Input type="date" value={checkOutDate} onChange={(event) => setCheckOutDate(event.target.value)} />
+            </FormField>
+          </div>
+          <FormField label="Internal notes">
+            <Textarea value={internalNotes} onChange={(event) => setInternalNotes(event.target.value)} />
+          </FormField>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button disabled={isPending || name.trim().length < 2} type="submit">
+              {isPending ? <Loader2 className="animate-spin" /> : <Pencil />}
+              Save
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function FormField({ children, label }: { children: React.ReactNode; label: string }) {
+  return (
+    <label className="grid gap-1.5">
+      <Label>{label}</Label>
+      {children}
+    </label>
   );
 }
 
@@ -296,4 +463,11 @@ function formatDate(value: string | null) {
   }
 
   return format(new Date(value), "dd MMM yyyy");
+}
+
+function toDateInput(value: string | null) {
+  if (!value) {
+    return "";
+  }
+  return value.slice(0, 10);
 }

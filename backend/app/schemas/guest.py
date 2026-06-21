@@ -32,6 +32,8 @@ class GuestUpdate(BaseModel):
     phone: str | None = None
     whatsapp_phone: str | None = None
     email: str | None = None
+    check_in_date: date | None = None
+    check_out_date: date | None = None
     status: str | None = None
     internal_notes: str | None = None
 

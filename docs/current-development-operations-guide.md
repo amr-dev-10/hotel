@@ -116,7 +116,7 @@ Order flow:
 2. The order is saved with source, guest/room/table/folio links, items, subtotal, tax, total, status, and instructions.
 3. Orders appear in the F&B Orders tab grouped by Pending, Preparing, Ready, Delivered, and Cancelled.
 4. Staff can create a manual order using Staff Order from the F&B action bar or Orders tab, with room and guest selectors plus table, folio, and instruction fields.
-5. Staff can edit an existing order from the order card. The drawer loads order detail, lets staff change order metadata, status, instructions, and line items, then sends a PATCH update.
+5. Staff can edit an existing order from the order card. An in-page order form loads order detail, lets staff change order metadata, status, instructions, and line items, then sends a PATCH update.
 6. Status buttons move orders through Accept, Preparing, Ready, and Delivered.
 7. Kitchen staff can use `/<hotelId>/kitchen` for the same order status workflow with realtime refresh.
 

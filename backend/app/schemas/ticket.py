@@ -26,6 +26,22 @@ class TicketStageUpdate(BaseModel):
     note: str | None = None
 
 
+class TicketUpdate(BaseModel):
+    guest_id: str | None = None
+    reservation_id: str | None = None
+    conversation_id: str | None = None
+    room_id: str | None = None
+    department_id: str | None = None
+    department_key: str | None = None
+    assigned_to: str | None = None
+    type: str | None = Field(default=None, min_length=2, max_length=40)
+    task_category: str | None = None
+    item_description: str | None = Field(default=None, min_length=2)
+    source: str | None = None
+    followers: list[str] | None = None
+    priority: int | None = Field(default=None, ge=1, le=5)
+
+
 class TicketRejectRequest(BaseModel):
     reason: str | None = Field(default=None, max_length=255)
 

@@ -1,5 +1,6 @@
 from typing import Any
 
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 
 from app.models.base import utcnow
@@ -29,9 +30,9 @@ class AuditService:
             action=action,
             entity=entity,
             entity_id=entity_id,
-            payload=payload or {},
-            old_payload=old_payload or {},
-            new_payload=new_payload or payload or {},
+            payload=jsonable_encoder(payload or {}),
+            old_payload=jsonable_encoder(old_payload or {}),
+            new_payload=jsonable_encoder(new_payload or payload or {}),
             ip_address=ip_address,
             created_at=utcnow(),
         )
