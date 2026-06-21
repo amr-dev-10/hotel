@@ -10,6 +10,7 @@ from app.models.guest import Guest
 from app.models.reservation import Reservation
 from app.models.room import Room
 from app.models.ticket import Ticket
+from app.models.ticket_category import TicketCategory
 from app.models.user import User
 from app.repositories.escalation_repository import EscalationLogRepository
 from app.repositories.ticket_acceptance_repository import TicketAcceptanceRepository
@@ -262,7 +263,7 @@ def update_ticket(
     current_user: User = Depends(require_permission("ticket.assign")),
 ) -> dict:
     ticket = TicketService(db).update_ticket(hotel_id, ticket_id, payload, actor_id=current_user.id)
-    return ok(TicketRead.model_validate(ticket).model_dump())
+    return ok(_ticket_read(ticket, _ticket_context(db, hotel_id, [ticket])).model_dump())
 
 
 @router.post("/{ticket_id}/accept")
@@ -376,6 +377,7 @@ def _ticket_context(db: Session, hotel_id: str, tickets: list[Ticket]) -> dict[s
     room_numbers = _room_numbers(db, hotel_id, [ticket.room_id for ticket in tickets])
     guest_names = _guest_names(db, hotel_id, [ticket.guest_id for ticket in tickets])
     reservation_numbers = _reservation_numbers(db, hotel_id, [ticket.reservation_id for ticket in tickets])
+    category_names = _category_names(db, hotel_id, [ticket.task_category_id for ticket in tickets])
 
     return {
         ticket.id: {
@@ -383,6 +385,7 @@ def _ticket_context(db: Session, hotel_id: str, tickets: list[Ticket]) -> dict[s
             "room_number": room_numbers.get(ticket.room_id or ""),
             "guest_name": guest_names.get(ticket.guest_id or ""),
             "reservation_no": reservation_numbers.get(ticket.reservation_id or ""),
+            "task_category_name": category_names.get(ticket.task_category_id or ""),
         }
         for ticket in tickets
     }
@@ -442,3 +445,17 @@ def _reservation_numbers(db: Session, hotel_id: str, reservation_ids: list[str |
         )
     ).all()
     return {reservation_id: reservation_no for reservation_id, reservation_no in rows}
+
+
+def _category_names(db: Session, hotel_id: str, category_ids: list[str | None]) -> dict[str, str]:
+    ids = {category_id for category_id in category_ids if category_id}
+    if not ids:
+        return {}
+    rows = db.execute(
+        select(TicketCategory.id, TicketCategory.name).where(
+            TicketCategory.hotel_id == hotel_id,
+            TicketCategory.id.in_(ids),
+            TicketCategory.is_active.is_(True),
+        )
+    ).all()
+    return {category_id: name for category_id, name in rows}

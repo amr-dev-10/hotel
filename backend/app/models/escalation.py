@@ -23,6 +23,7 @@ class EscalationRule(UUIDPrimaryKeyMixin, Base):
     hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
     department_id: Mapped[str | None] = mapped_column(ForeignKey("departments.id"), index=True)
     ticket_type: Mapped[str | None] = mapped_column(String(40), index=True)
+    task_category_id: Mapped[str | None] = mapped_column(ForeignKey("ticket_categories.id"), index=True)
     task_category: Mapped[str | None] = mapped_column(String(80), index=True)
     escalation_level: Mapped[int] = mapped_column(Integer, index=True)
     trigger_after_minutes: Mapped[int] = mapped_column(Integer)

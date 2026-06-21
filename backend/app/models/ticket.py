@@ -47,6 +47,7 @@ class Ticket(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     assigned_to: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
     stage: Mapped[str] = mapped_column(String(40), default="Open", index=True)
     type: Mapped[str] = mapped_column(String(40), default="Ticket")
+    task_category_id: Mapped[str | None] = mapped_column(ForeignKey("ticket_categories.id"), index=True)
     task_category: Mapped[str | None] = mapped_column(String(80), index=True)
     item_description: Mapped[str] = mapped_column(Text)
     source: Mapped[str] = mapped_column(String(40), default="DASHBOARD")

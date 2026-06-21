@@ -18,8 +18,10 @@ from app.schemas.guest_portal import (
 from app.schemas.menu import MenuCategoryRead, MenuItemRead
 from app.schemas.restaurant import RestaurantOrderCreate, RestaurantOrderItemRead, RestaurantOrderRead
 from app.schemas.ticket import TicketCreate, TicketRead
+from app.schemas.v51 import TicketCategoryRead
 from app.services.guest_portal_service import GuestPortalContext, GuestPortalService
 from app.services.restaurant_service import RestaurantService
+from app.services.ticket_category_service import TicketCategoryService
 from app.services.ticket_service import TicketService
 
 router = APIRouter()
@@ -68,6 +70,15 @@ def list_items(
 ) -> dict:
     items = MenuItemRepository(db).list_available(context.hotel_id, category_id)
     return ok([MenuItemRead.model_validate(item).model_dump() for item in items])
+
+
+@router.get("/request-categories")
+def list_request_categories(
+    db: Session = Depends(get_db),
+    context: GuestPortalContext = Depends(require_guest_session),
+) -> dict:
+    categories = TicketCategoryService(db).list_active(context.hotel_id)
+    return ok([TicketCategoryRead.model_validate(item).model_dump() for item in categories])
 
 
 @router.post("/orders")
@@ -137,6 +148,7 @@ def create_request(
             room_id=context.room_id,
             department_key=payload.department_key,
             type="guest_request",
+            task_category_id=payload.task_category_id,
             task_category=payload.task_category,
             item_description=payload.item_description,
             source="PORTAL",

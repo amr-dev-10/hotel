@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import date, timedelta
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -7,11 +7,13 @@ from app.core.database import SessionLocal
 from app.main import app
 from app.models.base import utcnow
 from app.models.ticket import Ticket
+from app.services.bot_service import BotService, IncomingWhatsAppMessage
 from app.services.escalation_service import EscalationService
 
 
-def _bootstrap(client: TestClient) -> tuple[str, str, str]:
+def _bootstrap(client: TestClient) -> tuple[str, str, str, str]:
     suffix = uuid4().hex[:8]
+    phone_number_id = f"v51_phone_{suffix}"
     response = client.post(
         "/api/v1/hotels/bootstrap",
         json={
@@ -21,19 +23,25 @@ def _bootstrap(client: TestClient) -> tuple[str, str, str]:
             "owner_email": f"v51-owner-{suffix}@example.com",
             "owner_password": "secretpass123",
             "contact_phone": "+919000511111",
-            "whatsapp_phone_number_id": f"v51_phone_{suffix}",
+            "whatsapp_phone_number_id": phone_number_id,
             "seed_rooms": ["5101"],
         },
     )
     assert response.status_code == 200
     data = response.json()["data"]
-    return data["hotel"]["id"], data["owner"]["id"], data["access_token"]
+    return data["hotel"]["id"], data["owner"]["id"], data["access_token"], phone_number_id
 
 
 def _department_id(client: TestClient, hotel_id: str, headers: dict[str, str], key: str) -> str:
     response = client.get(f"/api/v1/hotels/{hotel_id}/departments", headers=headers)
     assert response.status_code == 200
     return next(item["id"] for item in response.json()["data"] if item["key"] == key)
+
+
+def _room_id(client: TestClient, hotel_id: str, headers: dict[str, str], room_number: str) -> str:
+    response = client.get(f"/api/v1/hotels/{hotel_id}/rooms", headers=headers)
+    assert response.status_code == 200
+    return next(item["id"] for item in response.json()["data"] if item["room_number"] == room_number)
 
 
 def _create_user(
@@ -67,7 +75,7 @@ def _create_user(
 
 def test_v51_operational_hierarchy_acceptance_escalation_and_ai_settings() -> None:
     with TestClient(app) as client:
-        hotel_id, owner_id, token = _bootstrap(client)
+        hotel_id, owner_id, token, phone_number_id = _bootstrap(client)
         headers = {"Authorization": f"Bearer {token}"}
         suffix = uuid4().hex[:8]
         housekeeping_id = _department_id(client, hotel_id, headers, "housekeeping")
@@ -141,6 +149,12 @@ def test_v51_operational_hierarchy_acceptance_escalation_and_ai_settings() -> No
         towel_sla = next(item for item in slas.json()["data"] if item["task_category"] == "towel_request")
         assert towel_sla["sla_minutes"] == 10
         assert towel_sla["accept_timeout_minutes"] == 2
+        assert towel_sla["ticket_category_id"]
+
+        categories = client.get(f"/api/v1/hotels/{hotel_id}/ticket-categories", headers=headers)
+        assert categories.status_code == 200
+        category_by_key = {item["key"]: item for item in categories.json()["data"]}
+        assert {"guest_request", "towel_request", "maintenance", "room_service"} <= set(category_by_key)
 
         ticket = client.post(
             f"/api/v1/hotels/{hotel_id}/tickets",
@@ -148,6 +162,7 @@ def test_v51_operational_hierarchy_acceptance_escalation_and_ai_settings() -> No
             json={
                 "department_id": housekeeping_id,
                 "assigned_to": attendant_id,
+                "task_category_id": category_by_key["towel_request"]["id"],
                 "task_category": "towel_request",
                 "item_description": "Need fresh towels",
                 "priority": 2,
@@ -209,6 +224,11 @@ def test_v51_operational_hierarchy_acceptance_escalation_and_ai_settings() -> No
             row = db.get(Ticket, escalation_ticket_id)
             assert row is not None
             row.created_at = utcnow() - timedelta(minutes=11)
+            row.sla_due_at = utcnow() + timedelta(minutes=5)
+            db.commit()
+            fired = EscalationService(db).check_escalations(hotel_id)
+            assert len(fired) == 0
+            row.sla_due_at = utcnow() - timedelta(minutes=1)
             db.commit()
             fired = EscalationService(db).check_escalations(hotel_id)
             assert len(fired) == 1
@@ -233,6 +253,80 @@ def test_v51_operational_hierarchy_acceptance_escalation_and_ai_settings() -> No
         assert complaint.status_code == 200
         assert complaint.json()["data"]["priority"] == 1
         assert complaint.json()["data"]["assigned_to"] == owner_id
+
+        room_id = _room_id(client, hotel_id, headers, "5101")
+        portal_phone = f"555{suffix[:6]}"
+        reservation = client.post(
+            f"/api/v1/hotels/{hotel_id}/reservations",
+            headers=headers,
+            json={
+                "guest_name": "Portal Guest",
+                "phone": portal_phone,
+                "room_id": room_id,
+                "checkin_date": date.today().isoformat(),
+                "checkout_date": (date.today() + timedelta(days=1)).isoformat(),
+                "source": "walk_in",
+            },
+        )
+        assert reservation.status_code == 200
+        assert client.post(f"/api/v1/hotels/{hotel_id}/reservations/{reservation.json()['data']['id']}/check-in", headers=headers).status_code == 200
+        portal_login = client.post(
+            "/api/v1/guest-portal/auth/login",
+            json={"hotel_id": hotel_id, "phone": portal_phone, "room_number": "5101"},
+        )
+        assert portal_login.status_code == 200
+        portal_headers = {"Authorization": f"Bearer {portal_login.json()['data']['access_token']}"}
+        portal_categories = client.get("/api/v1/guest-portal/request-categories", headers=portal_headers)
+        assert portal_categories.status_code == 200
+        portal_guest_request = next(item for item in portal_categories.json()["data"] if item["key"] == "guest_request")
+        portal_ticket = client.post(
+            "/api/v1/guest-portal/requests",
+            headers=portal_headers,
+            json={
+                "task_category_id": portal_guest_request["id"],
+                "task_category": "guest_request",
+                "item_description": "Need help from guest portal",
+            },
+        )
+        assert portal_ticket.status_code == 200
+        assert portal_ticket.json()["data"]["source"] == "PORTAL"
+        assert portal_ticket.json()["data"]["task_category_id"] == portal_guest_request["id"]
+
+        db = SessionLocal()
+        try:
+            bot = BotService(db)
+            bot.handle_message(
+                IncomingWhatsAppMessage(
+                    phone_number_id=phone_number_id,
+                    from_phone=portal_phone,
+                    text="hi",
+                )
+            )
+            bot_result = bot.handle_message(
+                IncomingWhatsAppMessage(
+                    phone_number_id=phone_number_id,
+                    from_phone=portal_phone,
+                    interactive_id="extra_towels",
+                )
+            )
+            whatsapp_ticket_id = bot_result["ticket_id"]
+            assert whatsapp_ticket_id
+            whatsapp_ticket = db.get(Ticket, whatsapp_ticket_id)
+            assert whatsapp_ticket is not None
+            assert whatsapp_ticket.source == "WHATSAPP"
+            assert whatsapp_ticket.task_category == "towel_request"
+            assert whatsapp_ticket.task_category_id == category_by_key["towel_request"]["id"]
+        finally:
+            db.close()
+
+        visible_escalations = client.get(
+            f"/api/v1/hotels/{hotel_id}/tickets/escalations",
+            headers=headers,
+            params={"scope": "all"},
+        )
+        assert visible_escalations.status_code == 200
+        visible_ticket_ids = {item["ticket_id"] for item in visible_escalations.json()["data"]}
+        assert portal_ticket.json()["data"]["id"] in visible_ticket_ids
 
         routing_rules = client.get(f"/api/v1/hotels/{hotel_id}/routing-rules", headers=headers)
         assert routing_rules.status_code == 200

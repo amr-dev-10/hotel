@@ -25,6 +25,7 @@ class EscalationRuleRepository(BaseRepository[EscalationRule]):
         department_id: str | None,
         ticket_type: str | None,
         task_category: str | None,
+        task_category_id: str | None,
         escalation_level: int,
     ) -> EscalationRule | None:
         candidates = self.db.execute(
@@ -49,6 +50,10 @@ class EscalationRuleRepository(BaseRepository[EscalationRule]):
                 if rule.task_category != task_category:
                     continue
                 score += 1
+            if rule.task_category_id:
+                if rule.task_category_id != task_category_id:
+                    continue
+                score += 3
             matches.append((score, rule))
         if not matches:
             return None

@@ -35,6 +35,7 @@ from app.api.v1 import (
     saas,
     shifts,
     task_slas,
+    ticket_categories,
     tickets,
     users,
     whatsapp_accounts,
@@ -98,6 +99,11 @@ api_router.include_router(
     tags=["tax-configs"],
 )
 api_router.include_router(tickets.router, prefix="/hotels/{hotel_id}/tickets", tags=["tickets"])
+api_router.include_router(
+    ticket_categories.router,
+    prefix="/hotels/{hotel_id}/ticket-categories",
+    tags=["ticket-categories"],
+)
 api_router.include_router(
     escalation_rules.router,
     prefix="/hotels/{hotel_id}/escalation-rules",

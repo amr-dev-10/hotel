@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Plus } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -15,18 +15,21 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { apiErrorMessage } from "@/lib/api/client";
+import { useDepartments } from "@/features/departments/hooks/useDepartments";
 import { useRooms } from "@/features/rooms/hooks/useRooms";
 import { createTicketSchema, type CreateTicketValues } from "@/features/tickets/schemas/create-ticket.schema";
 import { useCreateTicket } from "@/features/tickets/hooks/useTickets";
+import { useTicketCategories } from "@/features/workflow/hooks/useWorkflowSettings";
 
 export function CreateTicketDialog({ hotelId }: { hotelId: string }) {
   const [open, setOpen] = useState(false);
   const rooms = useRooms(hotelId);
+  const departments = useDepartments(hotelId);
+  const categories = useTicketCategories(hotelId);
   const createTicket = useCreateTicket(hotelId);
   const form = useForm<CreateTicketValues>({
     resolver: zodResolver(createTicketSchema),
@@ -37,19 +40,47 @@ export function CreateTicketDialog({ hotelId }: { hotelId: string }) {
       priority: 2,
       item_description: "",
       room_id: "",
+      task_category_id: "",
       task_category: "",
     },
   });
+  const departmentKey = form.watch("department_key");
+  const selectedDepartment = departments.data?.find((department) => department.key === departmentKey);
+  const categoryOptions = useMemo(
+    () =>
+      (categories.data ?? []).filter(
+        (category) => !selectedDepartment?.id || category.department_id === selectedDepartment.id,
+      ),
+    [categories.data, selectedDepartment?.id],
+  );
+  const categoryId = form.watch("task_category_id");
+
+  useEffect(() => {
+    if (!categoryOptions.length) {
+      return;
+    }
+    if (!categoryId || !categoryOptions.some((category) => category.id === categoryId)) {
+      const first = categoryOptions[0];
+      form.setValue("task_category_id", first.id);
+      form.setValue("task_category", first.key);
+    }
+  }, [categoryId, categoryOptions, form]);
 
   const onSubmit = form.handleSubmit(async (values) => {
     try {
+      const selectedCategory = categories.data?.find((category) => category.id === values.task_category_id);
+      const resolvedDepartmentKey = departments.data?.find(
+        (department) => department.id === selectedCategory?.department_id,
+      )?.key as CreateTicketValues["department_key"] | undefined;
       await createTicket.mutateAsync({
         ...values,
+        department_key: resolvedDepartmentKey ?? values.department_key,
         guest_id: values.guest_id || undefined,
         reservation_id: values.reservation_id || undefined,
         conversation_id: values.conversation_id || undefined,
         room_id: values.room_id || undefined,
-        task_category: values.task_category || undefined,
+        task_category_id: selectedCategory?.id,
+        task_category: selectedCategory?.key ?? values.task_category ?? undefined,
         source: values.source || "DASHBOARD",
       });
       toast.success("Ticket created");
@@ -127,7 +158,21 @@ export function CreateTicketDialog({ hotelId }: { hotelId: string }) {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="task_category">Category</Label>
-              <Input id="task_category" placeholder="amenity, ac, billing" {...form.register("task_category")} />
+              <Select
+                id="task_category"
+                {...form.register("task_category_id", {
+                  onChange: (event) => {
+                    const selected = categories.data?.find((category) => category.id === event.target.value);
+                    form.setValue("task_category", selected?.key ?? "");
+                  },
+                })}
+              >
+                {categoryOptions.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </Select>
             </div>
           </div>
 

@@ -46,6 +46,7 @@ class GuestPortalOrderDetail(BaseModel):
 class GuestPortalRequestCreate(BaseModel):
     item_description: str = Field(min_length=3, max_length=500)
     department_key: str | None = None
+    task_category_id: str | None = None
     task_category: str | None = None
     priority: int = Field(default=2, ge=1, le=5)
 

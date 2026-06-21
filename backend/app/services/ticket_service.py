@@ -16,6 +16,7 @@ from app.repositories.bot_config_repository import BotConfigRepository
 from app.repositories.department_repository import DepartmentRepository
 from app.repositories.knowledge_repository import DepartmentConfigRepository
 from app.repositories.routing_rule_repository import RoutingRuleRepository
+from app.repositories.ticket_category_repository import TicketCategoryRepository
 from app.repositories.ticket_acceptance_repository import TicketAcceptanceRepository
 from app.repositories.ticket_repository import TicketMessageRepository, TicketRepository
 from app.repositories.user_repository import UserRepository
@@ -42,6 +43,7 @@ class TicketService:
         self.users = UserRepository(db)
         self.acceptances = TicketAcceptanceRepository(db)
         self.routing_rules = RoutingRuleRepository(db)
+        self.categories = TicketCategoryRepository(db)
         self.workflow_definitions = WorkflowDefinitionRepository(db)
         self.workflow_states = WorkflowStateRepository(db)
         self.bot_configs = BotConfigRepository(db)
@@ -61,8 +63,11 @@ class TicketService:
     ) -> Ticket:
         UsageService(self.db).check_and_increment(hotel_id, "tickets", commit=False)
         self._validate_context(hotel_id, payload)
+        category = self._resolve_category(hotel_id, payload.task_category_id, payload.task_category)
         department = None
-        if payload.department_id:
+        if category and category.department_id:
+            department = self.departments.get_for_hotel(hotel_id, category.department_id)
+        if not department and payload.department_id:
             department = self.departments.get_for_hotel(hotel_id, payload.department_id)
         if not department and payload.department_key:
             department = self.departments.get_by_key(hotel_id, payload.department_key)
@@ -100,7 +105,13 @@ class TicketService:
 
         initial_stage = self._initial_ticket_stage(hotel_id)
         uses_acceptance = bool(assignee and self._supports_state(hotel_id, "pending_accept"))
-        sla_config = self.slas.get_sla_config(hotel_id, department.id, payload.task_category)
+        task_category = category.key if category else payload.task_category
+        sla_config = self.slas.get_sla_config(
+            hotel_id,
+            department.id,
+            task_category,
+            category.id if category else None,
+        )
         ticket = Ticket(
             hotel_id=hotel_id,
             ticket_code=self._ticket_code(),
@@ -112,7 +123,8 @@ class TicketService:
             assigned_to=None if uses_acceptance else (assignee.id if assignee else None),
             stage=initial_stage,
             type=payload.type,
-            task_category=payload.task_category,
+            task_category_id=category.id if category else None,
+            task_category=task_category,
             item_description=payload.item_description,
             source=self._normalize_source(payload.source),
             followers=list(dict.fromkeys([*payload.followers, *([assignee.id] if assignee else [])])),
@@ -131,7 +143,8 @@ class TicketService:
                 "conversation_id": payload.conversation_id,
                 "item_description": payload.item_description,
                 "priority": payload.priority,
-                "task_category": payload.task_category,
+                "task_category": task_category,
+                "task_category_id": category.id if category else None,
             },
             actor_id=actor_id,
         )
@@ -283,7 +296,12 @@ class TicketService:
             current.response = "expired"
             current.auto_expired = True
             current.responded_at = utcnow()
-        config = self.slas.get_sla_config(ticket.hotel_id, ticket.department_id, ticket.task_category)
+        config = self.slas.get_sla_config(
+            ticket.hotel_id,
+            ticket.department_id,
+            ticket.task_category,
+            ticket.task_category_id,
+        )
         acceptance = TicketAcceptance(
             ticket_id=ticket.id,
             offered_to=offered_to,
@@ -471,6 +489,17 @@ class TicketService:
         self._validate_update_context(hotel_id, changes)
         if "source" in changes and changes["source"]:
             changes["source"] = self._normalize_source(changes["source"])
+        if "task_category_id" in changes:
+            category = self._resolve_category(hotel_id, changes.get("task_category_id"), changes.get("task_category"))
+            if category:
+                changes["task_category_id"] = category.id
+                changes["task_category"] = category.key
+                changes.setdefault("department_id", category.department_id)
+        elif "task_category" in changes and changes["task_category"]:
+            category = self._resolve_category(hotel_id, None, changes["task_category"])
+            if category:
+                changes["task_category_id"] = category.id
+                changes["task_category"] = category.key
         if "followers" in changes and changes["followers"] is not None:
             changes["followers"] = list(dict.fromkeys(changes["followers"]))
 
@@ -533,6 +562,21 @@ class TicketService:
         if not ticket:
             raise not_found("Ticket not found")
         return ticket
+
+    def _resolve_category(
+        self,
+        hotel_id: str,
+        category_id: str | None,
+        category_key: str | None,
+    ):
+        if category_id:
+            category = self.categories.get_for_hotel(hotel_id, category_id)
+            if not category or not category.is_active:
+                raise not_found("Ticket category not found")
+            return category
+        if category_key:
+            return self.categories.get_by_key(hotel_id, category_key)
+        return None
 
     def _validate_context(self, hotel_id: str, payload: TicketCreate) -> None:
         if payload.guest_id and not self.db.execute(

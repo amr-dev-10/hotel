@@ -441,6 +441,7 @@ class BotService:
             session,
             {
                 "department_key": "front_office",
+                "category_key": "guest_request",
                 "item": text.strip() or "Guest query",
                 "priority": 2,
             },
@@ -510,6 +511,7 @@ class BotService:
                 conversation_id=conversation.id,
                 room_id=session.room_id,
                 department_key=service.get("department_key"),
+                task_category=service.get("category_key") or service.get("task_category") or self._category_key_for_service(service),
                 item_description=description,
                 source="WHATSAPP",
                 type="Ticket",
@@ -527,6 +529,31 @@ class BotService:
             )
         )
         return ticket.id
+
+    def _category_key_for_service(self, service: dict[str, Any]) -> str | None:
+        service_id = service.get("id")
+        if service_id:
+            mapped = {
+                "extra_towels": "towel_request",
+                "drinking_water": "drinking_water",
+                "extra_pillows": "extra_pillow",
+                "ac_not_working": "ac_repair",
+                "tv_not_working": "tv_repair",
+                "plumbing_issue": "plumbing",
+                "taxi_cab": "taxi_booking",
+            }.get(service_id)
+            if mapped:
+                return mapped
+        department_key = service.get("department_key")
+        if department_key == "front_office":
+            return "guest_request"
+        if department_key == "housekeeping":
+            return "housekeeping"
+        if department_key == "engineering":
+            return "maintenance"
+        if department_key == "food_beverage":
+            return "room_service"
+        return None
 
     def _send_my_requests(
         self,

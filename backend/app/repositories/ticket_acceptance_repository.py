@@ -70,6 +70,7 @@ class TicketAcceptanceRepository(BaseRepository[TicketAcceptance]):
             .where(
                 Ticket.hotel_id == hotel_id,
                 Ticket.deleted_at.is_(None),
+                Ticket.stage.not_in(("Completed", "Cancelled", "approved", "cancelled", "closed", "resolved")),
                 TicketAcceptance.response == "pending",
             )
         )
@@ -117,11 +118,18 @@ class TicketAcceptanceRepository(BaseRepository[TicketAcceptance]):
         return list(rows)
 
     def pending_due(self, now: datetime, hotel_id: str | None = None) -> Sequence[TicketAcceptance]:
-        statement = select(TicketAcceptance).where(TicketAcceptance.response == "pending")
-        if hotel_id:
-            statement = statement.join(Ticket, Ticket.id == TicketAcceptance.ticket_id).where(
-                Ticket.hotel_id == hotel_id,
+        statement = (
+            select(TicketAcceptance)
+            .join(Ticket, Ticket.id == TicketAcceptance.ticket_id)
+            .where(
+                TicketAcceptance.response == "pending",
                 Ticket.deleted_at.is_(None),
+                Ticket.stage.not_in(("Completed", "Cancelled", "approved", "cancelled", "closed", "resolved")),
+            )
+        )
+        if hotel_id:
+            statement = statement.where(
+                Ticket.hotel_id == hotel_id,
             )
         rows = self.db.execute(statement).scalars().all()
         return [

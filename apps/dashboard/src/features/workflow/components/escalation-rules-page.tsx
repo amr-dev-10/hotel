@@ -14,46 +14,110 @@ import { Select } from "@/components/ui/select";
 import { apiErrorMessage } from "@/lib/api/client";
 import { titleCase } from "@/lib/utils";
 import { useDepartments } from "@/features/departments/hooks/useDepartments";
-import { useCreateEscalationRule, useEscalationRules } from "@/features/workflow/hooks/useWorkflowSettings";
+import {
+  useCreateEscalationRule,
+  useDeleteEscalationRule,
+  useEscalationRules,
+  useResetEscalationRules,
+  useTicketCategories,
+  useUpdateEscalationRule,
+} from "@/features/workflow/hooks/useWorkflowSettings";
+import type { EscalationRule } from "@/types/domain";
 
 export function EscalationRulesPage({ hotelId }: { hotelId: string }) {
   const departments = useDepartments(hotelId);
   const rules = useEscalationRules(hotelId);
+  const categories = useTicketCategories(hotelId);
   const createRule = useCreateEscalationRule(hotelId);
+  const updateRule = useUpdateEscalationRule(hotelId);
+  const deleteRule = useDeleteEscalationRule(hotelId);
+  const resetRules = useResetEscalationRules(hotelId);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [departmentId, setDepartmentId] = useState("");
   const [ticketType, setTicketType] = useState("Ticket");
-  const [taskCategory, setTaskCategory] = useState("");
+  const [categoryId, setCategoryId] = useState("");
   const [level, setLevel] = useState(1);
-  const [minutes, setMinutes] = useState(15);
+  const [minutes, setMinutes] = useState(0);
   const [targetLevel, setTargetLevel] = useState("supervisor");
 
-  async function handleCreate() {
+  async function handleSave() {
+    const selectedCategory = categories.data?.find((category) => category.id === categoryId);
+    const payload = {
+      department_id: (selectedCategory?.department_id ?? departmentId) || null,
+      ticket_type: ticketType || null,
+      task_category_id: selectedCategory?.id ?? null,
+      task_category: selectedCategory?.key ?? null,
+      escalation_level: level,
+      trigger_after_minutes: minutes,
+      action: "escalate_up",
+      target_staff_level: targetLevel || null,
+      auto_reassign: true,
+      send_notification: true,
+      notification_channels: ["fcm", "websocket"],
+      is_active: true,
+    };
     try {
-      await createRule.mutateAsync({
-        department_id: departmentId || null,
-        ticket_type: ticketType || null,
-        task_category: taskCategory || null,
-        escalation_level: level,
-        trigger_after_minutes: minutes,
-        action: "escalate_up",
-        target_staff_level: targetLevel || null,
-        auto_reassign: true,
-        send_notification: true,
-        notification_channels: ["fcm", "websocket"],
-        is_active: true,
-      });
-      toast.success("Escalation rule created");
+      if (editingId) {
+        await updateRule.mutateAsync({ ruleId: editingId, payload });
+        toast.success("Escalation rule updated");
+      } else {
+        await createRule.mutateAsync(payload);
+        toast.success("Escalation rule created");
+      }
+      clearForm();
     } catch (error) {
       toast.error(apiErrorMessage(error));
     }
   }
 
-  if (rules.isLoading || departments.isLoading) {
+  async function handleDelete(ruleId: string) {
+    try {
+      await deleteRule.mutateAsync(ruleId);
+      if (editingId === ruleId) {
+        clearForm();
+      }
+      toast.success("Escalation rule deleted");
+    } catch (error) {
+      toast.error(apiErrorMessage(error));
+    }
+  }
+
+  async function handleResetDefaults() {
+    try {
+      await resetRules.mutateAsync();
+      clearForm();
+      toast.success("Default escalation rules restored");
+    } catch (error) {
+      toast.error(apiErrorMessage(error));
+    }
+  }
+
+  function editRule(rule: EscalationRule) {
+    setEditingId(rule.id);
+    setDepartmentId(rule.department_id ?? "");
+    setTicketType(rule.ticket_type ?? "");
+    setCategoryId(rule.task_category_id ?? "");
+    setLevel(rule.escalation_level);
+    setMinutes(rule.trigger_after_minutes);
+    setTargetLevel(rule.target_staff_level ?? "supervisor");
+  }
+
+  function clearForm() {
+    setEditingId(null);
+    setDepartmentId("");
+    setTicketType("Ticket");
+    setCategoryId("");
+    setLevel(1);
+    setMinutes(0);
+    setTargetLevel("supervisor");
+  }
+
+  if (rules.isLoading || departments.isLoading || categories.isLoading) {
     return <DataState isLoading />;
   }
 
-  if (rules.error || departments.error) {
-    return <DataState error={rules.error ?? departments.error} />;
+  if (rules.error || departments.error || categories.error) {
+    return <DataState error={rules.error ?? departments.error ?? categories.error} />;
   }
 
   return (
@@ -66,6 +130,7 @@ export function EscalationRulesPage({ hotelId }: { hotelId: string }) {
           </Link>
         </Button>
         <h2 className="mt-2 text-xl font-semibold">Escalation Rules</h2>
+        <p className="mt-1 text-sm text-slate-500">Rules fire after the ticket SLA due time or after dispatch offer timeout.</p>
       </div>
 
       <section className="grid gap-4 rounded-md border border-slate-200 bg-white p-4 md:grid-cols-3">
@@ -83,12 +148,19 @@ export function EscalationRulesPage({ hotelId }: { hotelId: string }) {
           <Input id="esc-ticket-type" value={ticketType} onChange={(event) => setTicketType(event.target.value)} />
         </Field>
         <Field label="Task category" id="esc-task-category">
-          <Input id="esc-task-category" value={taskCategory} onChange={(event) => setTaskCategory(event.target.value)} />
+          <Select id="esc-task-category" value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
+            <option value="">Any category</option>
+            {(categories.data ?? []).map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </Select>
         </Field>
         <Field label="Level" id="esc-level">
           <Input id="esc-level" min={1} type="number" value={level} onChange={(event) => setLevel(Number(event.target.value))} />
         </Field>
-        <Field label="After minutes" id="esc-minutes">
+        <Field label="Minutes after due" id="esc-minutes">
           <Input id="esc-minutes" min={0} type="number" value={minutes} onChange={(event) => setMinutes(Number(event.target.value))} />
         </Field>
         <Field label="Target level" id="esc-target">
@@ -99,10 +171,21 @@ export function EscalationRulesPage({ hotelId }: { hotelId: string }) {
           </Select>
         </Field>
         <div className="md:col-span-3">
-          <Button disabled={createRule.isPending} type="button" onClick={handleCreate}>
-            {createRule.isPending ? <Loader2 className="animate-spin" /> : <Plus />}
-            Add rule
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button disabled={createRule.isPending || updateRule.isPending} type="button" onClick={handleSave}>
+              {createRule.isPending || updateRule.isPending ? <Loader2 className="animate-spin" /> : <Plus />}
+              {editingId ? "Update rule" : "Add rule"}
+            </Button>
+            {editingId ? (
+              <Button type="button" variant="secondary" onClick={clearForm}>
+                Cancel edit
+              </Button>
+            ) : null}
+            <Button disabled={resetRules.isPending} type="button" variant="secondary" onClick={handleResetDefaults}>
+              {resetRules.isPending ? <Loader2 className="animate-spin" /> : null}
+              Reset defaults
+            </Button>
+          </div>
         </div>
       </section>
 
@@ -116,10 +199,19 @@ export function EscalationRulesPage({ hotelId }: { hotelId: string }) {
                 <div>
                   <h3 className="font-semibold">Level {rule.escalation_level}</h3>
                   <p className="text-sm text-slate-500">
-                    {titleCase(rule.ticket_type)} {rule.task_category ? `- ${rule.task_category}` : ""}
+                    {rule.ticket_type ? titleCase(rule.ticket_type) : "Any ticket"}{" "}
+                    {rule.task_category_name ?? rule.task_category ? `- ${rule.task_category_name ?? rule.task_category}` : ""}
                   </p>
                 </div>
-                <Badge variant={rule.is_active ? "green" : "default"}>{rule.trigger_after_minutes} min</Badge>
+                <div className="flex items-center gap-2">
+                  <Badge variant={rule.is_active ? "green" : "default"}>{rule.trigger_after_minutes} min after due</Badge>
+                  <Button size="sm" type="button" variant="secondary" onClick={() => editRule(rule)}>
+                    Edit
+                  </Button>
+                  <Button size="sm" type="button" variant="secondary" onClick={() => handleDelete(rule.id)}>
+                    Delete
+                  </Button>
+                </div>
               </div>
               <p className="mt-2 text-sm text-slate-600">
                 {titleCase(rule.action)} to {titleCase(rule.target_staff_level)}

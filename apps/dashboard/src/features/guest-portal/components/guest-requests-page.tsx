@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { formatDistanceToNowStrict } from "date-fns";
 import { ConciergeBell, Send } from "lucide-react";
 import { toast } from "sonner";
@@ -11,24 +11,29 @@ import { DataState } from "@/components/ui/data-state";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useCreateGuestRequest, useGuestProfile, useGuestRequests } from "@/features/guest-portal/hooks/useGuestPortal";
+import {
+  useCreateGuestRequest,
+  useGuestProfile,
+  useGuestRequestCategories,
+  useGuestRequests,
+} from "@/features/guest-portal/hooks/useGuestPortal";
 import { titleCase } from "@/lib/utils";
 import { useGuestSessionStore } from "@/stores/guest-session.store";
-
-const departments = [
-  { label: "Housekeeping", value: "housekeeping" },
-  { label: "Engineering", value: "engineering" },
-  { label: "Food & Beverage", value: "food_beverage" },
-  { label: "Front Office", value: "front_office" },
-];
 
 export function GuestRequestsPage() {
   const token = useGuestSessionStore((state) => state.token);
   useGuestProfile();
   const requests = useGuestRequests();
+  const categories = useGuestRequestCategories();
   const createRequest = useCreateGuestRequest();
   const [description, setDescription] = useState("");
-  const [departmentKey, setDepartmentKey] = useState("housekeeping");
+  const [categoryId, setCategoryId] = useState("");
+
+  useEffect(() => {
+    if (!categoryId && categories.data?.length) {
+      setCategoryId(categories.data[0].id);
+    }
+  }, [categories.data, categoryId]);
 
   if (!token) {
     return <DataState empty emptyTitle="Please verify your stay to request service." />;
@@ -36,12 +41,13 @@ export function GuestRequestsPage() {
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const category = categories.data?.find((item) => item.id === categoryId);
     await createRequest.mutateAsync(
       {
         item_description: description,
-        department_key: departmentKey,
-        task_category: departmentKey,
-        priority: departmentKey === "engineering" ? 3 : 2,
+        task_category_id: category?.id,
+        task_category: category?.key,
+        priority: category?.default_priority ?? 2,
       },
       {
         onSuccess: () => {
@@ -62,11 +68,11 @@ export function GuestRequestsPage() {
 
       <form className="grid gap-3 rounded-md border border-slate-200 bg-white p-4" onSubmit={onSubmit}>
         <label className="grid gap-1.5">
-          <Label>Department</Label>
-          <Select value={departmentKey} onChange={(event) => setDepartmentKey(event.target.value)}>
-            {departments.map((department) => (
-              <option key={department.value} value={department.value}>
-                {department.label}
+          <Label>Category</Label>
+          <Select value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
+            {(categories.data ?? []).map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
               </option>
             ))}
           </Select>
@@ -79,7 +85,7 @@ export function GuestRequestsPage() {
             onChange={(event) => setDescription(event.target.value)}
           />
         </label>
-        <Button disabled={createRequest.isPending || description.trim().length < 3} type="submit">
+        <Button disabled={createRequest.isPending || description.trim().length < 3 || !categoryId} type="submit">
           <Send />
           Send request
         </Button>

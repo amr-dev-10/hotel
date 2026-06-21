@@ -12,6 +12,7 @@ import type {
   RestaurantOrder,
   RestaurantOrderDetail,
   Ticket,
+  TicketCategory,
 } from "@/types/domain";
 
 export function useGuestProfile() {
@@ -110,11 +111,21 @@ export function useGuestRequests() {
   });
 }
 
+export function useGuestRequestCategories() {
+  const token = useGuestSessionStore((state) => state.token);
+  return useQuery({
+    queryKey: queryKeys.guestPortal.requestCategories(),
+    queryFn: () => guestGet<TicketCategory[]>("/guest-portal/request-categories"),
+    enabled: Boolean(token),
+  });
+}
+
 export function useCreateGuestRequest() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (payload: {
       item_description: string;
+      task_category_id?: string | null;
       department_key?: string | null;
       task_category?: string | null;
       priority?: number;

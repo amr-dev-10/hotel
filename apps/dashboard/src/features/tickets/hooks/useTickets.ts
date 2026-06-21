@@ -25,6 +25,7 @@ export type TicketUpdatePayload = {
   department_key?: string | null;
   assigned_to?: string | null;
   type?: string;
+  task_category_id?: string | null;
   task_category?: string | null;
   item_description?: string;
   source?: string;

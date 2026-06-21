@@ -28,6 +28,7 @@ class DepartmentHierarchyRead(BaseModel):
 class EscalationRuleCreate(BaseModel):
     department_id: str | None = None
     ticket_type: str | None = None
+    task_category_id: str | None = None
     task_category: str | None = None
     escalation_level: int = Field(ge=1, le=10)
     trigger_after_minutes: int = Field(ge=0)
@@ -42,6 +43,7 @@ class EscalationRuleCreate(BaseModel):
 class EscalationRuleUpdate(BaseModel):
     department_id: str | None = None
     ticket_type: str | None = None
+    task_category_id: str | None = None
     task_category: str | None = None
     escalation_level: int | None = Field(default=None, ge=1, le=10)
     trigger_after_minutes: int | None = Field(default=None, ge=0)
@@ -58,7 +60,9 @@ class EscalationRuleRead(ORMModel):
     hotel_id: str
     department_id: str | None = None
     ticket_type: str | None = None
+    task_category_id: str | None = None
     task_category: str | None = None
+    task_category_name: str | None = None
     escalation_level: int
     trigger_after_minutes: int
     action: str
@@ -83,6 +87,7 @@ class EscalationLogRead(ORMModel):
 
 
 class TaskTypeSLACreate(BaseModel):
+    ticket_category_id: str | None = None
     task_category: str = Field(min_length=2, max_length=80)
     sla_minutes: int = Field(gt=0)
     accept_timeout_minutes: int = Field(default=2, gt=0)
@@ -91,6 +96,7 @@ class TaskTypeSLACreate(BaseModel):
 
 
 class TaskTypeSLAUpdate(BaseModel):
+    ticket_category_id: str | None = None
     task_category: str | None = Field(default=None, min_length=2, max_length=80)
     sla_minutes: int | None = Field(default=None, gt=0)
     accept_timeout_minutes: int | None = Field(default=None, gt=0)
@@ -102,7 +108,9 @@ class TaskTypeSLARead(ORMModel):
     id: str
     hotel_id: str
     department_id: str
+    ticket_category_id: str | None = None
     task_category: str
+    task_category_name: str | None = None
     sla_minutes: int
     accept_timeout_minutes: int
     description: str | None = None
@@ -144,6 +152,21 @@ class RoutingRuleRead(ORMModel):
     notification_channels: list[str]
     is_active: bool
     created_at: datetime
+
+
+class TicketCategoryRead(ORMModel):
+    id: str
+    hotel_id: str
+    department_id: str | None = None
+    key: str
+    name: str
+    description: str | None = None
+    default_priority: int
+    sla_minutes: int
+    accept_timeout_minutes: int
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
 
 
 class AISettingsRead(BaseModel):

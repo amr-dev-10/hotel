@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Loader2, Plus } from "lucide-react";
+import { ArrowLeft, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -13,42 +13,95 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { apiErrorMessage } from "@/lib/api/client";
 import { useDepartments } from "@/features/departments/hooks/useDepartments";
-import { useCreateTaskSla, useTaskSlas } from "@/features/workflow/hooks/useWorkflowSettings";
+import {
+  useCreateTaskSla,
+  useDeleteTaskSla,
+  useTaskSlas,
+  useTicketCategories,
+  useUpdateTaskSla,
+} from "@/features/workflow/hooks/useWorkflowSettings";
+import type { TaskTypeSLA } from "@/types/domain";
 
 export function TaskSlasPage({ hotelId }: { hotelId: string }) {
   const departments = useDepartments(hotelId);
   const [selectedDepartment, setSelectedDepartment] = useState("");
   const departmentId = selectedDepartment || departments.data?.[0]?.id || "";
   const slas = useTaskSlas(hotelId, departmentId);
+  const categories = useTicketCategories(hotelId);
   const createSla = useCreateTaskSla(hotelId, departmentId);
-  const [category, setCategory] = useState("");
+  const updateSla = useUpdateTaskSla(hotelId, departmentId);
+  const deleteSla = useDeleteTaskSla(hotelId, departmentId);
+  const departmentCategories = (categories.data ?? []).filter((category) => category.department_id === departmentId);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [categoryId, setCategoryId] = useState("");
   const [slaMinutes, setSlaMinutes] = useState(30);
   const [acceptMinutes, setAcceptMinutes] = useState(2);
   const [description, setDescription] = useState("");
 
-  async function handleCreate() {
+  async function handleSave() {
+    const selectedCategory = departmentCategories.find((category) => category.id === categoryId) ?? departmentCategories[0];
+    if (!selectedCategory) {
+      toast.error("Select a task category before saving.");
+      return;
+    }
+    const payload = {
+      ticket_category_id: selectedCategory.id,
+      task_category: selectedCategory.key,
+      sla_minutes: slaMinutes,
+      accept_timeout_minutes: acceptMinutes,
+      description: description || null,
+      is_active: true,
+    };
     try {
-      await createSla.mutateAsync({
-        task_category: category,
-        sla_minutes: slaMinutes,
-        accept_timeout_minutes: acceptMinutes,
-        description: description || null,
-        is_active: true,
-      });
-      setCategory("");
-      setDescription("");
-      toast.success("Task SLA created");
+      if (editingId) {
+        await updateSla.mutateAsync({ slaId: editingId, payload });
+        toast.success("Task SLA updated");
+      } else {
+        await createSla.mutateAsync(payload);
+        toast.success("Task SLA created");
+      }
+      clearForm();
     } catch (error) {
       toast.error(apiErrorMessage(error));
     }
   }
 
-  if (departments.isLoading) {
+  async function handleDelete(slaId: string) {
+    try {
+      await deleteSla.mutateAsync(slaId);
+      if (editingId === slaId) {
+        clearForm();
+      }
+      toast.success("Task SLA deleted");
+    } catch (error) {
+      toast.error(apiErrorMessage(error));
+    }
+  }
+
+  function editSla(sla: TaskTypeSLA) {
+    const matchingCategory = departmentCategories.find((category) => category.id === sla.ticket_category_id)
+      ?? departmentCategories.find((category) => category.key === sla.task_category);
+    setEditingId(sla.id);
+    setCategoryId(matchingCategory?.id ?? "");
+    setSlaMinutes(sla.sla_minutes);
+    setAcceptMinutes(sla.accept_timeout_minutes);
+    setDescription(sla.description ?? "");
+  }
+
+  function clearForm() {
+    setEditingId(null);
+    setCategoryId("");
+    setSlaMinutes(30);
+    setAcceptMinutes(2);
+    setDescription("");
+  }
+
+  if (departments.isLoading || categories.isLoading) {
     return <DataState isLoading />;
   }
 
-  if (departments.error) {
-    return <DataState error={departments.error} />;
+  if (departments.error || categories.error) {
+    return <DataState error={departments.error ?? categories.error} />;
   }
 
   return (
@@ -64,7 +117,13 @@ export function TaskSlasPage({ hotelId }: { hotelId: string }) {
           <h2 className="mt-2 text-xl font-semibold">Task SLAs</h2>
         </div>
         <div className="w-full sm:w-72">
-          <Select value={departmentId} onChange={(event) => setSelectedDepartment(event.target.value)}>
+          <Select
+            value={departmentId}
+            onChange={(event) => {
+              setSelectedDepartment(event.target.value);
+              clearForm();
+            }}
+          >
             {(departments.data ?? []).map((department) => (
               <option key={department.id} value={department.id}>
                 {department.name}
@@ -76,7 +135,13 @@ export function TaskSlasPage({ hotelId }: { hotelId: string }) {
 
       <section className="grid gap-4 rounded-md border border-slate-200 bg-white p-4 md:grid-cols-[1fr_140px_140px_1fr_auto] md:items-end">
         <Field label="Task category" id="sla-category">
-          <Input id="sla-category" value={category} onChange={(event) => setCategory(event.target.value)} />
+          <Select id="sla-category" value={categoryId || departmentCategories[0]?.id || ""} onChange={(event) => setCategoryId(event.target.value)}>
+            {departmentCategories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </Select>
         </Field>
         <Field label="SLA minutes" id="sla-minutes">
           <Input id="sla-minutes" min={1} type="number" value={slaMinutes} onChange={(event) => setSlaMinutes(Number(event.target.value))} />
@@ -87,10 +152,22 @@ export function TaskSlasPage({ hotelId }: { hotelId: string }) {
         <Field label="Description" id="sla-description">
           <Input id="sla-description" value={description} onChange={(event) => setDescription(event.target.value)} />
         </Field>
-        <Button disabled={createSla.isPending || category.length < 2 || !departmentId} type="button" onClick={handleCreate}>
-          {createSla.isPending ? <Loader2 className="animate-spin" /> : <Plus />}
-          Add
+        <Button
+          disabled={createSla.isPending || updateSla.isPending || !departmentCategories.length || !departmentId}
+          type="button"
+          onClick={handleSave}
+        >
+          {createSla.isPending || updateSla.isPending ? <Loader2 className="animate-spin" /> : editingId ? <Pencil /> : <Plus />}
+          {editingId ? "Update" : "Add"}
         </Button>
+        {editingId ? (
+          <div className="md:col-span-5">
+            <Button type="button" variant="secondary" onClick={clearForm}>
+              <X />
+              Cancel edit
+            </Button>
+          </div>
+        ) : null}
       </section>
 
       {slas.isLoading ? <DataState isLoading /> : null}
@@ -102,10 +179,20 @@ export function TaskSlasPage({ hotelId }: { hotelId: string }) {
             <div className="rounded-md border border-slate-200 bg-white p-4" key={sla.id}>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h3 className="font-semibold">{sla.task_category}</h3>
+                  <h3 className="font-semibold">{sla.task_category_name ?? sla.task_category}</h3>
                   <p className="text-sm text-slate-500">{sla.description ?? "No description"}</p>
                 </div>
-                <Badge variant={sla.is_active ? "green" : "default"}>{sla.sla_minutes} min</Badge>
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <Badge variant={sla.is_active ? "green" : "default"}>{sla.sla_minutes} min</Badge>
+                  <Button size="sm" type="button" variant="secondary" onClick={() => editSla(sla)}>
+                    <Pencil />
+                    Edit
+                  </Button>
+                  <Button disabled={deleteSla.isPending} size="sm" type="button" variant="secondary" onClick={() => handleDelete(sla.id)}>
+                    {deleteSla.isPending ? <Loader2 className="animate-spin" /> : <Trash2 />}
+                    Delete
+                  </Button>
+                </div>
               </div>
               <p className="mt-3 text-sm text-slate-600">Accept timeout: {sla.accept_timeout_minutes} min</p>
             </div>

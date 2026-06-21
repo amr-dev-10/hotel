@@ -7,7 +7,10 @@ from app.models.task_type_sla import TaskTypeSLA
 from app.repositories.department_repository import DepartmentRepository
 from app.repositories.knowledge_repository import DepartmentConfigRepository
 from app.repositories.task_type_sla_repository import TaskTypeSLARepository
+from app.repositories.ticket_category_repository import TicketCategoryRepository
 from app.schemas.v51 import TaskTypeSLACreate, TaskTypeSLAUpdate
+from app.services.defaults import DEFAULT_TICKET_CATEGORIES
+from app.services.ticket_category_service import TicketCategoryService
 
 
 @dataclass(frozen=True)
@@ -51,16 +54,22 @@ class SLAService:
         self.slas = TaskTypeSLARepository(db)
         self.departments = DepartmentRepository(db)
         self.department_configs = DepartmentConfigRepository(db)
+        self.categories = TicketCategoryRepository(db)
 
     def get_sla_config(
         self,
         hotel_id: str,
         department_id: str | None,
         task_category: str | None,
+        ticket_category_id: str | None = None,
     ) -> SLAConfig:
-        task_sla = self.slas.find(hotel_id, department_id, task_category)
+        task_sla = self.slas.find(hotel_id, department_id, task_category, ticket_category_id)
         if task_sla:
             return SLAConfig(task_sla.sla_minutes, task_sla.accept_timeout_minutes)
+        if ticket_category_id:
+            category = self.categories.get_for_hotel(hotel_id, ticket_category_id)
+            if category:
+                return SLAConfig(category.sla_minutes, category.accept_timeout_minutes)
         if department_id:
             config = self.department_configs.get_for_department(hotel_id, department_id)
             if config and config.sla_minutes:
@@ -70,16 +79,32 @@ class SLAService:
     def create(self, hotel_id: str, department_id: str, payload: TaskTypeSLACreate) -> TaskTypeSLA:
         if not self.departments.get_for_hotel(hotel_id, department_id):
             raise not_found("Department not found")
-        existing = self.slas.find(hotel_id, department_id, payload.task_category)
+        data = payload.model_dump()
+        if payload.ticket_category_id:
+            category = self.categories.get_for_hotel(hotel_id, payload.ticket_category_id)
+            if not category or category.department_id != department_id:
+                raise not_found("Ticket category not found")
+            data["task_category"] = category.key
+        else:
+            category = TicketCategoryService(self.db).ensure(
+                hotel_id,
+                payload.task_category,
+                department_id=department_id,
+                sla_minutes=payload.sla_minutes,
+                accept_timeout_minutes=payload.accept_timeout_minutes,
+            )
+            data["ticket_category_id"] = category.id
+        existing = self.slas.find(hotel_id, department_id, data["task_category"], data.get("ticket_category_id"))
         if existing:
             existing.sla_minutes = payload.sla_minutes
             existing.accept_timeout_minutes = payload.accept_timeout_minutes
             existing.description = payload.description
             existing.is_active = payload.is_active
+            existing.ticket_category_id = data.get("ticket_category_id")
             self.db.commit()
             self.db.refresh(existing)
             return existing
-        row = TaskTypeSLA(hotel_id=hotel_id, department_id=department_id, **payload.model_dump())
+        row = TaskTypeSLA(hotel_id=hotel_id, department_id=department_id, **data)
         self.db.add(row)
         self.db.commit()
         self.db.refresh(row)
@@ -95,7 +120,13 @@ class SLAService:
         row = self.slas.get_for_hotel(hotel_id, sla_id)
         if not row or row.department_id != department_id:
             raise not_found("Task SLA not found")
-        for key, value in payload.model_dump(exclude_unset=True).items():
+        data = payload.model_dump(exclude_unset=True)
+        if data.get("ticket_category_id"):
+            category = self.categories.get_for_hotel(hotel_id, data["ticket_category_id"])
+            if not category or category.department_id != department_id:
+                raise not_found("Ticket category not found")
+            data["task_category"] = category.key
+        for key, value in data.items():
             setattr(row, key, value)
         self.db.commit()
         self.db.refresh(row)
@@ -109,21 +140,22 @@ class SLAService:
         self.db.commit()
 
     def seed_defaults(self, hotel_id: str, department_ids: dict[str, str]) -> None:
-        for department_key, rows in DEFAULT_TASK_SLAS.items():
-            department_id = department_ids.get(department_key)
+        for item in DEFAULT_TICKET_CATEGORIES:
+            department_id = department_ids.get(item["department_key"])
             if not department_id:
                 continue
-            for task_category, sla_minutes, accept_timeout, description in rows:
-                if self.slas.find(hotel_id, department_id, task_category):
-                    continue
-                self.db.add(
-                    TaskTypeSLA(
-                        hotel_id=hotel_id,
-                        department_id=department_id,
-                        task_category=task_category,
-                        sla_minutes=sla_minutes,
-                        accept_timeout_minutes=accept_timeout,
-                        description=description,
-                        is_active=True,
-                    )
+            category = self.categories.get_by_key(hotel_id, item["key"])
+            if self.slas.find(hotel_id, department_id, item["key"], category.id if category else None):
+                continue
+            self.db.add(
+                TaskTypeSLA(
+                    hotel_id=hotel_id,
+                    department_id=department_id,
+                    ticket_category_id=category.id if category else None,
+                    task_category=item["key"],
+                    sla_minutes=item["sla_minutes"],
+                    accept_timeout_minutes=item["accept_timeout_minutes"],
+                    description=item["description"],
+                    is_active=True,
                 )
+            )

@@ -14,6 +14,7 @@ class TicketCreate(BaseModel):
     department_key: str | None = None
     assigned_to: str | None = None
     type: str = "Ticket"
+    task_category_id: str | None = None
     task_category: str | None = None
     item_description: str = Field(min_length=2)
     source: str = "DASHBOARD"
@@ -35,6 +36,7 @@ class TicketUpdate(BaseModel):
     department_key: str | None = None
     assigned_to: str | None = None
     type: str | None = Field(default=None, min_length=2, max_length=40)
+    task_category_id: str | None = None
     task_category: str | None = None
     item_description: str | None = Field(default=None, min_length=2)
     source: str | None = None
@@ -62,7 +64,9 @@ class TicketRead(ORMModel):
     reservation_no: str | None = None
     stage: str
     type: str
+    task_category_id: str | None = None
     task_category: str | None = None
+    task_category_name: str | None = None
     item_description: str
     source: str
     followers: list[str]

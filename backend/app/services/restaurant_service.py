@@ -137,6 +137,7 @@ class RestaurantService:
                     room_id=payload.room_id,
                     department_key="food_beverage",
                     type="food_order",
+                    task_category="food_order",
                     item_description=f"Food order {order.order_number}",
                     source=payload.source,
                 ),

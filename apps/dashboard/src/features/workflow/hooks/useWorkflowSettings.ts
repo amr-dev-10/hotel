@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { apiGet, apiPost } from "@/lib/api/client";
+import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api/client";
 import { queryKeys } from "@/lib/api/query-keys";
 import type {
   EscalationRule,
   RoutingRule,
   TaskTypeSLA,
+  TicketCategory,
   WorkflowDefinition,
   WorkflowState,
   WorkflowTransition,
@@ -14,6 +15,7 @@ import type {
 export interface EscalationRulePayload {
   department_id?: string | null;
   ticket_type?: string | null;
+  task_category_id?: string | null;
   task_category?: string | null;
   escalation_level: number;
   trigger_after_minutes: number;
@@ -26,6 +28,7 @@ export interface EscalationRulePayload {
 }
 
 export interface TaskSlaPayload {
+  ticket_category_id?: string | null;
   task_category: string;
   sla_minutes: number;
   accept_timeout_minutes: number;
@@ -77,12 +80,48 @@ export function useEscalationRules(hotelId: string) {
   });
 }
 
+export function useTicketCategories(hotelId: string) {
+  return useQuery({
+    queryKey: queryKeys.workflow.ticketCategories(hotelId),
+    queryFn: () => apiGet<TicketCategory[]>(`/hotels/${hotelId}/ticket-categories`),
+    enabled: Boolean(hotelId),
+  });
+}
+
 export function useCreateEscalationRule(hotelId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (payload: EscalationRulePayload) =>
       apiPost<EscalationRule>(`/hotels/${hotelId}/escalation-rules`, payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.workflow.escalationRules(hotelId) }),
+  });
+}
+
+export function useUpdateEscalationRule(hotelId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ ruleId, payload }: { ruleId: string; payload: EscalationRulePayload }) =>
+      apiPut<EscalationRule>(`/hotels/${hotelId}/escalation-rules/${ruleId}`, payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.workflow.escalationRules(hotelId) }),
+  });
+}
+
+export function useDeleteEscalationRule(hotelId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (ruleId: string) => apiDelete<{ deleted: boolean; rule_id: string }>(`/hotels/${hotelId}/escalation-rules/${ruleId}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.workflow.escalationRules(hotelId) }),
+  });
+}
+
+export function useResetEscalationRules(hotelId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => apiPost<EscalationRule[]>(`/hotels/${hotelId}/escalation-rules/reset-defaults`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.workflow.escalationRules(hotelId) }),
   });
 }
@@ -105,6 +144,26 @@ export function useCreateTaskSla(hotelId: string, departmentId: string) {
   });
 }
 
+export function useUpdateTaskSla(hotelId: string, departmentId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ slaId, payload }: { slaId: string; payload: TaskSlaPayload }) =>
+      apiPut<TaskTypeSLA>(`/hotels/${hotelId}/departments/${departmentId}/task-slas/${slaId}`, payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.workflow.taskSlas(hotelId, departmentId) }),
+  });
+}
+
+export function useDeleteTaskSla(hotelId: string, departmentId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (slaId: string) =>
+      apiDelete<{ deleted: boolean; sla_id: string }>(`/hotels/${hotelId}/departments/${departmentId}/task-slas/${slaId}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.workflow.taskSlas(hotelId, departmentId) }),
+  });
+}
+
 export function useRoutingRules(hotelId: string) {
   return useQuery({
     queryKey: queryKeys.workflow.routingRules(hotelId),
@@ -119,6 +178,25 @@ export function useCreateRoutingRule(hotelId: string) {
   return useMutation({
     mutationFn: (payload: RoutingRulePayload) =>
       apiPost<RoutingRule>(`/hotels/${hotelId}/routing-rules`, payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.workflow.routingRules(hotelId) }),
+  });
+}
+
+export function useUpdateRoutingRule(hotelId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ ruleId, payload }: { ruleId: string; payload: RoutingRulePayload }) =>
+      apiPut<RoutingRule>(`/hotels/${hotelId}/routing-rules/${ruleId}`, payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.workflow.routingRules(hotelId) }),
+  });
+}
+
+export function useDeleteRoutingRule(hotelId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (ruleId: string) => apiDelete<{ deleted: boolean; rule_id: string }>(`/hotels/${hotelId}/routing-rules/${ruleId}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.workflow.routingRules(hotelId) }),
   });
 }

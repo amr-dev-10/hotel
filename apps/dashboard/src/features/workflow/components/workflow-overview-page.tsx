@@ -89,7 +89,7 @@ function buildEscalationGraph(rules: { id: string; escalation_level: number; tri
     id: rule.id,
     position: { x: index * 240, y: index % 2 === 0 ? 0 : 120 },
     data: {
-      label: `Level ${rule.escalation_level}: ${rule.target_staff_level ?? "next staff"} after ${rule.trigger_after_minutes}m`,
+      label: `Level ${rule.escalation_level}: ${rule.target_staff_level ?? "next staff"} ${rule.trigger_after_minutes}m after due`,
     },
     style: { borderColor: "#0F3D91", borderRadius: 6, fontSize: 12 },
   }));

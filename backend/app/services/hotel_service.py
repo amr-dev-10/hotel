@@ -29,6 +29,7 @@ from app.services.rate_limit_service import RateLimitService
 from app.services.escalation_service import EscalationRuleService
 from app.services.routing_service import RoutingRuleService
 from app.services.sla_service import SLAService
+from app.services.ticket_category_service import TicketCategoryService
 from app.services.usage_service import FeatureService
 
 
@@ -163,6 +164,7 @@ class HotelService:
             )
         FeatureService(self.db).seed_defaults()
         RateLimitService(self.db).seed_defaults(hotel.id)
+        TicketCategoryService(self.db).seed_defaults(hotel.id, department_ids)
         SLAService(self.db).seed_defaults(hotel.id, department_ids)
         EscalationRuleService(self.db).seed_defaults(hotel.id)
         RoutingRuleService(self.db).seed_defaults(hotel.id)

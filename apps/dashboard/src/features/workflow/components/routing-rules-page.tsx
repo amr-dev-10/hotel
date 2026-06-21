@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Loader2, Plus } from "lucide-react";
+import { ArrowLeft, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -13,31 +13,95 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { apiErrorMessage } from "@/lib/api/client";
 import { titleCase } from "@/lib/utils";
-import { useCreateRoutingRule, useRoutingRules } from "@/features/workflow/hooks/useWorkflowSettings";
+import {
+  useCreateRoutingRule,
+  useDeleteRoutingRule,
+  useRoutingRules,
+  useUpdateRoutingRule,
+} from "@/features/workflow/hooks/useWorkflowSettings";
+import type { RoutingRule } from "@/types/domain";
+
+const CHANNEL_OPTIONS = [
+  { value: "fcm", label: "Mobile push" },
+  { value: "websocket", label: "In-app" },
+  { value: "whatsapp", label: "WhatsApp" },
+];
 
 export function RoutingRulesPage({ hotelId }: { hotelId: string }) {
   const rules = useRoutingRules(hotelId);
   const createRule = useCreateRoutingRule(hotelId);
+  const updateRule = useUpdateRoutingRule(hotelId);
+  const deleteRule = useDeleteRoutingRule(hotelId);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [ticketType, setTicketType] = useState("Complaint");
   const [targetLevel, setTargetLevel] = useState("manager");
   const [priority, setPriority] = useState(4);
+  const [skipNormalAssignment, setSkipNormalAssignment] = useState(true);
+  const [notifyImmediately, setNotifyImmediately] = useState(true);
+  const [notificationChannels, setNotificationChannels] = useState(["fcm", "websocket", "whatsapp"]);
 
-  async function handleCreate() {
+  async function handleSave() {
+    const channels = notifyImmediately ? notificationChannels.length ? notificationChannels : ["websocket"] : [];
+    const payload = {
+      ticket_type: ticketType,
+      target_staff_level: targetLevel || null,
+      target_user_id: null,
+      skip_normal_assignment: skipNormalAssignment,
+      priority_override: priority,
+      notify_immediately: notifyImmediately,
+      notification_channels: channels,
+      is_active: true,
+    };
     try {
-      await createRule.mutateAsync({
-        ticket_type: ticketType,
-        target_staff_level: targetLevel,
-        target_user_id: null,
-        skip_normal_assignment: true,
-        priority_override: priority,
-        notify_immediately: true,
-        notification_channels: ["fcm", "websocket", "whatsapp"],
-        is_active: true,
-      });
-      toast.success("Routing rule created");
+      if (editingId) {
+        await updateRule.mutateAsync({ ruleId: editingId, payload });
+        toast.success("Routing rule updated");
+      } else {
+        await createRule.mutateAsync(payload);
+        toast.success("Routing rule created");
+      }
+      clearForm();
     } catch (error) {
       toast.error(apiErrorMessage(error));
     }
+  }
+
+  async function handleDelete(ruleId: string) {
+    try {
+      await deleteRule.mutateAsync(ruleId);
+      if (editingId === ruleId) {
+        clearForm();
+      }
+      toast.success("Routing rule deleted");
+    } catch (error) {
+      toast.error(apiErrorMessage(error));
+    }
+  }
+
+  function editRule(rule: RoutingRule) {
+    setEditingId(rule.id);
+    setTicketType(rule.ticket_type);
+    setTargetLevel(rule.target_staff_level ?? "manager");
+    setPriority(rule.priority_override ?? 4);
+    setSkipNormalAssignment(rule.skip_normal_assignment);
+    setNotifyImmediately(rule.notify_immediately);
+    setNotificationChannels(rule.notification_channels.length ? rule.notification_channels : ["websocket"]);
+  }
+
+  function clearForm() {
+    setEditingId(null);
+    setTicketType("Complaint");
+    setTargetLevel("manager");
+    setPriority(4);
+    setSkipNormalAssignment(true);
+    setNotifyImmediately(true);
+    setNotificationChannels(["fcm", "websocket", "whatsapp"]);
+  }
+
+  function toggleChannel(channel: string) {
+    setNotificationChannels((current) =>
+      current.includes(channel) ? current.filter((item) => item !== channel) : [...current, channel],
+    );
   }
 
   if (rules.isLoading) {
@@ -60,7 +124,7 @@ export function RoutingRulesPage({ hotelId }: { hotelId: string }) {
         <h2 className="mt-2 text-xl font-semibold">Routing Rules</h2>
       </div>
 
-      <section className="grid gap-4 rounded-md border border-slate-200 bg-white p-4 md:grid-cols-[1fr_180px_140px_auto] md:items-end">
+      <section className="grid gap-4 rounded-md border border-slate-200 bg-white p-4 md:grid-cols-3">
         <Field label="Ticket type" id="route-ticket-type">
           <Input id="route-ticket-type" value={ticketType} onChange={(event) => setTicketType(event.target.value)} />
         </Field>
@@ -74,10 +138,48 @@ export function RoutingRulesPage({ hotelId }: { hotelId: string }) {
         <Field label="Priority" id="route-priority">
           <Input id="route-priority" max={5} min={1} type="number" value={priority} onChange={(event) => setPriority(Number(event.target.value))} />
         </Field>
-        <Button disabled={createRule.isPending || ticketType.length < 2} type="button" onClick={handleCreate}>
-          {createRule.isPending ? <Loader2 className="animate-spin" /> : <Plus />}
-          Add
-        </Button>
+        <Field label="Assignment" id="route-assignment">
+          <Select id="route-assignment" value={skipNormalAssignment ? "skip" : "normal"} onChange={(event) => setSkipNormalAssignment(event.target.value === "skip")}>
+            <option value="skip">Skip normal assignment</option>
+            <option value="normal">Use normal assignment</option>
+          </Select>
+        </Field>
+        <Field label="Notify" id="route-notify">
+          <Select id="route-notify" value={notifyImmediately ? "yes" : "no"} onChange={(event) => setNotifyImmediately(event.target.value === "yes")}>
+            <option value="yes">Notify immediately</option>
+            <option value="no">Do not notify</option>
+          </Select>
+        </Field>
+        <Field label="Channels" id="route-channels">
+          <div className="flex min-h-9 flex-wrap items-center gap-2">
+            {CHANNEL_OPTIONS.map((channel) => (
+              <label className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs text-slate-700" key={channel.value}>
+                <input
+                  checked={notificationChannels.includes(channel.value)}
+                  className="size-3 accent-[#0F3D91]"
+                  disabled={!notifyImmediately}
+                  type="checkbox"
+                  onChange={() => toggleChannel(channel.value)}
+                />
+                {channel.label}
+              </label>
+            ))}
+          </div>
+        </Field>
+        <div className="md:col-span-3">
+          <div className="flex flex-wrap gap-2">
+            <Button disabled={createRule.isPending || updateRule.isPending || ticketType.length < 2} type="button" onClick={handleSave}>
+              {createRule.isPending || updateRule.isPending ? <Loader2 className="animate-spin" /> : editingId ? <Pencil /> : <Plus />}
+              {editingId ? "Update rule" : "Add rule"}
+            </Button>
+            {editingId ? (
+              <Button type="button" variant="secondary" onClick={clearForm}>
+                <X />
+                Cancel edit
+              </Button>
+            ) : null}
+          </div>
+        </div>
       </section>
 
       {!rules.data?.length ? (
@@ -93,10 +195,23 @@ export function RoutingRulesPage({ hotelId }: { hotelId: string }) {
                     Route to {titleCase(rule.target_staff_level)} {rule.skip_normal_assignment ? "immediately" : "normally"}
                   </p>
                 </div>
-                <Badge variant={rule.is_active ? "green" : "default"}>
-                  {rule.priority_override ? `P${rule.priority_override}` : "No override"}
-                </Badge>
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <Badge variant={rule.is_active ? "green" : "default"}>
+                    {rule.priority_override ? `P${rule.priority_override}` : "No override"}
+                  </Badge>
+                  <Button size="sm" type="button" variant="secondary" onClick={() => editRule(rule)}>
+                    <Pencil />
+                    Edit
+                  </Button>
+                  <Button disabled={deleteRule.isPending} size="sm" type="button" variant="secondary" onClick={() => handleDelete(rule.id)}>
+                    {deleteRule.isPending ? <Loader2 className="animate-spin" /> : <Trash2 />}
+                    Delete
+                  </Button>
+                </div>
               </div>
+              <p className="mt-2 text-sm text-slate-600">
+                {rule.notify_immediately ? `Notify via ${rule.notification_channels.join(", ")}` : "No immediate notification"}
+              </p>
             </div>
           ))}
         </div>

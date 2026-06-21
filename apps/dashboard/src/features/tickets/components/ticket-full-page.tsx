@@ -47,7 +47,7 @@ import { useReservations } from "@/features/reservations/hooks/useReservations";
 import { useRooms } from "@/features/rooms/hooks/useRooms";
 import { useStaff } from "@/features/staff/hooks/useStaff";
 import { useWhatsappConversations, useWhatsappMessages } from "@/features/whatsapp/hooks/useWhatsapp";
-import type { Department, Guest, Reservation, Room, StaffUser, Ticket, TicketTimelineItem, WhatsAppMessage } from "@/types/domain";
+import type { Department, Guest, Reservation, Room, StaffUser, Ticket, TicketCategory, TicketTimelineItem, WhatsAppMessage } from "@/types/domain";
 import {
   useAcceptTicket,
   useApproveTicket,
@@ -63,6 +63,7 @@ import {
   useTicketTimeline,
   useUpdateTicket,
 } from "@/features/tickets/hooks/useTickets";
+import { useTicketCategories } from "@/features/workflow/hooks/useWorkflowSettings";
 
 type CommunicationTab = "internal" | "ticket-chat" | "whatsapp-history";
 
@@ -83,6 +84,7 @@ export function TicketFullPage({
   const reservations = useReservations(hotelId);
   const rooms = useRooms(hotelId);
   const staff = useStaff(hotelId);
+  const categories = useTicketCategories(hotelId);
   const conversations = useWhatsappConversations(hotelId);
   const acceptTicket = useAcceptTicket(hotelId);
   const rejectTicket = useRejectTicket(hotelId);
@@ -373,6 +375,7 @@ export function TicketFullPage({
         reservations={reservations.data ?? []}
         rooms={rooms.data ?? []}
         staff={staff.data ?? []}
+        categories={categories.data ?? []}
         ticket={ticket}
         onOpenChange={setEditDialogOpen}
         onSubmit={async (payload) => {
@@ -397,6 +400,7 @@ function EditTicketDialog({
   reservations,
   rooms,
   staff,
+  categories,
   ticket,
   onOpenChange,
   onSubmit,
@@ -408,6 +412,7 @@ function EditTicketDialog({
   reservations: Reservation[];
   rooms: Room[];
   staff: StaffUser[];
+  categories: TicketCategory[];
   ticket: Ticket;
   onOpenChange: (open: boolean) => void;
   onSubmit: (payload: {
@@ -418,6 +423,7 @@ function EditTicketDialog({
     department_id: string | null;
     assigned_to: string | null;
     type: string;
+    task_category_id: string | null;
     task_category: string | null;
     item_description: string;
     source: string;
@@ -427,6 +433,7 @@ function EditTicketDialog({
 }) {
   const [description, setDescription] = useState(ticket.item_description);
   const [type, setType] = useState(ticket.type);
+  const [taskCategoryId, setTaskCategoryId] = useState(ticket.task_category_id ?? "");
   const [taskCategory, setTaskCategory] = useState(ticket.task_category ?? "");
   const [source, setSource] = useState(ticket.source);
   const [priority, setPriority] = useState(String(ticket.priority));
@@ -444,6 +451,7 @@ function EditTicketDialog({
     }
     setDescription(ticket.item_description);
     setType(ticket.type);
+    setTaskCategoryId(ticket.task_category_id ?? "");
     setTaskCategory(ticket.task_category ?? "");
     setSource(ticket.source);
     setPriority(String(ticket.priority));
@@ -466,6 +474,7 @@ function EditTicketDialog({
       department_id: optionalId(departmentId),
       assigned_to: optionalId(assignedTo),
       type,
+      task_category_id: optionalId(taskCategoryId),
       task_category: taskCategory.trim() || null,
       item_description: description.trim(),
       source,
@@ -545,7 +554,24 @@ function EditTicketDialog({
               </Select>
             </TicketFormField>
             <TicketFormField label="Task category">
-              <Input value={taskCategory} onChange={(event) => setTaskCategory(event.target.value)} />
+              <Select
+                value={taskCategoryId}
+                onChange={(event) => {
+                  const category = categories.find((item) => item.id === event.target.value);
+                  setTaskCategoryId(event.target.value);
+                  setTaskCategory(category?.key ?? "");
+                  if (category?.department_id) {
+                    setDepartmentId(category.department_id);
+                  }
+                }}
+              >
+                <option value="">No category</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </Select>
             </TicketFormField>
           </div>
           <div className="grid gap-4 sm:grid-cols-3">

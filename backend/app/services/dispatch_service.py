@@ -103,7 +103,12 @@ class DispatchService:
         acceptance = self.acceptances.update_response(ticket.id, user_id, "accepted", now)
         if not acceptance and ticket.assigned_to != user_id:
             raise bad_request("Ticket is not pending acceptance for this user")
-        config = self.slas.get_sla_config(ticket.hotel_id, ticket.department_id, ticket.task_category)
+        config = self.slas.get_sla_config(
+            ticket.hotel_id,
+            ticket.department_id,
+            ticket.task_category,
+            ticket.task_category_id,
+        )
         ticket.assigned_to = user_id
         ticket.stage = "accepted"
         ticket.sla_due_at = now + timedelta(minutes=config.sla_minutes)
@@ -226,6 +231,7 @@ class DispatchService:
             ticket.department_id,
             ticket.type,
             ticket.task_category,
+            ticket.task_category_id,
             next_level,
         )
         if not rule:
@@ -370,6 +376,7 @@ class DispatchService:
             ticket.department_id,
             ticket.type,
             ticket.task_category,
+            ticket.task_category_id,
             1,
         )
         return rule.target_staff_level if rule and rule.target_staff_level else "attendant"
@@ -381,7 +388,12 @@ class DispatchService:
     ) -> int:
         if escalation_rule and escalation_rule.trigger_after_minutes > 0:
             return escalation_rule.trigger_after_minutes
-        return self.slas.get_sla_config(ticket.hotel_id, ticket.department_id, ticket.task_category).accept_timeout_minutes
+        return self.slas.get_sla_config(
+            ticket.hotel_id,
+            ticket.department_id,
+            ticket.task_category,
+            ticket.task_category_id,
+        ).accept_timeout_minutes
 
     def _ticket_payload(self, ticket: Ticket) -> dict:
         room = (
@@ -408,6 +420,8 @@ class DispatchService:
             "department_id": ticket.department_id,
             "assigned_to": ticket.assigned_to,
             "assigned_to_name": assignee.name if assignee else None,
+            "task_category_id": ticket.task_category_id,
+            "task_category": ticket.task_category,
             "source": ticket.source,
             "reservation_id": ticket.reservation_id,
             "conversation_id": ticket.conversation_id,

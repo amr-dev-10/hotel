@@ -134,7 +134,9 @@ export interface Ticket {
   reservation_no?: string | null;
   stage: string;
   type: string;
+  task_category_id: string | null;
   task_category: string | null;
+  task_category_name?: string | null;
   item_description: string;
   source: string;
   followers: string[];
@@ -633,7 +635,9 @@ export interface EscalationRule {
   hotel_id: string;
   department_id: string | null;
   ticket_type: string | null;
+  task_category_id: string | null;
   task_category: string | null;
+  task_category_name?: string | null;
   escalation_level: number;
   trigger_after_minutes: number;
   action: string;
@@ -649,12 +653,29 @@ export interface TaskTypeSLA {
   id: string;
   hotel_id: string;
   department_id: string;
+  ticket_category_id: string | null;
   task_category: string;
+  task_category_name?: string | null;
   sla_minutes: number;
   accept_timeout_minutes: number;
   description: string | null;
   is_active: boolean;
   created_at: string;
+}
+
+export interface TicketCategory {
+  id: string;
+  hotel_id: string;
+  department_id: string | null;
+  key: string;
+  name: string;
+  description: string | null;
+  default_priority: number;
+  sla_minutes: number;
+  accept_timeout_minutes: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface RoutingRule {

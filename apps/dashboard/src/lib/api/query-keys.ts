@@ -32,6 +32,7 @@ export const queryKeys = {
     items: (categoryId?: string) => ["guest-portal", "items", categoryId ?? "all"] as const,
     orders: () => ["guest-portal", "orders"] as const,
     requests: () => ["guest-portal", "requests"] as const,
+    requestCategories: () => ["guest-portal", "request-categories"] as const,
   },
   reservationDetail: (hotelId: string, reservationId: string) =>
     ["reservations", hotelId, reservationId] as const,
@@ -69,6 +70,7 @@ export const queryKeys = {
     transitions: (hotelId: string, workflowId: string) =>
       ["workflow", hotelId, workflowId, "transitions"] as const,
     escalationRules: (hotelId: string) => ["workflow", hotelId, "escalation-rules"] as const,
+    ticketCategories: (hotelId: string) => ["workflow", hotelId, "ticket-categories"] as const,
     taskSlas: (hotelId: string, departmentId: string) =>
       ["workflow", hotelId, departmentId, "task-slas"] as const,
     routingRules: (hotelId: string) => ["workflow", hotelId, "routing-rules"] as const,
