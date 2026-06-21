@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { Mail, MessageCircle, Phone, Search, UserRound } from "lucide-react";
@@ -15,54 +15,15 @@ import { compactId, titleCase } from "@/lib/utils";
 import type { Guest } from "@/types/domain";
 import { CreateGuestDialog } from "@/features/guests/components/create-guest-dialog";
 import { useGuests } from "@/features/guests/hooks/useGuests";
-import { useReservations } from "@/features/reservations/hooks/useReservations";
-import { useWhatsappConversations } from "@/features/whatsapp/hooks/useWhatsapp";
 
 export function GuestsPage({ hotelId }: { hotelId: string }) {
-  const guests = useGuests(hotelId);
-  const reservations = useReservations(hotelId);
-  const conversations = useWhatsappConversations(hotelId);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
-
-  const reservationCountByGuest = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const reservation of reservations.data ?? []) {
-      counts.set(reservation.guest_id, (counts.get(reservation.guest_id) ?? 0) + 1);
-    }
-    return counts;
-  }, [reservations.data]);
-
-  const conversationByGuest = useMemo(() => {
-    const byGuest = new Map<string, boolean>();
-    for (const conversation of conversations.data ?? []) {
-      if (conversation.guest_id) {
-        byGuest.set(conversation.guest_id, true);
-      }
-    }
-    return byGuest;
-  }, [conversations.data]);
-
-  const filteredGuests = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase();
-
-    return (guests.data ?? []).filter((guest) => {
-      const matchesStatus = status === "all" || guest.status === status;
-      const matchesSearch =
-        !normalizedSearch ||
-        [
-          guest.name,
-          guest.phone,
-          guest.whatsapp_phone,
-          guest.email,
-          guest.id,
-        ]
-          .filter(Boolean)
-          .some((value) => value?.toLowerCase().includes(normalizedSearch));
-
-      return matchesStatus && matchesSearch;
-    });
-  }, [guests.data, search, status]);
+  const guests = useGuests(hotelId, {
+    q: search.trim() || undefined,
+    status: status === "all" ? undefined : status,
+  });
+  const filteredGuests = guests.data ?? [];
 
   if (guests.isLoading) {
     return <DataState isLoading />;
@@ -112,32 +73,35 @@ export function GuestsPage({ hotelId }: { hotelId: string }) {
       {!filteredGuests.length ? (
         <DataState empty emptyTitle={guests.data?.length ? "No guests match these filters." : "No guests yet."} />
       ) : (
-        <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[940px] border-collapse text-sm">
-              <thead className="bg-slate-50 text-left text-xs uppercase tracking-normal text-slate-500">
-                <tr>
-                  <th className="border-b border-slate-200 px-4 py-3 font-semibold">Guest</th>
-                  <th className="border-b border-slate-200 px-4 py-3 font-semibold">Contact</th>
-                  <th className="border-b border-slate-200 px-4 py-3 font-semibold">Stay Window</th>
-                  <th className="border-b border-slate-200 px-4 py-3 font-semibold">Reservations</th>
-                  <th className="border-b border-slate-200 px-4 py-3 font-semibold">Status</th>
-                  <th className="border-b border-slate-200 px-4 py-3 font-semibold" />
-                </tr>
-              </thead>
-              <tbody>
-                {filteredGuests.map((guest) => (
-                  <GuestRow
-                    guest={guest}
-                    hasConversation={conversationByGuest.get(guest.id) ?? false}
-                    hotelId={hotelId}
-                    key={guest.id}
-                    reservationCount={reservationCountByGuest.get(guest.id) ?? 0}
-                  />
-                ))}
-              </tbody>
-            </table>
+        <div className="grid gap-3">
+          <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[940px] border-collapse text-sm">
+                <thead className="bg-slate-50 text-left text-xs uppercase tracking-normal text-slate-500">
+                  <tr>
+                    <th className="border-b border-slate-200 px-4 py-3 font-semibold">Guest</th>
+                    <th className="border-b border-slate-200 px-4 py-3 font-semibold">Contact</th>
+                    <th className="border-b border-slate-200 px-4 py-3 font-semibold">Stay Window</th>
+                    <th className="border-b border-slate-200 px-4 py-3 font-semibold">Reservations</th>
+                    <th className="border-b border-slate-200 px-4 py-3 font-semibold">Status</th>
+                    <th className="border-b border-slate-200 px-4 py-3 font-semibold" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredGuests.map((guest) => (
+                    <GuestRow guest={guest} hotelId={hotelId} key={guest.id} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
+          {guests.hasNextPage ? (
+            <div className="flex justify-center">
+              <Button disabled={guests.isFetchingNextPage} type="button" variant="secondary" onClick={() => guests.fetchNextPage()}>
+                {guests.isFetchingNextPage ? "Loading..." : "Load more"}
+              </Button>
+            </div>
+          ) : null}
         </div>
       )}
     </div>
@@ -146,14 +110,10 @@ export function GuestsPage({ hotelId }: { hotelId: string }) {
 
 function GuestRow({
   guest,
-  hasConversation,
   hotelId,
-  reservationCount,
 }: {
   guest: Guest;
-  hasConversation: boolean;
   hotelId: string;
-  reservationCount: number;
 }) {
   return (
     <tr className="border-b border-slate-100 last:border-0">
@@ -194,8 +154,10 @@ function GuestRow({
       </td>
       <td className="px-4 py-3 align-middle">
         <div className="flex items-center gap-2">
-          <Badge variant={reservationCount > 1 ? "teal" : "default"}>{reservationCount}</Badge>
-          {hasConversation ? <Badge variant="green">WhatsApp</Badge> : null}
+          <Badge variant={(guest.reservation_count ?? 0) > 1 ? "teal" : "default"}>
+            {guest.reservation_count ?? 0}
+          </Badge>
+          {guest.has_whatsapp_conversation ? <Badge variant="green">WhatsApp</Badge> : null}
         </div>
       </td>
       <td className="px-4 py-3 align-middle">

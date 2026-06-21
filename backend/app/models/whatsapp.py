@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, ForeignKey, Integer, JSON, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, JSON, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -79,6 +79,9 @@ class WhatsAppConversation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "whatsapp_conversations"
     __table_args__ = (
         UniqueConstraint("hotel_id", "guest_id", name="uq_whatsapp_conversation_guest"),
+        Index("ix_wa_conv_hotel_phone", "hotel_id", "phone"),
+        Index("ix_wa_conv_hotel_last_msg", "hotel_id", "last_message_at", "id"),
+        Index("ix_wa_conv_hotel_status", "hotel_id", "status"),
     )
 
     hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)

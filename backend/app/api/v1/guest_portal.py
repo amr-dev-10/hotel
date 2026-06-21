@@ -152,9 +152,10 @@ def list_requests(
     db: Session = Depends(get_db),
     context: GuestPortalContext = Depends(require_guest_session),
 ) -> dict:
-    tickets = TicketRepository(db).list_filtered(
+    page = TicketRepository(db).list_filtered(
         context.hotel_id,
         guest_id=context.guest_id,
         reservation_id=context.reservation_id,
+        limit=100,
     )
-    return ok([TicketRead.model_validate(item).model_dump() for item in tickets if item.source == "PORTAL"])
+    return ok([TicketRead.model_validate(item).model_dump() for item in page.items if item.source == "PORTAL"])

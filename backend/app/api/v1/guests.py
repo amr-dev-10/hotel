@@ -1,19 +1,20 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import require_permission
 from app.core.database import get_db
+from app.core.exceptions import bad_request, not_found
 from app.core.responses import ok
 from app.models.guest import Guest
 from app.models.user import User
 from app.repositories.guest_repository import GuestRepository
 from app.schemas.consent import GuestConsentRead, GuestConsentUpsert
-from app.schemas.guest import GuestCreate, GuestRead, GuestUpdate, TimelineEvent
+from app.schemas.guest import GuestCreate, GuestDetail, GuestListItem, GuestRead, GuestUpdate, TimelineEvent
 from app.services.consent_service import GuestConsentService
 from app.models.reservation import Reservation, ReservationGuest
 from app.models.whatsapp import WhatsAppConversation, WhatsAppMessage
 from app.models.ticket import Ticket
-from sqlalchemy import select, or_
 
 router = APIRouter()
 
@@ -21,11 +22,35 @@ router = APIRouter()
 @router.get("")
 def list_guests(
     hotel_id: str,
+    q: str | None = None,
+    status: str | None = None,
+    cursor: str | None = None,
+    limit: int = Query(default=50, ge=1, le=200),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("guest.view")),
 ) -> dict:
-    guests = GuestRepository(db).list_for_hotel(hotel_id)
-    return ok([GuestRead.model_validate(item).model_dump() for item in guests])
+    try:
+        page = GuestRepository(db).list_filtered(
+            hotel_id,
+            q=q,
+            status=status,
+            cursor=cursor,
+            limit=limit,
+        )
+    except ValueError:
+        raise bad_request("Invalid pagination cursor") from None
+    guest_context = _guest_list_context(db, hotel_id, [item.id for item in page.items])
+    items = []
+    for item in page.items:
+        data = GuestListItem.model_validate(item).model_dump()
+        context = guest_context.get(item.id)
+        if context:
+            data.update(context)
+        items.append(data)
+    return ok(
+        items,
+        meta={"next_cursor": page.next_cursor, "has_more": page.has_more, "limit": page.limit},
+    )
 
 
 @router.post("")
@@ -60,8 +85,8 @@ def get_guest(
 ) -> dict:
     guest = GuestRepository(db).get_for_hotel(hotel_id, guest_id)
     if not guest:
-        return {"error": "Not found"}
-    return ok(GuestRead.model_validate(guest).model_dump())
+        raise not_found("Guest not found")
+    return ok(GuestDetail.model_validate(guest).model_dump())
 
 @router.patch("/{guest_id}")
 def update_guest(
@@ -230,3 +255,46 @@ def get_guest_conversation(
         "conversation_id": conversation.id,
         "reservation_id": active_reservation_id
     })
+
+
+def _guest_list_context(db: Session, hotel_id: str, guest_ids: list[str]) -> dict[str, dict[str, int | bool]]:
+    if not guest_ids:
+        return {}
+    id_set = set(guest_ids)
+    context: dict[str, dict[str, int | bool]] = {
+        guest_id: {"reservation_count": 0, "has_whatsapp_conversation": False}
+        for guest_id in id_set
+    }
+    direct_counts = db.execute(
+        select(Reservation.guest_id, func.count(Reservation.id))
+        .where(
+            Reservation.hotel_id == hotel_id,
+            Reservation.guest_id.in_(id_set),
+            Reservation.deleted_at.is_(None),
+        )
+        .group_by(Reservation.guest_id)
+    ).all()
+    for guest_id, count in direct_counts:
+        context[guest_id]["reservation_count"] = int(count)
+    linked_counts = db.execute(
+        select(ReservationGuest.guest_id, func.count(ReservationGuest.reservation_id.distinct()))
+        .where(
+            ReservationGuest.hotel_id == hotel_id,
+            ReservationGuest.guest_id.in_(id_set),
+        )
+        .group_by(ReservationGuest.guest_id)
+    ).all()
+    for guest_id, count in linked_counts:
+        context[guest_id]["reservation_count"] = max(
+            int(context[guest_id]["reservation_count"]),
+            int(count),
+        )
+    conversations = db.execute(
+        select(WhatsAppConversation.guest_id).where(
+            WhatsAppConversation.hotel_id == hotel_id,
+            WhatsAppConversation.guest_id.in_(id_set),
+        )
+    ).scalars().all()
+    for guest_id in conversations:
+        context[guest_id]["has_whatsapp_conversation"] = True
+    return context

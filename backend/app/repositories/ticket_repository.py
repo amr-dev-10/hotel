@@ -1,12 +1,13 @@
 from collections.abc import Sequence
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.base import utcnow
 from app.models.department import Department
 from app.models.ticket import Ticket, TicketEvent, TicketMessage
 from app.repositories.base import BaseRepository
+from app.repositories.pagination import CursorResult, apply_created_at_cursor, paginate_created_at_desc
 
 
 class TicketRepository(BaseRepository[Ticket]):
@@ -34,7 +35,10 @@ class TicketRepository(BaseRepository[Ticket]):
         assigned_to: str | None = None,
         department_key: str | None = None,
         sla_status: str | None = None,
-    ) -> Sequence[Ticket]:
+        q: str | None = None,
+        limit: int = 50,
+        cursor: str | None = None,
+    ) -> CursorResult[Ticket]:
         statement = select(Ticket).where(
             Ticket.hotel_id == hotel_id,
             Ticket.deleted_at.is_(None),
@@ -70,7 +74,27 @@ class TicketRepository(BaseRepository[Ticket]):
                 Ticket.sla_due_at < utcnow(),
                 Ticket.stage.not_in(("approved", "Completed", "Cancelled", "closed", "resolved")),
             )
-        return self.db.execute(statement.order_by(Ticket.created_at.desc())).scalars().all()
+        if q:
+            pattern = f"%{q.strip()}%"
+            statement = statement.where(
+                or_(
+                    Ticket.ticket_code.ilike(pattern),
+                    Ticket.item_description.ilike(pattern),
+                    Ticket.stage.ilike(pattern),
+                    Ticket.room_id.ilike(pattern),
+                    Ticket.assigned_to.ilike(pattern),
+                    Ticket.source.ilike(pattern),
+                )
+            )
+        statement = apply_created_at_cursor(statement, Ticket, cursor)
+        rows = (
+            self.db.execute(
+                statement.order_by(Ticket.created_at.desc(), Ticket.id.desc()).limit(limit + 1)
+            )
+            .scalars()
+            .all()
+        )
+        return paginate_created_at_desc(rows, limit)
 
     def list_unresolved(self, hotel_id: str | None = None) -> Sequence[Ticket]:
         terminal = (

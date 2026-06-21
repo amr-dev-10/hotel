@@ -69,6 +69,14 @@ class TicketRead(ORMModel):
     updated_at: datetime
 
 
+class TicketListItem(TicketRead):
+    pass
+
+
+class TicketDetail(TicketRead):
+    pass
+
+
 class EscalatedTicketRead(BaseModel):
     escalation_id: str
     ticket_id: str

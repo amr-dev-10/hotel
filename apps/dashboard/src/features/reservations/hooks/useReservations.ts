@@ -1,8 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { apiGet, apiPost, apiPut } from "@/lib/api/client";
+import { apiGet, apiGetEnvelope, apiPost, apiPut } from "@/lib/api/client";
 import { queryKeys } from "@/lib/api/query-keys";
-import type { Folio, Reservation, ReservationGuest, StayRecord, WhatsAppMessage } from "@/types/domain";
+import type { ApiEnvelope, CursorPageMeta, Folio, Reservation, ReservationGuest, StayRecord, WhatsAppMessage } from "@/types/domain";
 import type { CreateReservationValues } from "@/features/reservations/schemas/create-reservation.schema";
 
 export type ReservationUpdatePayload = {
@@ -15,12 +15,35 @@ export type ReservationUpdatePayload = {
   notes?: string | null;
 };
 
-export function useReservations(hotelId: string) {
-  return useQuery({
-    queryKey: queryKeys.reservations(hotelId),
-    queryFn: () => apiGet<Reservation[]>(`/hotels/${hotelId}/reservations`),
+export type ReservationFilters = {
+  q?: string;
+  status?: string;
+  from?: string;
+  to?: string;
+  limit?: number;
+};
+
+export function useReservations(hotelId: string, filters: ReservationFilters = {}) {
+  const limit = filters.limit ?? 100;
+  const query = useInfiniteQuery<ApiEnvelope<Reservation[]>, Error>({
+    queryKey: queryKeys.reservationsList(hotelId, compactParams({ ...filters, limit })),
+    queryFn: ({ pageParam }) =>
+      apiGetEnvelope<Reservation[]>(`/hotels/${hotelId}/reservations`, {
+        params: compactParams({ ...filters, limit, cursor: pageParam as string | undefined }),
+      }),
+    initialPageParam: undefined,
+    getNextPageParam: (lastPage) => {
+      const meta = lastPage.meta as CursorPageMeta | null | undefined;
+      return meta?.has_more ? meta.next_cursor : undefined;
+    },
     enabled: Boolean(hotelId),
   });
+
+  return {
+    ...query,
+    data: query.data?.pages.flatMap((page) => page.data) ?? [],
+    pageMeta: query.data?.pages.at(-1)?.meta as CursorPageMeta | null | undefined,
+  };
 }
 
 export function useReservation(hotelId: string, reservationId: string) {
@@ -135,4 +158,10 @@ export function useCancelReservation(hotelId: string) {
       queryClient.invalidateQueries({ queryKey: queryKeys.reservationStays(hotelId, variables.reservationId) });
     },
   });
+}
+
+function compactParams(params: Record<string, string | number | undefined>) {
+  return Object.fromEntries(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== ""),
+  );
 }

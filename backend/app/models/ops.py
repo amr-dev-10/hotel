@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, JSON, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import Date, DateTime, ForeignKey, Index, Integer, JSON, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -191,6 +191,11 @@ class ImportJob(UUIDPrimaryKeyMixin, Base):
 
 class HousekeepingSchedule(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "housekeeping_schedules"
+    __table_args__ = (
+        Index("ix_hk_hotel_status", "hotel_id", "status"),
+        Index("ix_hk_hotel_room", "hotel_id", "room_id"),
+        Index("ix_hk_hotel_scheduled", "hotel_id", "scheduled_date"),
+    )
 
     hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
     room_id: Mapped[str] = mapped_column(ForeignKey("rooms.id"), index=True)

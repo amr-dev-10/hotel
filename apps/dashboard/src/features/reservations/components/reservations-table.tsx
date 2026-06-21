@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { createColumnHelper, flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table";
 import { format } from "date-fns";
@@ -15,8 +15,7 @@ import { Select } from "@/components/ui/select";
 import { Can } from "@/lib/auth/can";
 import { apiErrorMessage } from "@/lib/api/client";
 import { compactId, titleCase } from "@/lib/utils";
-import type { Guest, Reservation } from "@/types/domain";
-import { useGuests } from "@/features/guests/hooks/useGuests";
+import type { Reservation } from "@/types/domain";
 import { CancelReservationDialog } from "@/features/reservations/components/cancel-reservation-dialog";
 import {
   useCancelReservation,
@@ -28,53 +27,21 @@ import {
 const columnHelper = createColumnHelper<Reservation>();
 
 export function ReservationsTable({ hotelId }: { hotelId: string }) {
-  const reservations = useReservations(hotelId);
-  const guests = useGuests(hotelId);
-  const checkIn = useCheckInReservation(hotelId);
-  const checkOut = useCheckOutReservation(hotelId);
-  const cancelReservation = useCancelReservation(hotelId);
   const [reservationToCancel, setReservationToCancel] = useState<Reservation | null>(null);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
-
-  const guestById = useMemo(() => {
-    const byId = new Map<string, Guest>();
-    for (const guest of guests.data ?? []) {
-      byId.set(guest.id, guest);
-    }
-    return byId;
-  }, [guests.data]);
-
-  const filteredReservations = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase();
-    const from = fromDate ? new Date(fromDate).getTime() : null;
-    const to = toDate ? new Date(toDate).getTime() : null;
-
-    return (reservations.data ?? []).filter((reservation) => {
-      const guest = guestById.get(reservation.guest_id);
-      const checkin = new Date(reservation.checkin_date).getTime();
-      const checkout = new Date(reservation.checkout_date).getTime();
-      const matchesStatus = status === "all" || reservation.status === status;
-      const matchesDate = (from == null || checkout >= from) && (to == null || checkin <= to);
-      const matchesSearch =
-        !normalizedSearch ||
-        [
-          reservation.reservation_no,
-          reservation.guest_id,
-          reservation.room_id,
-          reservation.source,
-          guest?.name,
-          guest?.phone,
-          guest?.whatsapp_phone,
-        ]
-          .filter(Boolean)
-          .some((value) => value?.toLowerCase().includes(normalizedSearch));
-
-      return matchesStatus && matchesDate && matchesSearch;
-    });
-  }, [fromDate, guestById, reservations.data, search, status, toDate]);
+  const reservations = useReservations(hotelId, {
+    q: search.trim() || undefined,
+    status: status === "all" ? undefined : status,
+    from: fromDate || undefined,
+    to: toDate || undefined,
+  });
+  const rows = reservations.data ?? [];
+  const checkIn = useCheckInReservation(hotelId);
+  const checkOut = useCheckOutReservation(hotelId);
+  const cancelReservation = useCancelReservation(hotelId);
 
   const columns = [
     columnHelper.accessor("reservation_no", {
@@ -91,17 +58,17 @@ export function ReservationsTable({ hotelId }: { hotelId: string }) {
     columnHelper.accessor("guest_id", {
       header: "Guest",
       cell: (info) => {
-        const guest = guestById.get(info.getValue());
-
         return (
           <div className="min-w-0">
             <Link
               className="font-medium text-slate-900 hover:text-[#0F3D91]"
               href={`/${hotelId}/guests/${info.getValue()}`}
             >
-              {guest?.name ?? compactId(info.getValue())}
+              {info.row.original.guest_name ?? compactId(info.getValue())}
             </Link>
-            <p className="mt-0.5 text-xs text-slate-500">{guest?.phone ?? compactId(info.getValue())}</p>
+            <p className="mt-0.5 text-xs text-slate-500">
+              {info.row.original.guest_phone ?? compactId(info.getValue())}
+            </p>
           </div>
         );
       },
@@ -191,7 +158,7 @@ export function ReservationsTable({ hotelId }: { hotelId: string }) {
   ];
 
   const table = useReactTable({
-    data: filteredReservations,
+    data: rows,
     columns,
     getCoreRowModel: getCoreRowModel(),
   });
@@ -243,36 +210,50 @@ export function ReservationsTable({ hotelId }: { hotelId: string }) {
         </div>
       </section>
 
-      {!filteredReservations.length ? (
+      {!rows.length ? (
         <DataState empty emptyTitle="No reservations match these filters." />
       ) : (
-        <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px] border-collapse text-sm">
-              <thead className="bg-slate-50 text-left text-xs uppercase tracking-normal text-slate-500">
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <tr key={headerGroup.id}>
-                    {headerGroup.headers.map((header) => (
-                      <th className="border-b border-slate-200 px-4 py-3 font-semibold" key={header.id}>
-                        {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
-                      </th>
-                    ))}
-                  </tr>
-                ))}
-              </thead>
-              <tbody>
-                {table.getRowModel().rows.map((row) => (
-                  <tr className="border-b border-slate-100 last:border-0" key={row.id}>
-                    {row.getVisibleCells().map((cell) => (
-                      <td className="px-4 py-3 align-middle" key={cell.id}>
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <div className="grid gap-3">
+          <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[980px] border-collapse text-sm">
+                <thead className="bg-slate-50 text-left text-xs uppercase tracking-normal text-slate-500">
+                  {table.getHeaderGroups().map((headerGroup) => (
+                    <tr key={headerGroup.id}>
+                      {headerGroup.headers.map((header) => (
+                        <th className="border-b border-slate-200 px-4 py-3 font-semibold" key={header.id}>
+                          {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                        </th>
+                      ))}
+                    </tr>
+                  ))}
+                </thead>
+                <tbody>
+                  {table.getRowModel().rows.map((row) => (
+                    <tr className="border-b border-slate-100 last:border-0" key={row.id}>
+                      {row.getVisibleCells().map((cell) => (
+                        <td className="px-4 py-3 align-middle" key={cell.id}>
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
+          {reservations.hasNextPage ? (
+            <div className="flex justify-center">
+              <Button
+                disabled={reservations.isFetchingNextPage}
+                type="button"
+                variant="secondary"
+                onClick={() => reservations.fetchNextPage()}
+              >
+                {reservations.isFetchingNextPage ? "Loading..." : "Load more"}
+              </Button>
+            </div>
+          ) : null}
         </div>
       )}
 

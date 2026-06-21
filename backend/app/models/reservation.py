@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -11,6 +11,11 @@ class Reservation(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     __tablename__ = "reservations"
     __table_args__ = (
         UniqueConstraint("hotel_id", "reservation_no", name="uq_reservations_hotel_no"),
+        Index("ix_reservation_hotel_checkin", "hotel_id", "checkin_date"),
+        Index("ix_reservation_hotel_checkout", "hotel_id", "checkout_date"),
+        Index("ix_reservation_hotel_room", "hotel_id", "room_id"),
+        Index("ix_reservation_hotel_status", "hotel_id", "status"),
+        Index("ix_reservation_hotel_created", "hotel_id", "created_at", "id"),
     )
 
     hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)

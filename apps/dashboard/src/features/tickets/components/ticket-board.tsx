@@ -54,27 +54,7 @@ export function TicketBoard({ hotelId }: { hotelId: string }) {
   );
   const tickets = useTickets(hotelId, filters);
   const updateStage = useUpdateTicketStage(hotelId);
-
-  const filteredTickets = useMemo(() => {
-    const q = filters.q.toLowerCase();
-    return (tickets.data ?? []).filter((ticket) => {
-      const matchesQuery =
-        !q ||
-        [
-          ticket.ticket_code,
-          ticket.item_description,
-          ticket.stage,
-          ticket.room_id ?? "",
-          ticket.assigned_to ?? "",
-        ]
-          .join(" ")
-          .toLowerCase()
-          .includes(q);
-      const matchesStage = !filters.stage || normalizeStage(ticket.stage) === filters.stage;
-      const matchesPriority = !filters.priority || String(ticket.priority) === filters.priority;
-      return matchesQuery && matchesStage && matchesPriority;
-    });
-  }, [filters.priority, filters.q, filters.stage, tickets.data]);
+  const rows = tickets.data ?? [];
 
   async function handleDragEnd(event: DragEndEvent) {
     const ticket = event.active.data.current?.ticket as Ticket | undefined;
@@ -104,11 +84,18 @@ export function TicketBoard({ hotelId }: { hotelId: string }) {
       <DndContext onDragEnd={handleDragEnd}>
         <div className="grid min-h-[640px] gap-4 overflow-x-auto pb-2 xl:grid-cols-6">
           {columns.map((column) => {
-            const items = filteredTickets.filter((ticket) => column.aliases.includes(ticket.stage));
+            const items = rows.filter((ticket) => column.aliases.includes(ticket.stage));
             return <BoardColumn columnKey={column.key} key={column.key} tickets={items} title={column.title} />;
           })}
         </div>
       </DndContext>
+      {tickets.hasNextPage ? (
+        <div className="mt-3 flex justify-center">
+          <Button disabled={tickets.isFetchingNextPage} type="button" variant="secondary" onClick={() => tickets.fetchNextPage()}>
+            {tickets.isFetchingNextPage ? "Loading..." : "Load more"}
+          </Button>
+        </div>
+      ) : null}
       <TicketDetailDialog hotelId={hotelId} tickets={tickets.data ?? []} />
     </>
   );

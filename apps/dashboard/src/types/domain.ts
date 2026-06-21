@@ -1,7 +1,13 @@
 export interface ApiEnvelope<T> {
   success: boolean;
   data: T;
-  meta?: Record<string, unknown> | null;
+  meta?: Record<string, unknown> | CursorPageMeta | null;
+}
+
+export interface CursorPageMeta {
+  next_cursor: string | null;
+  has_more: boolean;
+  limit: number;
 }
 
 export interface TokenResponse {
@@ -213,6 +219,8 @@ export interface Reservation {
   cancelled_at: string | null;
   cancelled_by: string | null;
   cancellation_reason: string | null;
+  guest_name?: string | null;
+  guest_phone?: string | null;
 }
 
 export interface Guest {
@@ -226,6 +234,8 @@ export interface Guest {
   check_out_date: string | null;
   status: string;
   internal_notes: string | null;
+  reservation_count?: number;
+  has_whatsapp_conversation?: boolean;
 }
 
 export interface GuestConsent {

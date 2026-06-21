@@ -28,26 +28,7 @@ export function TicketList({ hotelId }: { hotelId: string }) {
     [searchParams],
   );
   const tickets = useTickets(hotelId, filters);
-
-  const filteredTickets = useMemo(() => {
-    const q = filters.q.toLowerCase();
-    return (tickets.data ?? []).filter((ticket) => {
-      if (!q) {
-        return true;
-      }
-      return [
-        ticket.ticket_code,
-        ticket.item_description,
-        ticket.stage,
-        ticket.room_id ?? "",
-        ticket.assigned_to ?? "",
-        ticket.source,
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(q);
-    });
-  }, [filters.q, tickets.data]);
+  const rows = tickets.data ?? [];
 
   if (tickets.isLoading) {
     return <DataState isLoading />;
@@ -57,7 +38,7 @@ export function TicketList({ hotelId }: { hotelId: string }) {
     return <DataState error={tickets.error} />;
   }
 
-  if (!filteredTickets.length) {
+  if (!rows.length) {
     return (
       <>
         <DataState empty emptyTitle="No tickets match this view." />
@@ -82,7 +63,7 @@ export function TicketList({ hotelId }: { hotelId: string }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {filteredTickets.map((ticket) => (
+            {rows.map((ticket) => (
               <TicketRow hotelId={hotelId} key={ticket.id} ticket={ticket} />
             ))}
           </tbody>
@@ -90,10 +71,18 @@ export function TicketList({ hotelId }: { hotelId: string }) {
       </div>
 
       <div className="grid gap-3 lg:hidden">
-        {filteredTickets.map((ticket) => (
+        {rows.map((ticket) => (
           <MobileTicketCard hotelId={hotelId} key={ticket.id} ticket={ticket} />
         ))}
       </div>
+
+      {tickets.hasNextPage ? (
+        <div className="mt-3 flex justify-center">
+          <Button disabled={tickets.isFetchingNextPage} type="button" variant="secondary" onClick={() => tickets.fetchNextPage()}>
+            {tickets.isFetchingNextPage ? "Loading..." : "Load more"}
+          </Button>
+        </div>
+      ) : null}
 
       <TicketDetailDialog hotelId={hotelId} tickets={tickets.data ?? []} />
     </>

@@ -1,12 +1,14 @@
 from collections.abc import Sequence
+from datetime import date
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.models.guest import Guest
 from app.models.reservation import Reservation, ReservationGuest, ReservationRoomType, StayRecord
 from app.models.room import Room
 from app.repositories.base import BaseRepository
+from app.repositories.pagination import CursorResult, apply_created_at_cursor, paginate_created_at_desc
 
 
 class ReservationRepository(BaseRepository[Reservation]):
@@ -40,6 +42,49 @@ class ReservationRepository(BaseRepository[Reservation]):
                 .order_by(Reservation.checkin_date.desc())
             ).all()
         )
+
+    def list_filtered(
+        self,
+        hotel_id: str,
+        q: str | None = None,
+        status: str | None = None,
+        from_date: date | None = None,
+        to_date: date | None = None,
+        limit: int = 50,
+        cursor: str | None = None,
+    ) -> CursorResult[Reservation]:
+        statement = select(Reservation).where(
+            Reservation.hotel_id == hotel_id,
+            Reservation.deleted_at.is_(None),
+        )
+        if status:
+            statement = statement.where(Reservation.status == status)
+        if from_date:
+            statement = statement.where(Reservation.checkout_date >= from_date)
+        if to_date:
+            statement = statement.where(Reservation.checkin_date <= to_date)
+        if q:
+            pattern = f"%{q.strip()}%"
+            statement = statement.outerjoin(Guest, Guest.id == Reservation.guest_id).where(
+                or_(
+                    Reservation.reservation_no.ilike(pattern),
+                    Reservation.guest_id.ilike(pattern),
+                    Reservation.room_id.ilike(pattern),
+                    Reservation.source.ilike(pattern),
+                    Guest.name.ilike(pattern),
+                    Guest.phone.ilike(pattern),
+                    Guest.whatsapp_phone.ilike(pattern),
+                )
+            )
+        statement = apply_created_at_cursor(statement, Reservation, cursor)
+        rows = (
+            self.db.execute(
+                statement.order_by(Reservation.created_at.desc(), Reservation.id.desc()).limit(limit + 1)
+            )
+            .scalars()
+            .all()
+        )
+        return paginate_created_at_desc(rows, limit)
 
 
 class ReservationGuestRepository(BaseRepository[ReservationGuest]):

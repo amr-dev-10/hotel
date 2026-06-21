@@ -1,10 +1,14 @@
-from fastapi import APIRouter, Depends
+from datetime import date
+
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import require_permission
 from app.core.database import get_db
-from app.core.exceptions import not_found
+from app.core.exceptions import bad_request, not_found
 from app.core.responses import ok
+from app.models.guest import Guest
 from app.models.user import User
 from app.repositories.reservation_repository import (
     ReservationRepository,
@@ -15,8 +19,10 @@ from app.schemas.reservation import (
     ReservationCheckInRequest,
     ReservationCancelRequest,
     ReservationCreate,
+    ReservationDetail,
     ReservationGuestNew,
     ReservationGuestRead,
+    ReservationListItem,
     ReservationRead,
     ReservationRoomTypeRead,
     ReservationUpdate,
@@ -31,11 +37,40 @@ router = APIRouter()
 @router.get("")
 def list_reservations(
     hotel_id: str,
+    q: str | None = None,
+    status: str | None = None,
+    from_date: date | None = Query(default=None, alias="from"),
+    to_date: date | None = Query(default=None, alias="to"),
+    cursor: str | None = None,
+    limit: int = Query(default=50, ge=1, le=200),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("guest.view")),
 ) -> dict:
-    reservations = ReservationRepository(db).list_for_hotel(hotel_id)
-    return ok([ReservationRead.model_validate(item).model_dump() for item in reservations])
+    try:
+        page = ReservationRepository(db).list_filtered(
+            hotel_id,
+            q=q,
+            status=status,
+            from_date=from_date,
+            to_date=to_date,
+            cursor=cursor,
+            limit=limit,
+        )
+    except ValueError:
+        raise bad_request("Invalid pagination cursor") from None
+    guest_context = _guest_context(db, hotel_id, [item.guest_id for item in page.items])
+    items = []
+    for item in page.items:
+        data = ReservationListItem.model_validate(item).model_dump()
+        guest = guest_context.get(item.guest_id)
+        if guest:
+            data["guest_name"] = guest["name"]
+            data["guest_phone"] = guest["phone"]
+        items.append(data)
+    return ok(
+        items,
+        meta={"next_cursor": page.next_cursor, "has_more": page.has_more, "limit": page.limit},
+    )
 
 
 @router.post("")
@@ -63,7 +98,7 @@ def get_reservation(
     reservation = ReservationRepository(db).get_for_hotel(hotel_id, reservation_id)
     if not reservation:
         raise not_found("Reservation not found")
-    return ok(ReservationRead.model_validate(reservation).model_dump())
+    return ok(ReservationDetail.model_validate(reservation).model_dump())
 
 
 @router.put("/{reservation_id}")
@@ -226,3 +261,15 @@ def list_reservation_room_types(
 ) -> dict:
     rows = ReservationRoomTypeRepository(db).list_for_reservation(hotel_id, reservation_id)
     return ok([ReservationRoomTypeRead.model_validate(item).model_dump() for item in rows])
+
+
+def _guest_context(db: Session, hotel_id: str, guest_ids: list[str]) -> dict[str, dict[str, str | None]]:
+    if not guest_ids:
+        return {}
+    rows = db.execute(
+        select(Guest.id, Guest.name, Guest.phone).where(
+            Guest.hotel_id == hotel_id,
+            Guest.id.in_(set(guest_ids)),
+        )
+    ).all()
+    return {guest_id: {"name": name, "phone": phone} for guest_id, name, phone in rows}

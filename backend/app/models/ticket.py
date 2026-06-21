@@ -5,6 +5,7 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     JSON,
     String,
@@ -27,7 +28,14 @@ ticket_menu_items = Table(
 
 class Ticket(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     __tablename__ = "tickets"
-    __table_args__ = (UniqueConstraint("hotel_id", "ticket_code", name="uq_tickets_hotel_code"),)
+    __table_args__ = (
+        UniqueConstraint("hotel_id", "ticket_code", name="uq_tickets_hotel_code"),
+        Index("ix_ticket_hotel_dept", "hotel_id", "department_id"),
+        Index("ix_ticket_hotel_assigned", "hotel_id", "assigned_to"),
+        Index("ix_ticket_hotel_created", "hotel_id", "created_at", "id"),
+        Index("ix_ticket_hotel_priority", "hotel_id", "priority"),
+        Index("ix_ticket_hotel_stage", "hotel_id", "stage"),
+    )
 
     ticket_code: Mapped[str] = mapped_column(String(40), index=True)
     hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)

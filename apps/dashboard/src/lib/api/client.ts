@@ -28,6 +28,11 @@ export async function apiGet<T>(url: string, config?: AxiosRequestConfig) {
   return response.data.data;
 }
 
+export async function apiGetEnvelope<T>(url: string, config?: AxiosRequestConfig) {
+  const response = await api.get<ApiEnvelope<T>>(url, config);
+  return response.data;
+}
+
 export async function apiPost<T, TPayload = unknown>(
   url: string,
   payload?: TPayload,

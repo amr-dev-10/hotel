@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.models.guest import Guest, GuestConsent
 from app.repositories.base import BaseRepository
+from app.repositories.pagination import CursorResult, apply_created_at_cursor, paginate_created_at_desc
 
 
 class GuestRepository(BaseRepository[Guest]):
@@ -44,6 +45,41 @@ class GuestRepository(BaseRepository[Guest]):
                 Guest.status == "checked_in",
             )
         ).scalars().all()
+
+    def list_filtered(
+        self,
+        hotel_id: str,
+        q: str | None = None,
+        status: str | None = None,
+        limit: int = 50,
+        cursor: str | None = None,
+    ) -> CursorResult[Guest]:
+        statement = select(Guest).where(
+            Guest.hotel_id == hotel_id,
+            Guest.deleted_at.is_(None),
+        )
+        if status:
+            statement = statement.where(Guest.status == status)
+        if q:
+            pattern = f"%{q.strip()}%"
+            statement = statement.where(
+                or_(
+                    Guest.name.ilike(pattern),
+                    Guest.phone.ilike(pattern),
+                    Guest.whatsapp_phone.ilike(pattern),
+                    Guest.email.ilike(pattern),
+                    Guest.id.ilike(pattern),
+                )
+            )
+        statement = apply_created_at_cursor(statement, Guest, cursor)
+        rows = (
+            self.db.execute(
+                statement.order_by(Guest.created_at.desc(), Guest.id.desc()).limit(limit + 1)
+            )
+            .scalars()
+            .all()
+        )
+        return paginate_created_at_desc(rows, limit)
 
 
 class GuestConsentRepository(BaseRepository[GuestConsent]):

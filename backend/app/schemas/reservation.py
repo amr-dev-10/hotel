@@ -63,6 +63,15 @@ class ReservationRead(ORMModel):
     cancellation_reason: str | None = None
 
 
+class ReservationListItem(ReservationRead):
+    guest_name: str | None = None
+    guest_phone: str | None = None
+
+
+class ReservationDetail(ReservationRead):
+    pass
+
+
 class ReservationGuestNew(BaseModel):
     name: str = Field(min_length=2, max_length=255)
     phone: str | None = None

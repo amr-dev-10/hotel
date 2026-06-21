@@ -1,8 +1,10 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { apiGet, apiPatch, apiPost } from "@/lib/api/client";
+import { apiGet, apiGetEnvelope, apiPatch, apiPost } from "@/lib/api/client";
 import { queryKeys } from "@/lib/api/query-keys";
 import type {
+  ApiEnvelope,
+  CursorPageMeta,
   EscalationLog,
   Ticket,
   TicketAcceptance,
@@ -31,10 +33,33 @@ export type TicketUpdatePayload = {
 };
 
 export function useTickets(hotelId: string, filters: TicketFilters) {
-  return useQuery({
-    queryKey: queryKeys.tickets.list(hotelId, filters),
-    queryFn: () => apiGet<Ticket[]>(`/hotels/${hotelId}/tickets`, { params: compactFilters(filters) }),
+  const limit = Number(filters.limit ?? 100);
+  const query = useInfiniteQuery<ApiEnvelope<Ticket[]>, Error>({
+    queryKey: queryKeys.tickets.list(hotelId, compactFilters({ ...filters, limit: String(limit) })),
+    queryFn: ({ pageParam }) =>
+      apiGetEnvelope<Ticket[]>(`/hotels/${hotelId}/tickets`, {
+        params: compactFilters({ ...filters, limit: String(limit), cursor: pageParam as string | undefined }),
+      }),
+    initialPageParam: undefined,
+    getNextPageParam: (lastPage) => {
+      const meta = lastPage.meta as CursorPageMeta | null | undefined;
+      return meta?.has_more ? meta.next_cursor : undefined;
+    },
     enabled: Boolean(hotelId),
+  });
+
+  return {
+    ...query,
+    data: query.data?.pages.flatMap((page) => page.data) ?? [],
+    pageMeta: query.data?.pages.at(-1)?.meta as CursorPageMeta | null | undefined,
+  };
+}
+
+export function useTicket(hotelId: string, ticketId: string) {
+  return useQuery({
+    queryKey: ["tickets", hotelId, ticketId],
+    queryFn: () => apiGet<Ticket>(`/hotels/${hotelId}/tickets/${ticketId}`),
+    enabled: Boolean(hotelId && ticketId),
   });
 }
 
@@ -193,6 +218,8 @@ export function useUpdateTicket(hotelId: string) {
   });
 }
 
-function compactFilters(filters: TicketFilters) {
-  return Object.fromEntries(Object.entries(filters).filter(([, value]) => Boolean(value)));
+function compactFilters(filters: Record<string, string | undefined>) {
+  return Object.fromEntries(
+    Object.entries(filters).filter(([, value]) => value !== undefined && value !== ""),
+  );
 }

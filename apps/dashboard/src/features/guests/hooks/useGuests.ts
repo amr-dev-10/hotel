@@ -1,8 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { apiGet, apiPatch, apiPost } from "@/lib/api/client";
+import { apiGet, apiGetEnvelope, apiPatch, apiPost } from "@/lib/api/client";
 import { queryKeys } from "@/lib/api/query-keys";
-import type { Guest, GuestConsent, GuestTimelineEvent } from "@/types/domain";
+import type { ApiEnvelope, CursorPageMeta, Guest, GuestConsent, GuestTimelineEvent } from "@/types/domain";
 import type { CreateGuestValues } from "@/features/guests/schemas/create-guest.schema";
 
 export type GuestUpdatePayload = {
@@ -16,21 +16,41 @@ export type GuestUpdatePayload = {
   internal_notes?: string | null;
 };
 
-export function useGuests(hotelId: string) {
-  return useQuery({
-    queryKey: queryKeys.guests(hotelId),
-    queryFn: () => apiGet<Guest[]>(`/hotels/${hotelId}/guests`),
+export type GuestFilters = {
+  q?: string;
+  status?: string;
+  limit?: number;
+};
+
+export function useGuests(hotelId: string, filters: GuestFilters = {}) {
+  const limit = filters.limit ?? 100;
+  const query = useInfiniteQuery<ApiEnvelope<Guest[]>, Error>({
+    queryKey: queryKeys.guestsList(hotelId, compactParams({ ...filters, limit })),
+    queryFn: ({ pageParam }) =>
+      apiGetEnvelope<Guest[]>(`/hotels/${hotelId}/guests`, {
+        params: compactParams({ ...filters, limit, cursor: pageParam as string | undefined }),
+      }),
+    initialPageParam: undefined,
+    getNextPageParam: (lastPage) => {
+      const meta = lastPage.meta as CursorPageMeta | null | undefined;
+      return meta?.has_more ? meta.next_cursor : undefined;
+    },
     enabled: Boolean(hotelId),
   });
+
+  return {
+    ...query,
+    data: query.data?.pages.flatMap((page) => page.data) ?? [],
+    pageMeta: query.data?.pages.at(-1)?.meta as CursorPageMeta | null | undefined,
+  };
 }
 
 export function useGuest(hotelId: string, guestId: string) {
-  const guests = useGuests(hotelId);
-
-  return {
-    ...guests,
-    data: guests.data?.find((guest) => guest.id === guestId),
-  };
+  return useQuery({
+    queryKey: queryKeys.guestDetail(hotelId, guestId),
+    queryFn: () => apiGet<Guest>(`/hotels/${hotelId}/guests/${guestId}`),
+    enabled: Boolean(hotelId && guestId),
+  });
 }
 
 export function useGuestConsent(hotelId: string, guestId: string) {
@@ -77,4 +97,10 @@ export function useGuestConversation(hotelId: string, guestId: string) {
     enabled: Boolean(hotelId && guestId),
     staleTime: 0,
   });
+}
+
+function compactParams(params: Record<string, string | number | undefined>) {
+  return Object.fromEntries(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== ""),
+  );
 }

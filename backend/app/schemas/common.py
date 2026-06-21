@@ -1,6 +1,8 @@
-from typing import Any
+from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict
+
+T = TypeVar("T")
 
 
 class ORMModel(BaseModel):
@@ -17,3 +19,16 @@ class APIEnvelope(BaseModel):
     success: bool = True
     data: Any = None
     meta: dict[str, Any] | None = None
+
+
+class CursorPageMeta(BaseModel):
+    next_cursor: str | None = None
+    has_more: bool = False
+    limit: int = 50
+
+
+class CursorPage(BaseModel, Generic[T]):
+    items: list[T]
+    next_cursor: str | None = None
+    has_more: bool = False
+    limit: int = 50

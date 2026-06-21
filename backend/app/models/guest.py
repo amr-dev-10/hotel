@@ -2,7 +2,7 @@ from datetime import date
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -11,6 +11,10 @@ from app.models.base import SoftDeleteMixin, TimestampMixin, UUIDPrimaryKeyMixin
 
 class Guest(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     __tablename__ = "guests"
+    __table_args__ = (
+        Index("ix_guest_hotel_created", "hotel_id", "created_at", "id"),
+        Index("ix_guest_hotel_status", "hotel_id", "status"),
+    )
 
     hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
     name: Mapped[str] = mapped_column(String(255))

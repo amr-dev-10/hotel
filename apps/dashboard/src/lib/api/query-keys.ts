@@ -4,11 +4,17 @@ export const queryKeys = {
   housekeeping: (hotelId: string) => ["housekeeping", hotelId] as const,
   departments: (hotelId: string) => ["departments", hotelId] as const,
   guests: (hotelId: string) => ["guests", hotelId] as const,
+  guestsList: (hotelId: string, filters?: Record<string, string | number | undefined>) =>
+    ["guests", hotelId, "list", filters ?? {}] as const,
   guestConsent: (hotelId: string, guestId: string) =>
     ["guests", hotelId, guestId, "consent"] as const,
+  guestDetail: (hotelId: string, guestId: string) =>
+    ["guests", hotelId, guestId] as const,
   guestTimeline: (hotelId: string, guestId: string) =>
     ["guests", hotelId, guestId, "timeline"] as const,
   reservations: (hotelId: string) => ["reservations", hotelId] as const,
+  reservationsList: (hotelId: string, filters?: Record<string, string | number | undefined>) =>
+    ["reservations", hotelId, "list", filters ?? {}] as const,
   notifications: (hotelId: string) => ["notifications", hotelId] as const,
   auditLogs: (hotelId: string, filters?: Record<string, string | number | undefined>) =>
     ["audit-logs", hotelId, filters ?? {}] as const,

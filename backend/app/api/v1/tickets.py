@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import require_permission
 from app.core.database import get_db
+from app.core.exceptions import bad_request, not_found
 from app.core.responses import ok
 from app.models.user import User
 from app.repositories.escalation_repository import EscalationLogRepository
@@ -12,7 +13,9 @@ from app.repositories.whatsapp_repository import WhatsAppConversationRepository
 from app.schemas.ticket import (
     TicketAcceptanceRead,
     TicketCreate,
+    TicketDetail,
     EscalatedTicketRead,
+    TicketListItem,
     TicketMessageCreate,
     TicketMessageRead,
     TicketRejectRequest,
@@ -30,6 +33,7 @@ router = APIRouter()
 @router.get("")
 def list_tickets(
     hotel_id: str,
+    q: str | None = None,
     guest_id: str | None = None,
     reservation_id: str | None = None,
     conversation_id: str | None = None,
@@ -38,21 +42,32 @@ def list_tickets(
     assigned_to: str | None = None,
     department_key: str | None = None,
     sla_status: str | None = None,
+    cursor: str | None = None,
+    limit: int = Query(default=50, ge=1, le=200),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("ticket.view")),
 ) -> dict:
-    tickets = TicketRepository(db).list_filtered(
-        hotel_id,
-        guest_id=guest_id,
-        reservation_id=reservation_id,
-        conversation_id=conversation_id,
-        stage=stage,
-        priority=priority,
-        assigned_to=assigned_to,
-        department_key=department_key,
-        sla_status=sla_status,
+    try:
+        page = TicketRepository(db).list_filtered(
+            hotel_id,
+            guest_id=guest_id,
+            reservation_id=reservation_id,
+            conversation_id=conversation_id,
+            stage=stage,
+            priority=priority,
+            assigned_to=assigned_to,
+            department_key=department_key,
+            sla_status=sla_status,
+            q=q,
+            cursor=cursor,
+            limit=limit,
+        )
+    except ValueError:
+        raise bad_request("Invalid pagination cursor") from None
+    return ok(
+        [TicketListItem.model_validate(item).model_dump() for item in page.items],
+        meta={"next_cursor": page.next_cursor, "has_more": page.has_more, "limit": page.limit},
     )
-    return ok([TicketRead.model_validate(item).model_dump() for item in tickets])
 
 
 @router.post("")
@@ -111,6 +126,19 @@ def list_escalated_tickets(
     return ok(items)
 
 
+@router.get("/{ticket_id}")
+def get_ticket(
+    hotel_id: str,
+    ticket_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("ticket.view")),
+) -> dict:
+    ticket = TicketRepository(db).get_for_hotel(hotel_id, ticket_id)
+    if not ticket:
+        raise not_found("Ticket not found")
+    return ok(TicketDetail.model_validate(ticket).model_dump())
+
+
 @router.get("/{ticket_id}/messages")
 def list_ticket_messages(
     hotel_id: str,
@@ -154,8 +182,6 @@ def list_ticket_guest_messages(
 ) -> dict:
     ticket = TicketRepository(db).get_for_hotel(hotel_id, ticket_id)
     if not ticket:
-        from app.core.exceptions import not_found
-
         raise not_found("Ticket not found")
     messages = WhatsAppConversationRepository(db).list_ticket_messages(hotel_id, ticket_id)
     return ok([WhatsAppMessageRead.model_validate(item).model_dump() for item in messages])

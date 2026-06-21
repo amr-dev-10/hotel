@@ -56,11 +56,11 @@ import {
   useRejectTicket,
   useReopenTicket,
   useSendTicketGuestMessage,
+  useTicket,
   useTicketAcceptances,
   useTicketEscalations,
   useTicketGuestMessages,
   useTicketTimeline,
-  useTickets,
   useUpdateTicket,
 } from "@/features/tickets/hooks/useTickets";
 
@@ -73,8 +73,7 @@ export function TicketFullPage({
   hotelId: string;
   ticketId: string;
 }) {
-  const filters = useMemo(() => ({}), []);
-  const tickets = useTickets(hotelId, filters);
+  const ticketQuery = useTicket(hotelId, ticketId);
   const acceptances = useTicketAcceptances(hotelId, ticketId);
   const escalations = useTicketEscalations(hotelId, ticketId);
   const timeline = useTicketTimeline(hotelId, ticketId);
@@ -92,7 +91,7 @@ export function TicketFullPage({
   const reopenTicket = useReopenTicket(hotelId);
   const updateTicket = useUpdateTicket(hotelId);
   const createTicketMessage = useCreateTicketMessage(hotelId, ticketId);
-  const ticket = tickets.data?.find((item) => item.id === ticketId);
+  const ticket = ticketQuery.data;
   const whatsappHistory = useWhatsappMessages(hotelId, ticket?.conversation_id ?? "");
   const sendGuestMessage = useSendTicketGuestMessage(hotelId, ticketId, ticket?.conversation_id ?? null);
   const [activeTab, setActiveTab] = useState<CommunicationTab>("internal");
@@ -150,12 +149,12 @@ export function TicketFullPage({
     }
   }
 
-  if (tickets.isLoading) {
+  if (ticketQuery.isLoading) {
     return <DataState isLoading />;
   }
 
-  if (tickets.error) {
-    return <DataState error={tickets.error} />;
+  if (ticketQuery.error) {
+    return <DataState error={ticketQuery.error} />;
   }
 
   if (!ticket) {
