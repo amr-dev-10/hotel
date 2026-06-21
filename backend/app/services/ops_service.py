@@ -5,6 +5,7 @@ from app.models.ops import Invoice, MediaFile, Notification, Subscription
 from app.repositories.ops_repository import InvoiceRepository, MediaFileRepository, NotificationRepository, SubscriptionRepository
 from app.schemas.ops import InvoiceCreate, MediaFileCreate, NotificationCreate
 from app.schemas.ops import SubscriptionUpgrade
+from app.services.notification_service import NotificationService
 
 
 class NotificationCenterService:
@@ -20,10 +21,34 @@ class NotificationCenterService:
             title=payload.title,
             message=payload.message,
             status="pending",
+            notification_type=payload.notification_type,
+            reference_id=payload.reference_id,
             metadata_json=payload.metadata,
             created_at=utcnow(),
         )
         self.db.add(notification)
+        self.db.flush()
+        NotificationService().publish_user_notification(
+            hotel_id,
+            notification.user_id,
+            {
+                "event": "notification",
+                "notification": {
+                    "id": notification.id,
+                    "hotel_id": notification.hotel_id,
+                    "user_id": notification.user_id,
+                    "channel": notification.channel,
+                    "title": notification.title,
+                    "message": notification.message,
+                    "status": notification.status,
+                    "notification_type": notification.notification_type,
+                    "reference_id": notification.reference_id,
+                    "metadata": notification.metadata_json,
+                    "read_at": notification.read_at,
+                    "created_at": notification.created_at,
+                },
+            },
+        )
         if commit:
             self.db.commit()
             self.db.refresh(notification)

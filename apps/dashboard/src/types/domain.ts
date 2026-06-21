@@ -144,6 +144,7 @@ export interface TicketAcceptance {
   responded_at: string | null;
   auto_expired: boolean;
   expire_after_minutes: number;
+  rejection_reason: string | null;
 }
 
 export interface TicketMessage {
@@ -182,6 +183,19 @@ export interface EscalationLog {
   level?: number;
   escalation_level?: number;
   created_at: string;
+}
+
+export interface EscalatedTicket {
+  escalation_id: string;
+  ticket_id: string;
+  rule_id: string;
+  escalation_level: number;
+  escalated_from: string | null;
+  escalated_to: string | null;
+  reason: string;
+  notes: string | null;
+  escalated_at: string;
+  ticket: Ticket;
 }
 
 export interface Reservation {
@@ -571,4 +585,19 @@ export interface AnalyticsSnapshot {
   revenue_other: number;
   revenue_total: number;
   whatsapp_messages: number;
+}
+
+export interface AppNotification {
+  id: string;
+  hotel_id: string;
+  user_id: string | null;
+  channel: string;
+  title: string;
+  message: string;
+  status: string;
+  notification_type: string;
+  reference_id: string | null;
+  metadata: Record<string, unknown>;
+  read_at: string | null;
+  created_at: string;
 }

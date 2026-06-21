@@ -117,7 +117,11 @@ export function useRejectTicket(hotelId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (ticketId: string) => apiPost<Ticket>(`/hotels/${hotelId}/tickets/${ticketId}/reject`),
+    mutationFn: (input: string | { ticketId: string; reason?: string }) => {
+      const ticketId = typeof input === "string" ? input : input.ticketId;
+      const payload = typeof input === "string" ? undefined : { reason: input.reason };
+      return apiPost<Ticket>(`/hotels/${hotelId}/tickets/${ticketId}/reject`, payload);
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.tickets.all(hotelId) }),
   });
 }

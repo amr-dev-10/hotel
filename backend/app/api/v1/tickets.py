@@ -12,8 +12,10 @@ from app.repositories.whatsapp_repository import WhatsAppConversationRepository
 from app.schemas.ticket import (
     TicketAcceptanceRead,
     TicketCreate,
+    EscalatedTicketRead,
     TicketMessageCreate,
     TicketMessageRead,
+    TicketRejectRequest,
     TicketRead,
     TicketStageUpdate,
 )
@@ -61,6 +63,51 @@ def create_ticket(
 ) -> dict:
     ticket = TicketService(db).create_ticket(hotel_id, payload, actor_id=current_user.id)
     return ok(TicketRead.model_validate(ticket).model_dump())
+
+
+@router.get("/escalations")
+def list_escalated_tickets(
+    hotel_id: str,
+    scope: str | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("ticket.view")),
+) -> dict:
+    include_all = bool(
+        scope == "all"
+        and (
+            current_user.is_hotel_owner
+            or current_user.user_type == "HOTEL_ADMIN"
+            or current_user.staff_level == "admin"
+        )
+    )
+    if scope is None:
+        include_all = bool(
+            current_user.is_hotel_owner
+            or current_user.user_type == "HOTEL_ADMIN"
+            or current_user.staff_level == "admin"
+        )
+    rows = EscalationLogRepository(db).list_for_hotel(
+        hotel_id,
+        user_id=current_user.id,
+        department_id=None if scope == "mine" else current_user.department_id,
+        include_all=include_all,
+    )
+    items = [
+        EscalatedTicketRead(
+            escalation_id=log.id,
+            ticket_id=log.ticket_id,
+            rule_id=log.rule_id,
+            escalation_level=log.escalation_level,
+            escalated_from=log.escalated_from,
+            escalated_to=log.escalated_to,
+            reason=log.reason,
+            notes=log.notes,
+            escalated_at=log.created_at,
+            ticket=TicketRead.model_validate(ticket),
+        ).model_dump()
+        for log, ticket in rows
+    ]
+    return ok(items)
 
 
 @router.get("/{ticket_id}/messages")
@@ -147,10 +194,16 @@ def accept_ticket(
 def reject_ticket(
     hotel_id: str,
     ticket_id: str,
+    payload: TicketRejectRequest | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("ticket.view")),
 ) -> dict:
-    ticket = TicketService(db).reject_ticket(hotel_id, ticket_id, current_user.id)
+    ticket = TicketService(db).reject_ticket(
+        hotel_id,
+        ticket_id,
+        current_user.id,
+        reason=payload.reason if payload else None,
+    )
     return ok(TicketRead.model_validate(ticket).model_dump())
 
 

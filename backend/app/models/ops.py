@@ -62,6 +62,8 @@ class Notification(UUIDPrimaryKeyMixin, Base):
     title: Mapped[str] = mapped_column(String(180))
     message: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(40), default="pending")
+    notification_type: Mapped[str] = mapped_column(String(40), default="general", index=True)
+    reference_id: Mapped[str | None] = mapped_column(String(36), index=True)
     metadata_json: Mapped[dict] = mapped_column("metadata", JSON, default=dict)
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

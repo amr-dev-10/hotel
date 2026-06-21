@@ -1,9 +1,10 @@
 from collections.abc import Sequence
 
-from sqlalchemy import func, select
+from sqlalchemy import false, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.escalation import EscalationLog, EscalationRule
+from app.models.ticket import Ticket
 from app.repositories.base import BaseRepository
 
 
@@ -65,6 +66,40 @@ class EscalationLogRepository(BaseRepository[EscalationLog]):
             .where(EscalationLog.ticket_id == ticket_id)
             .order_by(EscalationLog.created_at)
         ).scalars().all()
+
+    def list_for_hotel(
+        self,
+        hotel_id: str,
+        user_id: str | None = None,
+        department_id: str | None = None,
+        include_all: bool = False,
+        limit: int = 100,
+    ) -> Sequence[tuple[EscalationLog, Ticket]]:
+        statement = (
+            select(EscalationLog, Ticket)
+            .join(Ticket, Ticket.id == EscalationLog.ticket_id)
+            .where(
+                Ticket.hotel_id == hotel_id,
+                Ticket.deleted_at.is_(None),
+            )
+        )
+        if not include_all:
+            visibility = []
+            if user_id:
+                visibility.extend(
+                    [
+                        EscalationLog.escalated_to == user_id,
+                        EscalationLog.escalated_from == user_id,
+                        Ticket.assigned_to == user_id,
+                    ]
+                )
+            if department_id:
+                visibility.append(Ticket.department_id == department_id)
+            if visibility:
+                statement = statement.where(or_(*visibility))
+            else:
+                statement = statement.where(false())
+        return self.db.execute(statement.order_by(EscalationLog.created_at.desc()).limit(limit)).all()
 
     def max_level_for_ticket(self, ticket_id: str) -> int:
         return int(

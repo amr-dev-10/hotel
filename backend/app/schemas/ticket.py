@@ -26,6 +26,10 @@ class TicketStageUpdate(BaseModel):
     note: str | None = None
 
 
+class TicketRejectRequest(BaseModel):
+    reason: str | None = Field(default=None, max_length=255)
+
+
 class TicketRead(ORMModel):
     id: str
     ticket_code: str
@@ -49,6 +53,19 @@ class TicketRead(ORMModel):
     updated_at: datetime
 
 
+class EscalatedTicketRead(BaseModel):
+    escalation_id: str
+    ticket_id: str
+    rule_id: str
+    escalation_level: int
+    escalated_from: str | None = None
+    escalated_to: str | None = None
+    reason: str
+    notes: str | None = None
+    escalated_at: datetime
+    ticket: TicketRead
+
+
 class TicketAcceptanceRead(ORMModel):
     id: str
     ticket_id: str
@@ -58,6 +75,7 @@ class TicketAcceptanceRead(ORMModel):
     responded_at: datetime | None = None
     auto_expired: bool
     expire_after_minutes: int
+    rejection_reason: str | None = None
 
 
 class TicketEventRead(ORMModel):

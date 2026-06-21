@@ -9,6 +9,7 @@ export const queryKeys = {
   guestTimeline: (hotelId: string, guestId: string) =>
     ["guests", hotelId, guestId, "timeline"] as const,
   reservations: (hotelId: string) => ["reservations", hotelId] as const,
+  notifications: (hotelId: string) => ["notifications", hotelId] as const,
   reservationDetail: (hotelId: string, reservationId: string) =>
     ["reservations", hotelId, reservationId] as const,
   reservationGuests: (hotelId: string, reservationId: string) =>
@@ -57,6 +58,8 @@ export const queryKeys = {
       ["tickets", hotelId, ticketId, "acceptances"] as const,
     escalations: (hotelId: string, ticketId: string) =>
       ["tickets", hotelId, ticketId, "escalations"] as const,
+    escalatedTickets: (hotelId: string, scope: string) =>
+      ["tickets", hotelId, "escalated-tickets", scope] as const,
     messages: (hotelId: string, ticketId: string) =>
       ["tickets", hotelId, ticketId, "messages"] as const,
     timeline: (hotelId: string, ticketId: string) =>

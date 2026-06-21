@@ -61,16 +61,37 @@ def create_notification(
 @router.get("/notifications/me")
 def my_notifications(
     hotel_id: str,
+    unread_only: bool = False,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict:
     ensure_hotel_access(hotel_id, current_user)
-    notifications = NotificationRepository(db).list_for_user(hotel_id, current_user.id)
+    notifications = NotificationRepository(db).list_visible_for_user(
+        hotel_id,
+        current_user.id,
+        unread_only=unread_only,
+    )
     return ok([NotificationRead.model_validate(item).model_dump() for item in notifications])
 
 
 @router.put("/notifications/{notification_id}/read")
 def mark_notification_read(
+    hotel_id: str,
+    notification_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    ensure_hotel_access(hotel_id, current_user)
+    notification = NotificationCenterService(db).mark_read(
+        hotel_id,
+        notification_id,
+        current_user.id,
+    )
+    return ok(NotificationRead.model_validate(notification).model_dump())
+
+
+@router.post("/notifications/{notification_id}/read")
+def mark_notification_read_post(
     hotel_id: str,
     notification_id: str,
     db: Session = Depends(get_db),

@@ -16,17 +16,22 @@ import {
   Network,
   Sparkles,
   Shield,
+  ShieldAlert,
   UserCircle,
   Users,
 } from "lucide-react";
 
+import { DispatchAlert } from "@/components/dispatch-alert";
+import { NotificationBell } from "@/components/notification-bell";
 import { Button } from "@/components/ui/button";
+import { useWebSocket } from "@/hooks/useWebSocket";
 import { cn, titleCase } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth.store";
 
 const navItems = [
   { label: "Overview", href: "overview", icon: Gauge },
   { label: "Tickets", href: "tickets", icon: ListChecks },
+  { label: "Escalations", href: "escalations", icon: ShieldAlert },
   { label: "Guests", href: "guests", icon: Users },
   { label: "Reservations", href: "reservations", icon: CalendarDays },
   { label: "Rooms", href: "rooms", icon: BedDouble },
@@ -60,6 +65,7 @@ export function DashboardShell({
   const logout = useAuthStore((state) => state.logout);
   const [mounted, setMounted] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  useWebSocket(hotelId);
 
   useEffect(() => {
     setMounted(true);
@@ -208,6 +214,7 @@ export function DashboardShell({
           </div>
 
           <div className="flex items-center gap-3">
+            <NotificationBell hotelId={hotelId} />
             <span className="hidden rounded bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 sm:inline-flex">
               Live sync
             </span>
@@ -219,6 +226,7 @@ export function DashboardShell({
 
         <main className="mx-auto grid w-full max-w-[1500px] gap-6 p-4 lg:p-8">{children}</main>
       </div>
+      <DispatchAlert hotelId={hotelId} />
     </div>
   );
 }

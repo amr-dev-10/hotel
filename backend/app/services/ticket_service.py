@@ -146,8 +146,14 @@ class TicketService:
                 },
                 actor_id=actor_id,
             )
-        if assignee and uses_acceptance:
-            self.offer_ticket(ticket.id, assignee.id, actor_id=actor_id, commit=False)
+        if ticket.assigned_to is None:
+            from app.services.dispatch_service import DispatchService
+
+            DispatchService(self.db).dispatch_ticket(
+                ticket,
+                preferred_user_id=assignee.id if assignee else None,
+                commit=False,
+            )
         elif assignee:
             self.tickets.add_event(
                 ticket,
@@ -321,46 +327,14 @@ class TicketService:
         return acceptance
 
     def accept_ticket(self, hotel_id: str, ticket_id: str, user_id: str) -> Ticket:
-        ticket = self._get_ticket(hotel_id, ticket_id)
-        acceptance = self.acceptances.update_response(ticket.id, user_id, "accepted", utcnow())
-        if not acceptance and ticket.assigned_to != user_id:
-            raise bad_request("Ticket is not pending acceptance for this user")
-        config = self.slas.get_sla_config(hotel_id, ticket.department_id, ticket.task_category)
-        ticket.assigned_to = user_id
-        ticket.stage = "accepted"
-        ticket.sla_due_at = utcnow() + timedelta(minutes=config.sla_minutes)
-        self.tickets.add_event(
-            ticket,
-            "accepted",
-            {"accepted_by": user_id, "sla_minutes": config.sla_minutes},
-            actor_id=user_id,
-        )
-        self.audit.log(
-            hotel_id,
-            "ticket.accepted",
-            "ticket",
-            ticket.id,
-            user_id,
-            {"sla_due_at": ticket.sla_due_at.isoformat() if ticket.sla_due_at else None},
-        )
-        self.db.commit()
-        self.db.refresh(ticket)
-        self.notifications.publish_ticket_event(
-            hotel_id,
-            {"event": "ticket.accepted", "ticket_id": ticket.id, "accepted_by": user_id},
-        )
-        return ticket
+        from app.services.dispatch_service import DispatchService
 
-    def reject_ticket(self, hotel_id: str, ticket_id: str, user_id: str) -> Ticket:
-        ticket = self._get_ticket(hotel_id, ticket_id)
-        acceptance = self.acceptances.update_response(ticket.id, user_id, "rejected", utcnow())
-        if not acceptance and ticket.assigned_to != user_id:
-            raise bad_request("Ticket is not pending acceptance for this user")
-        self.tickets.add_event(ticket, "rejected", {"rejected_by": user_id}, actor_id=user_id)
-        self._offer_next_after_decline(ticket, user_id, actor_id=user_id)
-        self.db.commit()
-        self.db.refresh(ticket)
-        return ticket
+        return DispatchService(self.db).handle_acceptance(hotel_id, ticket_id, user_id)
+
+    def reject_ticket(self, hotel_id: str, ticket_id: str, user_id: str, reason: str | None = None) -> Ticket:
+        from app.services.dispatch_service import DispatchService
+
+        return DispatchService(self.db).handle_rejection(hotel_id, ticket_id, user_id, reason)
 
     def complete_ticket(self, hotel_id: str, ticket_id: str, user_id: str) -> Ticket:
         ticket = self._get_ticket(hotel_id, ticket_id)
@@ -412,26 +386,11 @@ class TicketService:
         return ticket
 
     def expire_pending_acceptances(self) -> list[Ticket]:
-        expired_tickets: list[Ticket] = []
-        now = utcnow()
-        for acceptance in self.acceptances.pending_due(now):
-            ticket = self.tickets.get(acceptance.ticket_id)
-            if not ticket:
-                continue
-            acceptance.response = "expired"
-            acceptance.auto_expired = True
-            acceptance.responded_at = now
-            self.tickets.add_event(
-                ticket,
-                "acceptance_expired",
-                {"offered_to": acceptance.offered_to},
-                actor_id=acceptance.offered_to,
-            )
-            self._offer_next_after_decline(ticket, acceptance.offered_to, actor_id=acceptance.offered_to)
-            expired_tickets.append(ticket)
-        if expired_tickets:
-            self.db.commit()
-        return expired_tickets
+        from app.services.dispatch_service import DispatchService
+
+        logs = DispatchService(self.db).check_expired_offers()
+        ticket_ids = {log.ticket_id for log in logs}
+        return [ticket for ticket_id in ticket_ids if (ticket := self.tickets.get(ticket_id))]
 
     def update_stage(
         self,

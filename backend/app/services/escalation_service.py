@@ -103,6 +103,9 @@ class EscalationService:
             if age_minutes < trigger_minutes:
                 continue
             fired.append(self.fire_rule(ticket, rule, "sla_breach"))
+        from app.services.dispatch_service import DispatchService
+
+        fired.extend(DispatchService(self.db).check_expired_offers(hotel_id))
         if fired:
             self.db.commit()
             for row in fired:
@@ -132,6 +135,8 @@ class EscalationService:
                     channel="fcm",
                     title=f"Escalation Level {rule.escalation_level}",
                     message=f"{ticket.ticket_code}: {ticket.item_description}",
+                    notification_type="escalation",
+                    reference_id=ticket.id,
                     metadata={"ticket_id": ticket.id, "reason": reason},
                 ),
                 commit=False,

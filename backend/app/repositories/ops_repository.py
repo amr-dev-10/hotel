@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.models.ops import (
@@ -32,13 +32,35 @@ class NotificationRepository(BaseRepository[Notification]):
     def __init__(self, db: Session) -> None:
         super().__init__(db, Notification)
 
-    def list_for_user(self, hotel_id: str, user_id: str) -> Sequence[Notification]:
-        return self.db.execute(
-            select(Notification).where(
-                Notification.hotel_id == hotel_id,
-                Notification.user_id == user_id,
-            )
-        ).scalars().all()
+    def list_for_user(
+        self,
+        hotel_id: str,
+        user_id: str,
+        unread_only: bool = False,
+        limit: int = 50,
+    ) -> Sequence[Notification]:
+        statement = select(Notification).where(
+            Notification.hotel_id == hotel_id,
+            Notification.user_id == user_id,
+        )
+        if unread_only:
+            statement = statement.where(Notification.read_at.is_(None))
+        return self.db.execute(statement.order_by(Notification.created_at.desc()).limit(limit)).scalars().all()
+
+    def list_visible_for_user(
+        self,
+        hotel_id: str,
+        user_id: str,
+        unread_only: bool = False,
+        limit: int = 50,
+    ) -> Sequence[Notification]:
+        statement = select(Notification).where(
+            Notification.hotel_id == hotel_id,
+            or_(Notification.user_id == user_id, Notification.user_id.is_(None)),
+        )
+        if unread_only:
+            statement = statement.where(Notification.read_at.is_(None))
+        return self.db.execute(statement.order_by(Notification.created_at.desc()).limit(limit)).scalars().all()
 
 
 class MediaFileRepository(BaseRepository[MediaFile]):
