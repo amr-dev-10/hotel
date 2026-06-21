@@ -42,6 +42,20 @@ class RestaurantOrderCreate(BaseModel):
     items: list[RestaurantOrderItemCreate] = Field(default_factory=list)
 
 
+class RestaurantOrderUpdate(BaseModel):
+    source: str | None = None
+    table_id: str | None = None
+    guest_id: str | None = None
+    room_id: str | None = None
+    ticket_id: str | None = None
+    folio_id: str | None = None
+    special_instructions: str | None = None
+    tax: Decimal | None = None
+    ordered_by_guest: bool | None = None
+    status: str | None = None
+    items: list[RestaurantOrderItemCreate] | None = None
+
+
 class RestaurantOrderRead(ORMModel):
     id: str
     hotel_id: str

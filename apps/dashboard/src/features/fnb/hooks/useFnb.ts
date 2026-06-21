@@ -10,31 +10,56 @@ import type {
   TaxConfig,
 } from "@/types/domain";
 
-type CategoryPayload = {
+export type CategoryPayload = {
   name: string;
   type?: string;
   display_order?: number;
   is_active?: boolean;
 };
 
-type MenuItemPayload = {
+export type MenuItemPayload = {
   category_id: string;
   name: string;
   price: number;
   description?: string | null;
   description_short?: string | null;
   dietary_tags?: string[];
+  preparation_time_minutes?: number;
   image_url?: string | null;
   is_available?: boolean;
   display_order?: number;
   tax_config_ids?: string[];
 };
 
-type TaxPayload = {
+export type TaxPayload = {
   name: string;
+  description?: string | null;
+  tax_type?: string;
   rate_percent: number;
+  fixed_amount?: number;
   applies_to?: string;
   is_active?: boolean;
+};
+
+export type RestaurantOrderItemPayload = {
+  menu_item_id: string;
+  quantity: number;
+  unit_price?: number | null;
+  notes?: string | null;
+};
+
+export type RestaurantOrderPayload = {
+  source?: string;
+  table_id?: string | null;
+  guest_id?: string | null;
+  room_id?: string | null;
+  ticket_id?: string | null;
+  folio_id?: string | null;
+  special_instructions?: string | null;
+  tax?: number | null;
+  ordered_by_guest?: boolean;
+  status?: string;
+  items: RestaurantOrderItemPayload[];
 };
 
 type OrderFilters = Record<string, string | undefined>;
@@ -80,6 +105,26 @@ export function useRestaurantOrder(hotelId: string, orderId: string | null) {
     queryKey: queryKeys.fnb.order(hotelId, orderId ?? "none"),
     queryFn: () => apiGet<RestaurantOrderDetail>(`/hotels/${hotelId}/restaurant/orders/${orderId}`),
     enabled: Boolean(hotelId && orderId),
+  });
+}
+
+export function useCreateRestaurantOrder(hotelId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: RestaurantOrderPayload) => apiPost<RestaurantOrder>(`/hotels/${hotelId}/restaurant/orders`, payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["fnb", hotelId, "orders"] }),
+  });
+}
+
+export function useUpdateRestaurantOrder(hotelId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ orderId, payload }: { orderId: string; payload: RestaurantOrderPayload }) =>
+      apiPatch<RestaurantOrder>(`/hotels/${hotelId}/restaurant/orders/${orderId}`, payload),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["fnb", hotelId, "orders"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.fnb.order(hotelId, variables.orderId) });
+    },
   });
 }
 

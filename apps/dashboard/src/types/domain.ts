@@ -291,7 +291,10 @@ export interface TaxConfig {
   id: string;
   hotel_id: string;
   name: string;
+  description: string | null;
+  tax_type: string;
   rate_percent: string | number;
+  fixed_amount: string | number;
   applies_to: string;
   is_active: boolean;
 }
@@ -325,6 +328,7 @@ export interface MenuItem {
   description: string | null;
   description_short: string | null;
   dietary_tags: string[];
+  preparation_time_minutes: number;
   image_url: string | null;
   is_available: boolean;
   display_order: number;

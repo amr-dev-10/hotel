@@ -49,7 +49,10 @@ class TaxConfig(UUIDPrimaryKeyMixin, Base):
 
     hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
     name: Mapped[str] = mapped_column(String(120))
+    description: Mapped[str | None] = mapped_column(Text)
+    tax_type: Mapped[str] = mapped_column(String(40), default="percentage")
     rate_percent: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=0)
+    fixed_amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=0)
     applies_to: Mapped[str] = mapped_column(String(40), default="all", index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 

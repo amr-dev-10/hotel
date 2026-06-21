@@ -2,6 +2,10 @@
 
 Architecture documents are versioned by folder so new designs can be added without overwriting earlier decisions.
 
+## Current Implementation Notes
+
+- `current-development-operations-guide.md` - current escalation, notification, Food and Beverage, kitchen, and guest portal flows, including staff manual order creation and order editing.
+
 ## Versions
 
 - `v1/` - initial Arcadia backend architecture and WhatsApp guest flow design.

@@ -35,6 +35,7 @@ class MenuItemCreate(BaseModel):
     description: str | None = None
     description_short: str | None = Field(default=None, max_length=255)
     dietary_tags: list[str] = Field(default_factory=list)
+    preparation_time_minutes: int = Field(default=15, ge=0, le=480)
     image_url: str | None = None
     is_available: bool = True
     display_order: int = 0
@@ -48,6 +49,7 @@ class MenuItemUpdate(BaseModel):
     description: str | None = None
     description_short: str | None = Field(default=None, max_length=255)
     dietary_tags: list[str] | None = None
+    preparation_time_minutes: int | None = Field(default=None, ge=0, le=480)
     image_url: str | None = None
     is_available: bool | None = None
     display_order: int | None = None
@@ -63,6 +65,7 @@ class MenuItemRead(ORMModel):
     description: str | None = None
     description_short: str | None = None
     dietary_tags: list[str]
+    preparation_time_minutes: int
     image_url: str | None = None
     is_available: bool
     display_order: int

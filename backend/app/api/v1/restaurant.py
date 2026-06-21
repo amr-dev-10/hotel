@@ -16,6 +16,7 @@ from app.schemas.restaurant import (
     RestaurantOrderItemRead,
     RestaurantOrderRead,
     RestaurantOrderStatusUpdate,
+    RestaurantOrderUpdate,
     RestaurantTableCreate,
     RestaurantTableRead,
 )
@@ -105,6 +106,18 @@ def list_order_items(
 ) -> dict:
     items = RestaurantOrderItemRepository(db).list_for_order(hotel_id, order_id)
     return ok([RestaurantOrderItemRead.model_validate(item).model_dump() for item in items])
+
+
+@router.patch("/orders/{order_id}")
+def update_order(
+    hotel_id: str,
+    order_id: str,
+    payload: RestaurantOrderUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("restaurant.manage")),
+) -> dict:
+    order = RestaurantService(db).update_order(hotel_id, order_id, payload, current_user.id)
+    return ok(RestaurantOrderRead.model_validate(order).model_dump())
 
 
 @router.patch("/orders/{order_id}/status")

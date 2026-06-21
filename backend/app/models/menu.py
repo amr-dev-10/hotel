@@ -36,6 +36,7 @@ class MenuItem(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     description: Mapped[str | None] = mapped_column(Text)
     description_short: Mapped[str | None] = mapped_column(String(255))
     dietary_tags: Mapped[list[str]] = mapped_column(JSON, default=list)
+    preparation_time_minutes: Mapped[int] = mapped_column(Integer, default=15)
     image_url: Mapped[str | None] = mapped_column(String(500))
     is_available: Mapped[bool] = mapped_column(Boolean, default=True)
     display_order: Mapped[int] = mapped_column(Integer, default=0)
