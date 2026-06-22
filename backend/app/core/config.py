@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     api_v1_prefix: str = "/api/v1"
     database_url: str = "sqlite:///./hotel_cloud_dev.db"
     auto_create_tables: bool = True
+    rate_limit_enabled: bool = True
 
     cors_origins: list[str] = ["*"]
 

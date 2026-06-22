@@ -13,6 +13,7 @@ from app.schemas.auth import (
     RefreshTokenRequest,
 )
 from app.services.auth_service import AuthService
+from app.services.rbac_service import RBACService
 
 router = APIRouter()
 
@@ -65,5 +66,10 @@ def change_password(
 
 
 @router.get("/me")
-def me(current_user: User = Depends(get_current_user)) -> dict:
-    return ok(CurrentUserRead.model_validate(current_user).model_dump())
+def me(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    permissions = sorted(RBACService(db).permission_codes_for_user(current_user))
+    payload = CurrentUserRead.model_validate(current_user).model_copy(update={"permissions": permissions})
+    return ok(payload.model_dump())

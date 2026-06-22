@@ -13,4 +13,5 @@ if test_db.exists():
 os.environ["DATABASE_URL"] = f"sqlite:///{test_db}"
 os.environ["AUTO_CREATE_TABLES"] = "true"
 os.environ["JWT_SECRET"] = "test-secret"
+os.environ["RATE_LIMIT_ENABLED"] = "false"
 os.environ["WHATSAPP_DRY_RUN"] = "true"

@@ -20,6 +20,7 @@ import {
   Shield,
   ShieldAlert,
   UserCircle,
+  UserCheck,
   Users,
   Utensils,
   type LucideIcon,
@@ -28,39 +29,48 @@ import {
 import { DispatchAlert } from "@/components/dispatch-alert";
 import { NotificationBell } from "@/components/notification-bell";
 import { Button } from "@/components/ui/button";
+import { Permissions, ticketViewPermissions } from "@/constants/permissions";
 import { useRouteHotelId } from "@/hooks/useRouteHotelId";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { cn, titleCase } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth.store";
+import type { CurrentUser } from "@/types/domain";
 
 type NavItem = {
   label: string;
   href: string;
   icon: LucideIcon;
+  permissions?: string[];
   adminOnly?: boolean;
 };
 
 const navItems: NavItem[] = [
   { label: "Overview", href: "overview", icon: Gauge },
-  { label: "Tickets", href: "tickets", icon: ListChecks },
-  { label: "Escalations", href: "escalations", icon: ShieldAlert },
-  { label: "Guests", href: "guests", icon: Users },
-  { label: "Reservations", href: "reservations", icon: CalendarDays },
-  { label: "Rooms", href: "rooms", icon: BedDouble },
-  { label: "F&B", href: "fnb", icon: Utensils },
-  { label: "Kitchen", href: "kitchen", icon: ChefHat },
-  { label: "Housekeeping", href: "housekeeping", icon: Sparkles },
-  { label: "Hierarchy", href: "hierarchy", icon: Network },
-  { label: "WhatsApp", href: "whatsapp", icon: MessageCircle },
+  {
+    label: "Staff Portal",
+    href: "staff-portal",
+    icon: UserCheck,
+    permissions: [Permissions.TICKET_VIEW_OWN, Permissions.TICKET_ACCEPT, Permissions.SHIFT_VIEW_OWN, Permissions.SHIFT_UPDATE_OWN],
+  },
+  { label: "Tickets", href: "tickets", icon: ListChecks, permissions: [...ticketViewPermissions] },
+  { label: "Escalations", href: "escalations", icon: ShieldAlert, permissions: [...ticketViewPermissions] },
+  { label: "Guests", href: "guests", icon: Users, permissions: [Permissions.GUEST_VIEW, Permissions.GUEST_VIEW_BASIC, Permissions.GUEST_VIEW_SENSITIVE] },
+  { label: "Reservations", href: "reservations", icon: CalendarDays, permissions: [Permissions.RESERVATION_VIEW, Permissions.RESERVATION_MANAGE] },
+  { label: "Rooms", href: "rooms", icon: BedDouble, permissions: [Permissions.ROOM_VIEW] },
+  { label: "F&B", href: "fnb", icon: Utensils, permissions: [Permissions.MENU_VIEW, Permissions.RESTAURANT_MANAGE] },
+  { label: "Kitchen", href: "kitchen", icon: ChefHat, permissions: [Permissions.RESTAURANT_MANAGE] },
+  { label: "Housekeeping", href: "housekeeping", icon: Sparkles, permissions: [Permissions.HOUSEKEEPING_MANAGE, Permissions.TICKET_VIEW_DEPT, Permissions.TICKET_VIEW_ALL] },
+  { label: "Hierarchy", href: "hierarchy", icon: Network, permissions: [Permissions.USER_VIEW, Permissions.TICKET_VIEW_DEPT, Permissions.TICKET_VIEW_ALL] },
+  { label: "WhatsApp", href: "whatsapp", icon: MessageCircle, permissions: [Permissions.WHATSAPP_HEALTH_VIEW, Permissions.LIVE_CHAT_MANAGE] },
 ];
 
 const settingsNavItems: NavItem[] = [
   { label: "Profile", href: "settings/profile", icon: UserCircle },
-  { label: "Staff", href: "settings/staff", icon: Users },
-  { label: "Roles & Access", href: "settings/roles", icon: Shield },
-  { label: "Workflow", href: "settings/workflow", icon: GitBranch },
+  { label: "Staff", href: "settings/staff", icon: Users, permissions: [Permissions.USER_VIEW, Permissions.USER_MANAGE] },
+  { label: "Roles & Access", href: "settings/roles", icon: Shield, permissions: [Permissions.ROLE_VIEW, Permissions.ROLE_MANAGE] },
+  { label: "Workflow", href: "settings/workflow", icon: GitBranch, permissions: [Permissions.WORKFLOW_MANAGE, Permissions.HOTEL_SETTINGS_MANAGE] },
   { label: "Audit Logs", href: "settings/audit", icon: ScrollText, adminOnly: true },
-  { label: "AI Configuration", href: "ai", icon: Bot },
+  { label: "AI Configuration", href: "ai", icon: Bot, permissions: [Permissions.BOT_VIEW, Permissions.BOT_MANAGE, Permissions.HOTEL_SETTINGS_MANAGE] },
 ];
 
 export function DashboardShell({
@@ -86,11 +96,15 @@ export function DashboardShell({
       currentUser?.user_type === "HOTEL_ADMIN" ||
       currentUser?.staff_level?.toLowerCase() === "admin",
   );
-  const visibleSettingsNavItems = useMemo(
-    () => settingsNavItems.filter((item) => !item.adminOnly || isHotelAdmin),
-    [isHotelAdmin],
+  const visibleNavItems = useMemo(
+    () => navItems.filter((item) => canAccessNavItem(item, currentUser, isHotelAdmin)),
+    [currentUser, isHotelAdmin],
   );
-  const allNavItems = useMemo(() => [...navItems, ...visibleSettingsNavItems], [visibleSettingsNavItems]);
+  const visibleSettingsNavItems = useMemo(
+    () => settingsNavItems.filter((item) => canAccessNavItem(item, currentUser, isHotelAdmin)),
+    [currentUser, isHotelAdmin],
+  );
+  const allNavItems = useMemo(() => [...visibleNavItems, ...visibleSettingsNavItems], [visibleNavItems, visibleSettingsNavItems]);
 
   useEffect(() => {
     setMounted(true);
@@ -145,7 +159,7 @@ export function DashboardShell({
           <p className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-normal text-slate-400">
             Operations
           </p>
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const Icon = item.icon;
             const href = `/${hotelId}/${item.href}`;
             const active = pathname === href || pathname?.startsWith(`${href}/`);
@@ -254,4 +268,21 @@ export function DashboardShell({
       <DispatchAlert hotelId={hotelId} />
     </div>
   );
+}
+
+function canAccessNavItem(item: NavItem, currentUser: CurrentUser | null, isHotelAdmin: boolean) {
+  if (!currentUser) {
+    return false;
+  }
+  if (currentUser.is_hotel_owner) {
+    return true;
+  }
+  if (item.adminOnly && !isHotelAdmin) {
+    return false;
+  }
+  if (!item.permissions?.length) {
+    return true;
+  }
+  const permissions = new Set(currentUser.permissions ?? []);
+  return item.permissions.some((permission) => permissions.has(permission));
 }

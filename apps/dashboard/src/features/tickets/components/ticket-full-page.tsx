@@ -194,12 +194,14 @@ export function TicketFullPage({
               {acceptTicket.isPending ? <Loader2 className="animate-spin" /> : <ThumbsUp />}
               Accept
             </Button>
+          </Can>
+          <Can I="reject" a="Ticket">
             <Button disabled={busy} type="button" variant="secondary" onClick={() => runAction(() => rejectTicket.mutateAsync(ticket.id), "Ticket rejected")}>
               {rejectTicket.isPending ? <Loader2 className="animate-spin" /> : <ThumbsDown />}
               Reject
             </Button>
           </Can>
-          <Can I="edit" a="Ticket">
+          <Can I="complete" a="Ticket">
             <Button disabled={busy} type="button" variant="secondary" onClick={() => runAction(() => completeTicket.mutateAsync(ticket.id), "Ticket completed")}>
               {completeTicket.isPending ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}
               Complete

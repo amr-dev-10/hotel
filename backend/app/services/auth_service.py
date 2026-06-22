@@ -9,7 +9,6 @@ from app.models.base import utcnow
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models.user import User, UserSession
 from app.repositories.user_repository import UserRepository, UserSessionRepository
-from app.services.rbac_service import RBACService
 
 
 class AuthService:
@@ -30,7 +29,6 @@ class AuthService:
         device_info: str | None = None,
         ip_address: str | None = None,
     ) -> dict:
-        permissions = sorted(RBACService(self.db).permission_codes_for_user(user))
         token = create_access_token(
             subject=user.id,
             hotel_id=user.hotel_id,
@@ -41,7 +39,6 @@ class AuthService:
                 "staff_level": user.staff_level,
                 "is_hotel_owner": user.is_hotel_owner,
                 "department_id": user.department_id,
-                "permissions": permissions,
             },
         )
         refresh_token = self._create_refresh_session(user, device_info, ip_address)

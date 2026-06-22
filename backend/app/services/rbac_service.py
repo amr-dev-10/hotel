@@ -2,6 +2,7 @@ from collections.abc import Iterable
 
 from sqlalchemy.orm import Session
 
+from app.core.permissions import Permissions
 from app.core.exceptions import bad_request, forbidden, not_found
 from app.models.rbac import Permission, PermissionGroup, Role
 from app.models.user import User
@@ -75,26 +76,39 @@ class RBACService:
             "Receptionist",
             "Front desk role for guests, rooms, and tickets.",
             [
-                "ticket.view",
-                "ticket.create",
-                "ticket.assign",
-                "guest.view",
-                "guest.create",
-                "guest.edit",
-                "guest.checkout",
-                "room.view",
-                "room.update",
-                "reservation.view",
-                "reservation.manage",
-                "folio.view",
-                "folio.manage",
+                Permissions.TICKET_VIEW,
+                Permissions.TICKET_VIEW_ALL,
+                Permissions.TICKET_CREATE,
+                Permissions.TICKET_ASSIGN,
+                Permissions.TICKET_ACCEPT,
+                Permissions.TICKET_REJECT,
+                Permissions.TICKET_COMPLETE_OWN,
+                Permissions.GUEST_VIEW,
+                Permissions.GUEST_VIEW_BASIC,
+                Permissions.GUEST_CREATE,
+                Permissions.GUEST_EDIT,
+                Permissions.GUEST_CHECKOUT,
+                Permissions.ROOM_VIEW,
+                Permissions.ROOM_UPDATE,
+                Permissions.RESERVATION_VIEW,
+                Permissions.RESERVATION_MANAGE,
+                Permissions.FOLIO_VIEW,
+                Permissions.FOLIO_MANAGE,
             ],
         )
         self._ensure_system_role(
             hotel_id,
             "Staff",
             "Operational staff role for assigned tickets.",
-            ["ticket.view", "ticket.create"],
+            [
+                Permissions.TICKET_VIEW_OWN,
+                Permissions.TICKET_CREATE,
+                Permissions.TICKET_ACCEPT,
+                Permissions.TICKET_REJECT,
+                Permissions.TICKET_COMPLETE_OWN,
+                Permissions.SHIFT_VIEW_OWN,
+                Permissions.SHIFT_UPDATE_OWN,
+            ],
         )
         return role
 
@@ -278,3 +292,44 @@ class RBACService:
         permissions = self.permission_codes_for_user(user)
         if permission_code not in permissions:
             raise forbidden(f"Missing permission: {permission_code}")
+
+    def has_any(self, user: User, permission_codes: Iterable[str]) -> bool:
+        if user.is_hotel_owner:
+            return True
+        permissions = self.permission_codes_for_user(user)
+        return any(permission_code in permissions for permission_code in permission_codes)
+
+    def ticket_visibility_scope(self, user: User) -> str:
+        if user.is_hotel_owner:
+            return "all"
+        permissions = self.permission_codes_for_user(user)
+        if Permissions.TICKET_VIEW_ALL in permissions or Permissions.TICKET_VIEW in permissions:
+            return "all"
+        if Permissions.TICKET_VIEW_DEPT in permissions:
+            return "department"
+        if Permissions.TICKET_VIEW_OWN in permissions:
+            return "own"
+        return "none"
+
+    def can_view_ticket(self, user: User, ticket) -> bool:
+        scope = self.ticket_visibility_scope(user)
+        if scope == "all":
+            return True
+        if scope == "department":
+            return bool(user.department_id and ticket.department_id == user.department_id)
+        if scope == "own":
+            followers = ticket.followers or []
+            return ticket.assigned_to == user.id or user.id in followers
+        return False
+
+    def shift_visibility_scope(self, user: User) -> str:
+        if user.is_hotel_owner:
+            return "all"
+        permissions = self.permission_codes_for_user(user)
+        if Permissions.SHIFT_MANAGE in permissions:
+            return "all"
+        if Permissions.SHIFT_VIEW_DEPT in permissions:
+            return "department"
+        if Permissions.SHIFT_VIEW_OWN in permissions or Permissions.SHIFT_UPDATE_OWN in permissions:
+            return "own"
+        return "none"

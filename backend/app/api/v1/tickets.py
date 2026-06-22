@@ -2,9 +2,10 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import require_permission
+from app.api.dependencies import require_any_permission, require_permission
+from app.core.permissions import Permissions
 from app.core.database import get_db
-from app.core.exceptions import bad_request, not_found
+from app.core.exceptions import bad_request, forbidden, not_found
 from app.core.responses import ok
 from app.models.guest import Guest
 from app.models.reservation import Reservation
@@ -29,9 +30,17 @@ from app.schemas.ticket import (
 )
 from app.schemas.v51 import EscalationLogRead
 from app.schemas.whatsapp_account import WhatsAppMessageRead
+from app.services.rbac_service import RBACService
 from app.services.ticket_service import TicketService
 
 router = APIRouter()
+
+TICKET_VIEW_PERMISSIONS = (
+    Permissions.TICKET_VIEW,
+    Permissions.TICKET_VIEW_OWN,
+    Permissions.TICKET_VIEW_DEPT,
+    Permissions.TICKET_VIEW_ALL,
+)
 
 
 @router.get("")
@@ -49,8 +58,10 @@ def list_tickets(
     cursor: str | None = None,
     limit: int = Query(default=50, ge=1, le=200),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("ticket.view")),
+    current_user: User = Depends(require_any_permission(*TICKET_VIEW_PERMISSIONS)),
 ) -> dict:
+    rbac = RBACService(db)
+    visibility_scope = rbac.ticket_visibility_scope(current_user)
     try:
         page = TicketRepository(db).list_filtered(
             hotel_id,
@@ -63,6 +74,9 @@ def list_tickets(
             department_key=department_key,
             sla_status=sla_status,
             q=q,
+            visibility_scope=visibility_scope,
+            visibility_user_id=current_user.id,
+            visibility_department_id=current_user.department_id,
             cursor=cursor,
             limit=limit,
         )
@@ -91,27 +105,20 @@ def list_escalated_tickets(
     hotel_id: str,
     scope: str | None = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("ticket.view")),
+    current_user: User = Depends(require_any_permission(*TICKET_VIEW_PERMISSIONS)),
 ) -> dict:
-    include_all = bool(
-        scope == "all"
-        and (
-            current_user.is_hotel_owner
-            or current_user.user_type == "HOTEL_ADMIN"
-            or current_user.staff_level == "admin"
-        )
-    )
+    visibility_scope = RBACService(db).ticket_visibility_scope(current_user)
+    include_all = bool(scope == "all" and visibility_scope == "all")
     if scope is None:
-        include_all = bool(
-            current_user.is_hotel_owner
-            or current_user.user_type == "HOTEL_ADMIN"
-            or current_user.staff_level == "admin"
-        )
+        include_all = visibility_scope == "all"
+    department_id = None
+    if visibility_scope == "department" and scope != "mine":
+        department_id = current_user.department_id
     rows = list(
         EscalationLogRepository(db).list_for_hotel(
             hotel_id,
             user_id=current_user.id,
-            department_id=None if scope == "mine" else current_user.department_id,
+            department_id=department_id,
             include_all=include_all,
         )
     )
@@ -119,7 +126,7 @@ def list_escalated_tickets(
         TicketAcceptanceRepository(db).list_pending_for_hotel(
             hotel_id,
             user_id=current_user.id,
-            department_id=None if scope == "mine" else current_user.department_id,
+            department_id=department_id,
             include_all=include_all,
         )
     )
@@ -179,11 +186,12 @@ def get_ticket(
     hotel_id: str,
     ticket_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("ticket.view")),
+    current_user: User = Depends(require_any_permission(*TICKET_VIEW_PERMISSIONS)),
 ) -> dict:
     ticket = TicketRepository(db).get_for_hotel(hotel_id, ticket_id)
     if not ticket:
         raise not_found("Ticket not found")
+    _ensure_ticket_visible(db, current_user, ticket)
     return ok(_ticket_read(ticket, _ticket_context(db, hotel_id, [ticket])).model_dump())
 
 
@@ -192,8 +200,9 @@ def list_ticket_messages(
     hotel_id: str,
     ticket_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("ticket.view")),
+    current_user: User = Depends(require_any_permission(*TICKET_VIEW_PERMISSIONS)),
 ) -> dict:
+    _get_visible_ticket(db, hotel_id, ticket_id, current_user)
     messages = TicketService(db).list_messages(hotel_id, ticket_id)
     return ok([TicketMessageRead.model_validate(item).model_dump() for item in messages])
 
@@ -204,8 +213,9 @@ def create_ticket_message(
     ticket_id: str,
     payload: TicketMessageCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("ticket.view")),
+    current_user: User = Depends(require_any_permission(*TICKET_VIEW_PERMISSIONS)),
 ) -> dict:
+    _get_visible_ticket(db, hotel_id, ticket_id, current_user)
     message = TicketService(db).create_message(hotel_id, ticket_id, payload, current_user.id)
     return ok(TicketMessageRead.model_validate(message).model_dump())
 
@@ -215,8 +225,9 @@ def get_ticket_timeline(
     hotel_id: str,
     ticket_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("ticket.view")),
+    current_user: User = Depends(require_any_permission(*TICKET_VIEW_PERMISSIONS)),
 ) -> dict:
+    _get_visible_ticket(db, hotel_id, ticket_id, current_user)
     items = TicketService(db).timeline(hotel_id, ticket_id)
     return ok([item.model_dump() for item in items])
 
@@ -226,11 +237,9 @@ def list_ticket_guest_messages(
     hotel_id: str,
     ticket_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("ticket.view")),
+    current_user: User = Depends(require_any_permission(*TICKET_VIEW_PERMISSIONS)),
 ) -> dict:
-    ticket = TicketRepository(db).get_for_hotel(hotel_id, ticket_id)
-    if not ticket:
-        raise not_found("Ticket not found")
+    _get_visible_ticket(db, hotel_id, ticket_id, current_user)
     messages = WhatsAppConversationRepository(db).list_ticket_messages(hotel_id, ticket_id)
     return ok([WhatsAppMessageRead.model_validate(item).model_dump() for item in messages])
 
@@ -271,8 +280,9 @@ def accept_ticket(
     hotel_id: str,
     ticket_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("ticket.view")),
+    current_user: User = Depends(require_any_permission(Permissions.TICKET_ACCEPT, Permissions.TICKET_VIEW)),
 ) -> dict:
+    _get_visible_ticket(db, hotel_id, ticket_id, current_user)
     ticket = TicketService(db).accept_ticket(hotel_id, ticket_id, current_user.id)
     return ok(TicketRead.model_validate(ticket).model_dump())
 
@@ -283,8 +293,9 @@ def reject_ticket(
     ticket_id: str,
     payload: TicketRejectRequest | None = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("ticket.view")),
+    current_user: User = Depends(require_any_permission(Permissions.TICKET_REJECT, Permissions.TICKET_VIEW)),
 ) -> dict:
+    _get_visible_ticket(db, hotel_id, ticket_id, current_user)
     ticket = TicketService(db).reject_ticket(
         hotel_id,
         ticket_id,
@@ -299,8 +310,9 @@ def complete_ticket(
     hotel_id: str,
     ticket_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("ticket.view")),
+    current_user: User = Depends(require_any_permission(Permissions.TICKET_COMPLETE_OWN, Permissions.TICKET_VIEW)),
 ) -> dict:
+    _get_visible_ticket(db, hotel_id, ticket_id, current_user)
     ticket = TicketService(db).complete_ticket(hotel_id, ticket_id, current_user.id)
     return ok(TicketRead.model_validate(ticket).model_dump())
 
@@ -338,13 +350,9 @@ def list_ticket_acceptances(
     hotel_id: str,
     ticket_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("ticket.view")),
+    current_user: User = Depends(require_any_permission(*TICKET_VIEW_PERMISSIONS)),
 ) -> dict:
-    ticket = TicketRepository(db).get_for_hotel(hotel_id, ticket_id)
-    if not ticket:
-        from app.core.exceptions import not_found
-
-        raise not_found("Ticket not found")
+    _get_visible_ticket(db, hotel_id, ticket_id, current_user)
     rows = TicketAcceptanceRepository(db).list_for_ticket(ticket_id)
     return ok([TicketAcceptanceRead.model_validate(item).model_dump() for item in rows])
 
@@ -354,15 +362,24 @@ def list_ticket_escalations(
     hotel_id: str,
     ticket_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("ticket.view")),
+    current_user: User = Depends(require_any_permission(*TICKET_VIEW_PERMISSIONS)),
 ) -> dict:
-    ticket = TicketRepository(db).get_for_hotel(hotel_id, ticket_id)
-    if not ticket:
-        from app.core.exceptions import not_found
-
-        raise not_found("Ticket not found")
+    _get_visible_ticket(db, hotel_id, ticket_id, current_user)
     rows = EscalationLogRepository(db).list_for_ticket(ticket_id)
     return ok([EscalationLogRead.model_validate(item).model_dump() for item in rows])
+
+
+def _get_visible_ticket(db: Session, hotel_id: str, ticket_id: str, current_user: User) -> Ticket:
+    ticket = TicketRepository(db).get_for_hotel(hotel_id, ticket_id)
+    if not ticket:
+        raise not_found("Ticket not found")
+    _ensure_ticket_visible(db, current_user, ticket)
+    return ticket
+
+
+def _ensure_ticket_visible(db: Session, current_user: User, ticket: Ticket) -> None:
+    if not RBACService(db).can_view_ticket(current_user, ticket):
+        raise forbidden("Ticket is outside your access scope")
 
 
 def _ticket_read(ticket: Ticket, ticket_context: dict[str, dict[str, str | None]]) -> TicketRead:

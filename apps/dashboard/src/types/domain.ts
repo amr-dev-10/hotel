@@ -116,6 +116,7 @@ export interface CurrentUser {
   job_role: string | null;
   is_hotel_owner: boolean;
   is_on_duty: boolean;
+  permissions: string[];
 }
 
 export interface Ticket {

@@ -32,6 +32,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { apiErrorMessage } from "@/lib/api/client";
+import { Can } from "@/lib/auth/can";
 import { cn, compactId, titleCase } from "@/lib/utils";
 import { useDepartments } from "@/features/departments/hooks/useDepartments";
 import { useAssignUserRoles, useRoles } from "@/features/roles/hooks/useRoles";
@@ -210,14 +211,18 @@ export function StaffProfilePage({
         <div className="flex flex-wrap gap-2">
           <Badge variant={user.is_active ? "green" : "rose"}>{user.is_active ? "Active" : "Inactive"}</Badge>
           <Badge variant={user.is_on_duty ? "blue" : "default"}>{user.is_on_duty ? "On duty" : "Off duty"}</Badge>
-          <Button type="button" variant="secondary" onClick={() => setEditing((value) => !value)}>
-            {editing ? <X /> : <Pencil />}
-            {editing ? "Close edit" : "Edit"}
-          </Button>
-          <Button disabled={deleteStaff.isPending} type="button" variant="danger" onClick={handleDelete}>
-            {deleteStaff.isPending ? <Loader2 className="animate-spin" /> : <Trash2 />}
-            Delete
-          </Button>
+          <Can I="edit" a="Staff">
+            <Button type="button" variant="secondary" onClick={() => setEditing((value) => !value)}>
+              {editing ? <X /> : <Pencil />}
+              {editing ? "Close edit" : "Edit"}
+            </Button>
+          </Can>
+          <Can I="delete" a="Staff">
+            <Button disabled={deleteStaff.isPending} type="button" variant="danger" onClick={handleDelete}>
+              {deleteStaff.isPending ? <Loader2 className="animate-spin" /> : <Trash2 />}
+              Delete
+            </Button>
+          </Can>
         </div>
       </div>
 

@@ -7,6 +7,7 @@ import { CreateTicketDialog } from "@/features/tickets/components/create-ticket-
 import { TicketBoard } from "@/features/tickets/components/ticket-board";
 import { TicketFilters } from "@/features/tickets/components/ticket-filters";
 import { TicketList } from "@/features/tickets/components/ticket-list";
+import { Can } from "@/lib/auth/can";
 
 export function TicketsPage({ hotelId }: { hotelId: string }) {
   return (
@@ -16,7 +17,9 @@ export function TicketsPage({ hotelId }: { hotelId: string }) {
           <h2 className="text-xl font-semibold">Tickets</h2>
           <p className="text-sm text-slate-500">Drag requests between workflow stages or use actions for acceptance and approval.</p>
         </div>
-        <CreateTicketDialog hotelId={hotelId} />
+        <Can I="create" a="Ticket">
+          <CreateTicketDialog hotelId={hotelId} />
+        </Can>
       </div>
       <Suspense>
         <TicketWorkspace hotelId={hotelId} />

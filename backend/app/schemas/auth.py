@@ -26,6 +26,7 @@ class CurrentUserRead(ORMModel):
     job_role: str | None = None
     is_hotel_owner: bool
     is_on_duty: bool
+    permissions: list[str] = Field(default_factory=list)
 
 
 class RefreshTokenRequest(BaseModel):

@@ -9,6 +9,13 @@ import type {
   UpdateStaffValues,
 } from "@/features/staff/schemas/create-staff.schema";
 
+export type ShiftUpdatePayload = {
+  status?: "scheduled" | "checked_in" | "completed" | "absent" | "late" | "on_leave";
+  actual_start?: string | null;
+  actual_end?: string | null;
+  notes?: string | null;
+};
+
 export function useStaff(hotelId: string) {
   return useQuery({
     queryKey: queryKeys.staff(hotelId),
@@ -67,7 +74,7 @@ export function useUpdateShift(hotelId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ shiftId, payload }: { shiftId: string; payload: Partial<ShiftValues> }) =>
+    mutationFn: ({ shiftId, payload }: { shiftId: string; payload: ShiftUpdatePayload }) =>
       apiPatch<EmployeeShift>(`/hotels/${hotelId}/shifts/${shiftId}`, payload),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.shifts(hotelId) }),
   });

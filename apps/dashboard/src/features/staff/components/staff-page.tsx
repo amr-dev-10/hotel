@@ -6,6 +6,7 @@ import { Building2, CalendarClock, ClipboardCheck, Network, Shield, TicketCheck,
 import { Button } from "@/components/ui/button";
 import { CreateStaffDialog } from "@/features/staff/components/create-staff-dialog";
 import { StaffDirectory } from "@/features/staff/components/staff-directory";
+import { Can } from "@/lib/auth/can";
 
 export function StaffPage({ hotelId }: { hotelId: string }) {
   const modules = [
@@ -25,13 +26,15 @@ export function StaffPage({ hotelId }: { hotelId: string }) {
           <p className="text-sm text-slate-500">Directory, workforce structure, roster signals, and access control.</p>
         </div>
         <div className="flex gap-2">
-          <Button asChild type="button" variant="secondary">
-            <Link href={`/${hotelId}/settings/staff/new`}>
-              <UserPlus />
-              Open form
-            </Link>
-          </Button>
-          <CreateStaffDialog hotelId={hotelId} />
+          <Can I="create" a="Staff">
+            <Button asChild type="button" variant="secondary">
+              <Link href={`/${hotelId}/settings/staff/new`}>
+                <UserPlus />
+                Open form
+              </Link>
+            </Button>
+            <CreateStaffDialog hotelId={hotelId} />
+          </Can>
         </div>
       </div>
       <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">

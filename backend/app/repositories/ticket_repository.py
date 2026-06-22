@@ -36,6 +36,9 @@ class TicketRepository(BaseRepository[Ticket]):
         department_key: str | None = None,
         sla_status: str | None = None,
         q: str | None = None,
+        visibility_scope: str = "all",
+        visibility_user_id: str | None = None,
+        visibility_department_id: str | None = None,
         limit: int = 50,
         cursor: str | None = None,
     ) -> CursorResult[Ticket]:
@@ -43,6 +46,23 @@ class TicketRepository(BaseRepository[Ticket]):
             Ticket.hotel_id == hotel_id,
             Ticket.deleted_at.is_(None),
         )
+        if visibility_scope == "own":
+            if not visibility_user_id:
+                statement = statement.where(Ticket.id == "__no_visible_tickets__")
+            else:
+                statement = statement.where(
+                    or_(
+                        Ticket.assigned_to == visibility_user_id,
+                        Ticket.followers.contains([visibility_user_id]),
+                    )
+                )
+        elif visibility_scope == "department":
+            if not visibility_department_id:
+                statement = statement.where(Ticket.id == "__no_visible_tickets__")
+            else:
+                statement = statement.where(Ticket.department_id == visibility_department_id)
+        elif visibility_scope != "all":
+            statement = statement.where(Ticket.id == "__no_visible_tickets__")
         if guest_id:
             statement = statement.where(Ticket.guest_id == guest_id)
         if reservation_id:
