@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import false, or_, select
 from sqlalchemy.orm import Session
@@ -135,5 +135,11 @@ class TicketAcceptanceRepository(BaseRepository[TicketAcceptance]):
         return [
             row
             for row in rows
-            if (now - row.offered_at).total_seconds() >= row.expire_after_minutes * 60
+            if (_aware(now) - _aware(row.offered_at)).total_seconds() >= row.expire_after_minutes * 60
         ]
+
+
+def _aware(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value

@@ -8,16 +8,38 @@ import type { Permission } from "@/types/domain";
 interface PermissionMatrixProps {
   permissions: Permission[];
   selectedPermissions: string[];
+  selectedScopes: Record<string, string>;
   onChange: (permissions: string[]) => void;
+  onScopesChange: (scopes: Record<string, string>) => void;
   disabled?: boolean;
 }
 
-const moduleOrder = ["ticket", "room", "reservation", "user", "role", "hotel", "workflow", "campaign", "report"];
+const moduleOrder = [
+  "tickets",
+  "rooms",
+  "guests",
+  "reservations",
+  "users",
+  "staff",
+  "roles",
+  "hotels",
+  "workflow",
+  "campaigns",
+  "analytics",
+];
+const scopedPermissionCodes = new Set(["ticket.view", "shift.view", "shift.update", "staff.view", "staff.update"]);
+const scopeOptions = [
+  { value: "own", label: "Own" },
+  { value: "department", label: "Department" },
+  { value: "hotel", label: "Hotel" },
+];
 
 export function PermissionMatrix({
   permissions,
   selectedPermissions,
+  selectedScopes,
   onChange,
+  onScopesChange,
   disabled,
 }: PermissionMatrixProps) {
   const grouped = useMemo(() => {
@@ -50,10 +72,25 @@ export function PermissionMatrix({
 
     if (selectedPermissions.includes(code)) {
       onChange(selectedPermissions.filter((item) => item !== code));
+      if (selectedScopes[code]) {
+        const nextScopes = { ...selectedScopes };
+        delete nextScopes[code];
+        onScopesChange(nextScopes);
+      }
       return;
     }
 
     onChange([...selectedPermissions, code].sort());
+    if (isScopedPermissionCode(code) && !selectedScopes[code]) {
+      onScopesChange({ ...selectedScopes, [code]: "hotel" });
+    }
+  }
+
+  function updateScope(code: string, scope: string) {
+    if (disabled) {
+      return;
+    }
+    onScopesChange({ ...selectedScopes, [code]: scope });
   }
 
   if (!permissions.length) {
@@ -82,20 +119,38 @@ export function PermissionMatrix({
               .sort((a, b) => a.code.localeCompare(b.code))
               .map((permission) => {
                 const checked = selectedPermissions.includes(permission.code);
+                const isScoped = isScopedPermissionCode(permission.code);
                 return (
-                  <label
-                    className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700"
+                  <div
+                    className="inline-flex min-h-9 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700"
                     key={permission.id}
                   >
-                    <input
-                      checked={checked}
-                      className="size-4 accent-[#0F3D91]"
-                      disabled={disabled}
-                      type="checkbox"
-                      onChange={() => toggle(permission.code)}
-                    />
-                    <span className="whitespace-nowrap">{permission.name}</span>
-                  </label>
+                    <label className="inline-flex items-center gap-2">
+                      <input
+                        checked={checked}
+                        className="size-4 accent-[#0F3D91]"
+                        disabled={disabled}
+                        type="checkbox"
+                        onChange={() => toggle(permission.code)}
+                      />
+                      <span className="whitespace-nowrap">{permission.name}</span>
+                    </label>
+                    {isScoped && checked ? (
+                      <select
+                        aria-label={`${permission.name} scope`}
+                        className="h-7 rounded-md border border-slate-200 bg-slate-50 px-2 text-xs text-slate-700"
+                        disabled={disabled}
+                        value={selectedScopes[permission.code] ?? permission.scope ?? "hotel"}
+                        onChange={(event) => updateScope(permission.code, event.target.value)}
+                      >
+                        {scopeOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    ) : null}
+                  </div>
                 );
               })}
           </div>
@@ -103,4 +158,8 @@ export function PermissionMatrix({
       ))}
     </div>
   );
+}
+
+function isScopedPermissionCode(code: string) {
+  return scopedPermissionCodes.has(code);
 }

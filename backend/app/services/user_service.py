@@ -12,6 +12,7 @@ from app.repositories.rbac_repository import RoleRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.user import UserUpdate
 from app.services.audit_service import AuditService
+from app.services.rbac_service import RBACService
 
 
 ADMIN_USER_TYPE = "HOTEL_ADMIN"
@@ -132,6 +133,7 @@ class UserService:
         self.db.execute(user_roles.delete().where(user_roles.c.user_id == user_id))
         if role_ids:
             self.roles.assign_user_roles(user_id, role_ids)
+        RBACService.clear_permission_cache(user_id)
 
     def _ensure_not_last_admin(self, hotel_id: str) -> None:
         if self.users.count_hotel_admins(hotel_id) <= 1:

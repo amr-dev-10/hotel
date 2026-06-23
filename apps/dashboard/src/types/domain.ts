@@ -117,6 +117,7 @@ export interface CurrentUser {
   is_hotel_owner: boolean;
   is_on_duty: boolean;
   permissions: string[];
+  permission_scopes?: Record<string, string>;
 }
 
 export interface Ticket {
@@ -474,8 +475,11 @@ export interface Permission {
   id: string;
   group_id: string | null;
   code: string;
+  resource: string;
+  action: string;
   name: string;
   module: string;
+  scope?: string;
 }
 
 export interface PermissionGroup {

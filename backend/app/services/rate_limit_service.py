@@ -1,9 +1,9 @@
 from collections import defaultdict, deque
 from time import time
 
+from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.core.exceptions import forbidden
 from app.models.ops import ApiRateLimit
 from app.repositories.ops_repository import ApiRateLimitRepository
 from app.schemas.platform import ApiRateLimitUpsert
@@ -64,5 +64,8 @@ class RateLimitService:
         while bucket and bucket[0] <= now - window_seconds:
             bucket.popleft()
         if len(bucket) >= max_requests:
-            raise forbidden("API rate limit exceeded")
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="API rate limit exceeded",
+            )
         bucket.append(now)

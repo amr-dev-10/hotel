@@ -39,6 +39,7 @@ export function RoleEditorPage({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [permissionCodes, setPermissionCodes] = useState<string[]>([]);
+  const [permissionScopes, setPermissionScopes] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!existingRole) {
@@ -48,6 +49,13 @@ export function RoleEditorPage({
     setName(existingRole.name);
     setDescription(existingRole.description ?? "");
     setPermissionCodes((existingRole.permissions ?? []).map((permission) => permission.code).sort());
+    setPermissionScopes(
+      Object.fromEntries(
+        (existingRole.permissions ?? [])
+          .filter((permission) => permission.scope)
+          .map((permission) => [permission.code, permission.scope ?? "hotel"]),
+      ),
+    );
   }, [existingRole]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -56,6 +64,7 @@ export function RoleEditorPage({
       name,
       description: description || null,
       permission_codes: permissionCodes,
+      permission_scopes: permissionScopes,
     };
 
     try {
@@ -125,7 +134,9 @@ export function RoleEditorPage({
       <PermissionMatrix
         permissions={permissions.data ?? []}
         selectedPermissions={permissionCodes}
+        selectedScopes={permissionScopes}
         onChange={setPermissionCodes}
+        onScopesChange={setPermissionScopes}
       />
     </form>
   );

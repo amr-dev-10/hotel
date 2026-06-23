@@ -9,6 +9,7 @@ role_permissions = Table(
     Base.metadata,
     Column("role_id", ForeignKey("roles.id"), primary_key=True),
     Column("permission_id", ForeignKey("permissions.id"), primary_key=True),
+    Column("scope", String(20), nullable=False, default="hotel", server_default="hotel"),
 )
 
 user_roles = Table(
@@ -49,5 +50,7 @@ class Permission(UUIDPrimaryKeyMixin, Base):
 
     group_id: Mapped[str | None] = mapped_column(ForeignKey("permission_groups.id"))
     code: Mapped[str] = mapped_column(String(120), unique=True, index=True)
+    resource: Mapped[str] = mapped_column(String(80), index=True)
+    action: Mapped[str] = mapped_column(String(80), index=True)
     name: Mapped[str] = mapped_column(String(160))
     module: Mapped[str] = mapped_column(String(80), index=True)

@@ -38,11 +38,19 @@ class Permissions:
     USER_DELETE = "user.delete"
     USER_MANAGE = "user.manage"
 
+    STAFF_VIEW = "staff.view"
+    STAFF_CREATE = "staff.create"
+    STAFF_UPDATE = "staff.update"
+    STAFF_DELETE = "staff.delete"
+    STAFF_MANAGE = "staff.manage"
+
     ROLE_VIEW = "role.view"
     ROLE_MANAGE = "role.manage"
 
     SHIFT_VIEW_OWN = "shift.view_own"
     SHIFT_VIEW_DEPT = "shift.view_dept"
+    SHIFT_VIEW = "shift.view"
+    SHIFT_UPDATE = "shift.update"
     SHIFT_UPDATE_OWN = "shift.update_own"
     SHIFT_MANAGE = "shift.manage"
 

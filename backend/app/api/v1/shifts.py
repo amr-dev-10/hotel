@@ -22,8 +22,10 @@ def list_shifts(
     current_user: User = Depends(
         require_any_permission(
             Permissions.SHIFT_MANAGE,
+            Permissions.SHIFT_VIEW,
             Permissions.SHIFT_VIEW_DEPT,
             Permissions.SHIFT_VIEW_OWN,
+            Permissions.SHIFT_UPDATE,
             Permissions.SHIFT_UPDATE_OWN,
         )
     ),
@@ -66,14 +68,17 @@ def update_shift(
     shift_id: str,
     payload: ShiftUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_any_permission(Permissions.SHIFT_MANAGE, Permissions.SHIFT_UPDATE_OWN)),
+    current_user: User = Depends(require_any_permission(Permissions.SHIFT_MANAGE, Permissions.SHIFT_UPDATE, Permissions.SHIFT_UPDATE_OWN)),
 ) -> dict:
     rbac = RBACService(db)
     if not rbac.has_any(current_user, [Permissions.SHIFT_MANAGE]):
         shift = EmployeeShiftRepository(db).get_for_hotel(hotel_id, shift_id)
         if not shift:
             raise not_found("Shift not found")
-        if shift.user_id != current_user.id:
+        scope = rbac.permission_scope(current_user, Permissions.SHIFT_UPDATE)
+        can_update_department = scope == "department" and current_user.department_id and shift.department_id == current_user.department_id
+        can_update_own = scope == "own" and shift.user_id == current_user.id
+        if scope != "hotel" and not can_update_department and not can_update_own:
             raise forbidden("Shift is outside your access scope")
     shift = ShiftService(db).update(hotel_id, shift_id, payload, current_user.id)
     return ok(ShiftRead.model_validate(shift).model_dump())

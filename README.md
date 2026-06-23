@@ -45,6 +45,8 @@ The backend follows the v5.1 principles:
 
 ## Quick Setup
 
+For the full local development flow, including database setup, backend/frontend commands, tests, and seeding, see `docs/development-setup-testing-and-seeding.md`.
+
 For the current Windows-native backend setup with `.venv-win`, Windows PostgreSQL, and WSL Redis, see `docs/windows-backend-db-setup.md`.
 
 ```bash

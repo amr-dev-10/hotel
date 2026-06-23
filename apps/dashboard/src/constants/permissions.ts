@@ -38,11 +38,19 @@ export const Permissions = {
   USER_DELETE: "user.delete",
   USER_MANAGE: "user.manage",
 
+  STAFF_VIEW: "staff.view",
+  STAFF_CREATE: "staff.create",
+  STAFF_UPDATE: "staff.update",
+  STAFF_DELETE: "staff.delete",
+  STAFF_MANAGE: "staff.manage",
+
   ROLE_VIEW: "role.view",
   ROLE_MANAGE: "role.manage",
 
   SHIFT_VIEW_OWN: "shift.view_own",
   SHIFT_VIEW_DEPT: "shift.view_dept",
+  SHIFT_VIEW: "shift.view",
+  SHIFT_UPDATE: "shift.update",
   SHIFT_UPDATE_OWN: "shift.update_own",
   SHIFT_MANAGE: "shift.manage",
 
@@ -88,4 +96,13 @@ export const ticketViewPermissions = [
   Permissions.TICKET_VIEW_OWN,
   Permissions.TICKET_VIEW_DEPT,
   Permissions.TICKET_VIEW_ALL,
+];
+
+export const shiftViewPermissions = [
+  Permissions.SHIFT_VIEW,
+  Permissions.SHIFT_VIEW_OWN,
+  Permissions.SHIFT_VIEW_DEPT,
+  Permissions.SHIFT_UPDATE,
+  Permissions.SHIFT_UPDATE_OWN,
+  Permissions.SHIFT_MANAGE,
 ];

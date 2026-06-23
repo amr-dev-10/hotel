@@ -27,6 +27,7 @@ class CurrentUserRead(ORMModel):
     is_hotel_owner: bool
     is_on_duty: bool
     permissions: list[str] = Field(default_factory=list)
+    permission_scopes: dict[str, str] = Field(default_factory=dict)
 
 
 class RefreshTokenRequest(BaseModel):

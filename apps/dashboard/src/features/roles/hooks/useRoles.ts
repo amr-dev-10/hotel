@@ -8,6 +8,7 @@ export interface RolePayload {
   name: string;
   description?: string | null;
   permission_codes?: string[];
+  permission_scopes?: Record<string, string>;
 }
 
 export function useRoles(hotelId: string) {

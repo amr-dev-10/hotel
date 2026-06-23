@@ -29,6 +29,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
     def _group(self, path: str) -> str:
+        if path.endswith("/auth/me"):
+            return "general"
         if "/auth/" in path:
             return "auth"
         if "/tickets" in path:

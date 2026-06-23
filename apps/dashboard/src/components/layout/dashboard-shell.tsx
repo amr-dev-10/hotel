@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import axios from "axios";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -32,9 +33,10 @@ import { Button } from "@/components/ui/button";
 import { Permissions, ticketViewPermissions } from "@/constants/permissions";
 import { useRouteHotelId } from "@/hooks/useRouteHotelId";
 import { useWebSocket } from "@/hooks/useWebSocket";
+import { api } from "@/lib/api/client";
 import { cn, titleCase } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth.store";
-import type { CurrentUser } from "@/types/domain";
+import type { ApiEnvelope, CurrentUser } from "@/types/domain";
 
 type NavItem = {
   label: string;
@@ -85,11 +87,35 @@ export function DashboardShell({
   const hotelId = useRouteHotelId(hotelIdProp);
   const token = useAuthStore((state) => state.token);
   const currentUser = useAuthStore((state) => state.currentUser);
+  const setCurrentUser = useAuthStore((state) => state.setCurrentUser);
   const switchHotel = useAuthStore((state) => state.switchHotel);
   const logout = useAuthStore((state) => state.logout);
   const [mounted, setMounted] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const lastAuthRefreshAt = useRef(0);
   useWebSocket(hotelId);
+
+  const refreshCurrentUser = useCallback(async () => {
+    if (!token) {
+      return;
+    }
+
+    const now = Date.now();
+    if (now - lastAuthRefreshAt.current < 30_000) {
+      return;
+    }
+    lastAuthRefreshAt.current = now;
+
+    try {
+      const response = await api.get<ApiEnvelope<CurrentUser>>("/auth/me");
+      setCurrentUser(response.data.data);
+    } catch (error) {
+      if (isSessionExpiredError(error)) {
+        logout();
+        router.replace("/login");
+      }
+    }
+  }, [logout, router, setCurrentUser, token]);
 
   const isHotelAdmin = Boolean(
     currentUser?.is_hotel_owner ||
@@ -109,6 +135,37 @@ export function DashboardShell({
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!mounted || !token) {
+      return;
+    }
+
+    void refreshCurrentUser();
+  }, [mounted, refreshCurrentUser, token]);
+
+  useEffect(() => {
+    if (!mounted || !token) {
+      return;
+    }
+
+    const handleFocus = () => {
+      void refreshCurrentUser();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void refreshCurrentUser();
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [mounted, refreshCurrentUser, token]);
 
   useEffect(() => {
     if (!mounted) {
@@ -285,4 +342,20 @@ function canAccessNavItem(item: NavItem, currentUser: CurrentUser | null, isHote
   }
   const permissions = new Set(currentUser.permissions ?? []);
   return item.permissions.some((permission) => permissions.has(permission));
+}
+
+function isSessionExpiredError(error: unknown) {
+  if (!axios.isAxiosError(error)) {
+    return false;
+  }
+
+  const status = error.response?.status ?? 0;
+  const detail = error.response?.data as { detail?: string; message?: string } | undefined;
+  const message = `${detail?.detail ?? detail?.message ?? ""}`.toLowerCase();
+
+  if (status === 429 || message.includes("rate limit")) {
+    return false;
+  }
+
+  return status === 401 || status === 403;
 }

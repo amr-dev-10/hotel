@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db, set_tenant_context
 from app.core.exceptions import forbidden
+from app.core.permissions import Permissions
 from app.core.security import decode_access_token
 from app.models.platform_admin import PlatformAdmin
 from app.models.user import User
@@ -67,15 +68,7 @@ def require_hotel_admin(
 ) -> User:
     ensure_hotel_access(hotel_id, current_user)
     set_tenant_context(db, hotel_id)
-
-    is_admin = (
-        current_user.is_hotel_owner
-        or current_user.user_type == "HOTEL_ADMIN"
-        or (current_user.staff_level or "").lower() == "admin"
-    )
-    if not is_admin:
-        raise forbidden("Hotel admin access required")
-
+    RBACService(db).require(current_user, Permissions.HOTEL_SETTINGS_MANAGE)
     return current_user
 
 
@@ -88,10 +81,7 @@ def require_any_permission(*permission_codes: str):
         ensure_hotel_access(hotel_id, current_user)
         set_tenant_context(db, hotel_id)
         rbac = RBACService(db)
-        if current_user.is_hotel_owner:
-            return current_user
-        permissions = rbac.permission_codes_for_user(current_user)
-        if not any(code in permissions for code in permission_codes):
+        if not rbac.has_any(current_user, permission_codes):
             raise forbidden(f"Missing one of permissions: {', '.join(permission_codes)}")
         return current_user
 

@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.api.dependencies import require_any_permission, require_permission
 from app.core.database import get_db
-from app.core.exceptions import bad_request
+from app.core.exceptions import bad_request, forbidden
 from app.core.responses import ok
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
@@ -23,7 +23,15 @@ def list_users(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("user.view")),
 ) -> dict:
+    rbac = RBACService(db)
+    scope = rbac.staff_visibility_scope(current_user)
     users = UserRepository(db).list_for_hotel(hotel_id)
+    if scope == "department":
+        users = [user for user in users if current_user.department_id and user.department_id == current_user.department_id]
+    elif scope == "own":
+        users = [user for user in users if user.id == current_user.id]
+    elif scope != "all":
+        users = []
     return ok([UserRead.model_validate(item).model_dump() for item in users])
 
 
@@ -72,6 +80,8 @@ def get_user(
     current_user: User = Depends(require_permission("user.view")),
 ) -> dict:
     user = UserService(db).get_user(hotel_id, user_id)
+    if not RBACService(db).can_view_staff(current_user, user):
+        raise forbidden("Staff member is outside your access scope")
     return ok(UserRead.model_validate(user).model_dump())
 
 
@@ -83,6 +93,9 @@ def update_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_any_permission("user.update", "user.manage")),
 ) -> dict:
+    target = UserService(db).get_user(hotel_id, user_id)
+    if not RBACService(db).can_update_staff(current_user, target):
+        raise forbidden("Staff member is outside your access scope")
     user = UserService(db).update_user(hotel_id, user_id, payload, current_user)
     return ok(UserRead.model_validate(user).model_dump())
 

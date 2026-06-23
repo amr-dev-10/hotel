@@ -70,6 +70,9 @@ def me(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict:
-    permissions = sorted(RBACService(db).permission_codes_for_user(current_user))
-    payload = CurrentUserRead.model_validate(current_user).model_copy(update={"permissions": permissions})
+    rbac = RBACService(db)
+    permissions = sorted(rbac.permission_codes_for_user(current_user))
+    payload = CurrentUserRead.model_validate(current_user).model_copy(
+        update={"permissions": permissions, "permission_scopes": rbac.permission_scopes_for_user(current_user)}
+    )
     return ok(payload.model_dump())

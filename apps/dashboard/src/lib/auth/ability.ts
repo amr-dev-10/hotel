@@ -1,6 +1,6 @@
 import { AbilityBuilder, createMongoAbility, type MongoAbility } from "@casl/ability";
 
-import { Permissions, ticketViewPermissions } from "@/constants/permissions";
+import { Permissions, shiftViewPermissions, ticketViewPermissions } from "@/constants/permissions";
 import type { CurrentUser } from "@/types/domain";
 
 export type AppAction =
@@ -87,12 +87,19 @@ export function buildAbility(user: CurrentUser | null): AppAbility {
   grant(permissions, Permissions.USER_UPDATE, () => can("edit", "Staff"));
   grant(permissions, Permissions.USER_DELETE, () => can("delete", "Staff"));
   grant(permissions, Permissions.USER_MANAGE, () => can(["view", "create", "edit", "delete"], "Staff"));
+  grant(permissions, Permissions.STAFF_VIEW, () => can(["view"], "Staff"));
+  grant(permissions, Permissions.STAFF_CREATE, () => can("create", "Staff"));
+  grant(permissions, Permissions.STAFF_UPDATE, () => can("edit", "Staff"));
+  grant(permissions, Permissions.STAFF_DELETE, () => can("delete", "Staff"));
+  grant(permissions, Permissions.STAFF_MANAGE, () => can(["view", "create", "edit", "delete"], "Staff"));
 
   grant(permissions, Permissions.ROLE_VIEW, () => can("view", "Role"));
   grant(permissions, Permissions.ROLE_MANAGE, () => can("manage", "Role"));
 
-  grant(permissions, Permissions.SHIFT_VIEW_OWN, () => can("view", "Shift"));
-  grant(permissions, Permissions.SHIFT_VIEW_DEPT, () => can("view", "Shift"));
+  if (shiftViewPermissions.some((permission) => permissions.has(permission))) {
+    can("view", "Shift");
+  }
+  grant(permissions, Permissions.SHIFT_UPDATE, () => can("edit", "Shift"));
   grant(permissions, Permissions.SHIFT_UPDATE_OWN, () => can("edit", "Shift"));
   grant(permissions, Permissions.SHIFT_MANAGE, () => can("manage", "Shift"));
 
@@ -105,7 +112,12 @@ export function buildAbility(user: CurrentUser | null): AppAbility {
   grant(permissions, Permissions.LIVE_CHAT_MANAGE, () => can("manage", "WhatsApp"));
   grant(permissions, Permissions.HOUSEKEEPING_MANAGE, () => can("manage", "Housekeeping"));
 
-  if (permissions.has(Permissions.USER_VIEW) || permissions.has(Permissions.TICKET_VIEW_DEPT) || permissions.has(Permissions.TICKET_VIEW_ALL)) {
+  if (
+    permissions.has(Permissions.USER_VIEW) ||
+    permissions.has(Permissions.STAFF_VIEW) ||
+    permissions.has(Permissions.TICKET_VIEW_DEPT) ||
+    permissions.has(Permissions.TICKET_VIEW_ALL)
+  ) {
     can("view", "Hierarchy");
   }
 
