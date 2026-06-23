@@ -4,7 +4,8 @@ Architecture documents are versioned by folder so new designs can be added witho
 
 ## Current Implementation Notes
 
-- `development-setup-testing-and-seeding.md` - local database setup, backend/frontend environment setup, test commands, demo data seeding, and load seed data.
+- `../SETUP.md` - canonical single-file setup guide for database setup, backend/frontend environment setup, test commands, demo data seeding, and production notes.
+- `development-setup-testing-and-seeding.md` - pointer to the canonical setup guide.
 - `current-development-operations-guide.md` - current escalation, notification, Food and Beverage, kitchen, and guest portal flows, including staff manual order creation and order editing.
 - `order-computation-functional-flow.md` - Food and Beverage POS order total calculation flow, current backend behavior, and recommended charge/discount extension model.
 

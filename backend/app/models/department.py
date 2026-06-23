@@ -9,7 +9,7 @@ class Department(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     __tablename__ = "departments"
     __table_args__ = (UniqueConstraint("hotel_id", "key", name="uq_departments_hotel_key"),)
 
-    hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
+    hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id", name="fk_departments_hotel_id_hotels"), index=True)
     name: Mapped[str] = mapped_column(String(120))
     key: Mapped[str] = mapped_column(String(80), index=True)
     description: Mapped[str | None] = mapped_column(Text)

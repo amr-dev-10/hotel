@@ -7,7 +7,7 @@ from dataclasses import asdict, dataclass
 from datetime import date, timedelta
 from decimal import Decimal
 from time import perf_counter
-from typing import Iterable
+from typing import Callable, Iterable
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -70,6 +70,7 @@ SIZE_PRESETS: dict[str, SeedPlan] = {
 DEPARTMENT_KEYS = ("front_office", "housekeeping", "engineering", "food_beverage")
 TICKET_STAGES = ("created", "pending_accept", "accepted", "in_progress", "pending_approval", "approved")
 TICKET_SOURCES = ("DASHBOARD", "WHATSAPP", "GUEST_PORTAL")
+ProgressCallback = Callable[[str], None]
 
 
 def resolve_seed_plan(
@@ -102,14 +103,33 @@ class LoadSeedService:
     def __init__(self, db: Session) -> None:
         self.db = db
 
-    def seed(self, plan: SeedPlan, *, hotel_slug: str, batch_size: int, dry_run: bool = False) -> SeedSummary:
+    def seed(
+        self,
+        plan: SeedPlan,
+        *,
+        hotel_slug: str,
+        batch_size: int,
+        dry_run: bool = False,
+        progress: ProgressCallback | None = None,
+    ) -> SeedSummary:
         if settings.environment.lower() == "production":
             raise forbidden("Load seed is disabled in production")
 
         started_at = perf_counter()
         run_id = utcnow().strftime("%Y%m%d%H%M%S%f")
         planned_slugs = self._planned_hotel_slugs(hotel_slug, plan.hotels)
+        _progress(
+            progress,
+            (
+                f"plan size={plan.size} hotels={plan.hotels} rooms={plan.rooms} "
+                f"staff={plan.staff} guests={plan.guests} reservations={plan.reservations} "
+                f"tickets={plan.tickets} batch_size={batch_size}"
+            ),
+        )
         if dry_run:
+            _progress(progress, f"dry run only; planned hotel slugs={', '.join(planned_slugs[:5])}")
+            if len(planned_slugs) > 5:
+                _progress(progress, f"dry run has {len(planned_slugs) - 5} more planned hotel slugs")
             return SeedSummary(
                 hotel_id="",
                 hotel_slug=planned_slugs[0],
@@ -122,14 +142,23 @@ class LoadSeedService:
 
         hotel_summaries: list[SeedHotelSummary] = []
         inserted = {key: 0 for key in ("hotels", "rooms", "staff", "guests", "reservations", "tickets")}
-        for slug in planned_slugs:
+        total_hotels = len(planned_slugs)
+        for hotel_index, slug in enumerate(planned_slugs, start=1):
+            hotel_started_at = perf_counter()
+            prefix = f"[{hotel_index}/{total_hotels}] {slug}"
+            _progress(progress, f"{prefix}: ensuring hotel and default data")
             hotel, owner = self._ensure_hotel(slug)
             hotel_summaries.append(SeedHotelSummary(hotel_id=hotel.id, hotel_slug=hotel.slug))
+            _progress(progress, f"{prefix}: loading departments and categories")
             departments = self._departments_by_key(hotel.id)
+            _progress(progress, f"{prefix}: ensuring {plan.rooms} rooms")
             room_ids = self._ensure_rooms(hotel, plan.rooms, batch_size)
+            _progress(progress, f"{prefix}: ensuring {plan.staff} staff users")
             staff_ids = self._ensure_staff(hotel, owner, departments, plan.staff, batch_size)
             category_by_key = self._categories_by_key(hotel.id)
+            _progress(progress, f"{prefix}: inserting {plan.guests} guests")
             guest_ids = self._insert_guests(hotel.id, run_id, plan.guests, batch_size)
+            _progress(progress, f"{prefix}: inserting {plan.reservations} reservations")
             reservation_ids = self._insert_reservations(
                 hotel.id,
                 run_id,
@@ -138,6 +167,7 @@ class LoadSeedService:
                 room_ids,
                 batch_size,
             )
+            _progress(progress, f"{prefix}: inserting {plan.tickets} tickets")
             self._insert_tickets(
                 hotel.id,
                 run_id,
@@ -156,8 +186,17 @@ class LoadSeedService:
             inserted["guests"] += plan.guests
             inserted["reservations"] += plan.reservations
             inserted["tickets"] += plan.tickets
+            _progress(
+                progress,
+                (
+                    f"{prefix}: done in {perf_counter() - hotel_started_at:.1f}s "
+                    f"(totals hotels={inserted['hotels']} guests={inserted['guests']} "
+                    f"reservations={inserted['reservations']} tickets={inserted['tickets']})"
+                ),
+            )
 
         first_hotel = hotel_summaries[0]
+        _progress(progress, f"completed load seed in {perf_counter() - started_at:.1f}s")
         return SeedSummary(
             hotel_id=first_hotel.hotel_id,
             hotel_slug=first_hotel.hotel_slug,
@@ -506,6 +545,7 @@ def main(argv: Iterable[str] | None = None) -> None:
             hotel_slug=args.hotel_slug,
             batch_size=max(args.batch_size, 1),
             dry_run=args.dry_run,
+            progress=_print_progress,
         )
         print(json.dumps(_summary_payload(summary), indent=2))
     finally:
@@ -537,6 +577,15 @@ def _validate_plan(plan: SeedPlan) -> None:
     invalid = [name for name, value in counts.items() if value < 0]
     if invalid:
         raise ValueError(f"Seed counts cannot be negative: {', '.join(invalid)}")
+
+
+def _progress(progress: ProgressCallback | None, message: str) -> None:
+    if progress:
+        progress(message)
+
+
+def _print_progress(message: str) -> None:
+    print(f"[seed] {message}", flush=True)
 
 
 def _summary_payload(summary: SeedSummary) -> dict:
