@@ -1241,8 +1241,8 @@ function OrdersPage({
                     key={order.id}
                     onEdit={() => openOrderDrawer({ mode: "edit", order })}
                     order={order}
-                    roomLabel={order.room_id ? `Room ${roomMap.get(order.room_id) ?? compactId(order.room_id)}` : "Table/POS"}
-                    guestLabel={order.guest_id ? guestMap.get(order.guest_id) ?? compactId(order.guest_id) : "Walk-in"}
+                    roomLabel={order.room_id ? `Room ${roomMap.get(order.room_id) ?? "assigned"}` : "Table/POS"}
+                    guestLabel={order.guest_id ? guestMap.get(order.guest_id) ?? "Guest" : "Walk-in"}
                     onStatus={(nextStatus) => updateStatus.mutate({ orderId: order.id, status: nextStatus })}
                   />
                 ))

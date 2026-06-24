@@ -38,7 +38,7 @@ export function HousekeepingPlanner({ hotelId }: { hotelId: string }) {
     () =>
       (housekeeping.data ?? []).map((task) => ({
         id: task.id,
-        title: `${roomMap.get(task.room_id) ?? compactId(task.room_id)} ${titleCase(task.task_type)}`,
+        title: `${roomMap.get(task.room_id) ?? "Room"} ${titleCase(task.task_type)}`,
         date: task.scheduled_date,
         backgroundColor: task.status === "completed" ? "#047857" : task.priority >= 4 ? "#BE123C" : "#0F3D91",
         borderColor: "transparent",
@@ -109,11 +109,11 @@ export function HousekeepingPlanner({ hotelId }: { hotelId: string }) {
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="text-sm font-semibold">
-                      Room {roomMap.get(task.room_id) ?? compactId(task.room_id)}
+                      Room {roomMap.get(task.room_id) ?? "Unassigned"}
                     </p>
                     <p className="text-xs text-slate-500">
                       {titleCase(task.task_type)}
-                      {task.assigned_to ? ` - ${staffMap.get(task.assigned_to) ?? compactId(task.assigned_to)}` : ""}
+                      {task.assigned_to ? ` - ${staffMap.get(task.assigned_to) ?? "Unassigned"}` : ""}
                     </p>
                   </div>
                   <Badge variant={taskStatusVariant(task.status)}>{titleCase(task.status)}</Badge>

@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
-import { Edit3, Search, UsersRound } from "lucide-react";
+import { Edit3, KeyRound, Loader2, Search, UsersRound } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -18,16 +18,18 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PaginationControls } from "@/components/ui/pagination-controls";
 import { Select } from "@/components/ui/select";
 import { PlatformShell } from "@/features/platform/components/platform-shell";
 import {
   usePlatformHotels,
   usePlatformUsers,
+  useResetPlatformUserPassword,
   useUpdatePlatformUser,
   type PlatformUserUpdatePayload,
 } from "@/features/platform/hooks/usePlatform";
 import { apiErrorMessage } from "@/lib/api/client";
-import { compactId, titleCase } from "@/lib/utils";
+import { titleCase } from "@/lib/utils";
 import type { PlatformUserSummary } from "@/types/domain";
 
 interface UserFormState {
@@ -39,6 +41,13 @@ interface UserFormState {
   is_active: boolean;
   is_on_duty: boolean;
 }
+
+interface PasswordFormState {
+  new_password: string;
+  confirm_password: string;
+}
+
+const PLATFORM_PAGE_SIZE = 50;
 
 export function PlatformUsersPage() {
   return (
@@ -52,11 +61,15 @@ function PlatformUsersContent() {
   const users = usePlatformUsers();
   const hotels = usePlatformHotels();
   const updateUser = useUpdatePlatformUser();
+  const resetPassword = useResetPlatformUserPassword();
   const [search, setSearch] = useState("");
   const [hotelFilter, setHotelFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [page, setPage] = useState(1);
   const [editingUser, setEditingUser] = useState<PlatformUserSummary | null>(null);
+  const [passwordUser, setPasswordUser] = useState<PlatformUserSummary | null>(null);
   const [form, setForm] = useState<UserFormState>(() => emptyForm());
+  const [passwordForm, setPasswordForm] = useState<PasswordFormState>(() => emptyPasswordForm());
 
   const hotelById = useMemo(() => {
     const byId = new Map<string, string>();
@@ -86,6 +99,17 @@ function PlatformUsersContent() {
     });
   }, [hotelById, hotelFilter, search, statusFilter, users.data]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [hotelFilter, search, statusFilter]);
+
+  const pageCount = Math.max(1, Math.ceil(filteredUsers.length / PLATFORM_PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const paginatedUsers = useMemo(() => {
+    const start = (currentPage - 1) * PLATFORM_PAGE_SIZE;
+    return filteredUsers.slice(start, start + PLATFORM_PAGE_SIZE);
+  }, [currentPage, filteredUsers]);
+
   function openEditor(user: PlatformUserSummary) {
     setEditingUser(user);
     setForm({
@@ -97,6 +121,11 @@ function PlatformUsersContent() {
       is_active: user.is_active,
       is_on_duty: user.is_on_duty,
     });
+  }
+
+  function openPasswordEditor(user: PlatformUserSummary) {
+    setPasswordUser(user);
+    setPasswordForm(emptyPasswordForm());
   }
 
   async function handleSave(event: React.FormEvent<HTMLFormElement>) {
@@ -119,6 +148,25 @@ function PlatformUsersContent() {
       await updateUser.mutateAsync({ userId: editingUser.id, payload });
       toast.success("User profile updated");
       setEditingUser(null);
+    } catch (error) {
+      toast.error(apiErrorMessage(error));
+    }
+  }
+
+  async function handlePasswordSave(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!passwordUser) {
+      return;
+    }
+
+    try {
+      await resetPassword.mutateAsync({
+        userId: passwordUser.id,
+        payload: passwordForm,
+      });
+      toast.success("User password updated");
+      setPasswordUser(null);
+      setPasswordForm(emptyPasswordForm());
     } catch (error) {
       toast.error(apiErrorMessage(error));
     }
@@ -176,64 +224,76 @@ function PlatformUsersContent() {
       {!filteredUsers.length ? (
         <DataState empty emptyTitle={users.data?.length ? "No users match these filters." : "No users found."} />
       ) : (
-        <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1020px] border-collapse text-sm">
-              <thead className="bg-slate-50 text-left text-xs uppercase tracking-normal text-slate-500">
-                <tr>
-                  <th className="border-b border-slate-200 px-4 py-3 font-semibold">User</th>
-                  <th className="border-b border-slate-200 px-4 py-3 font-semibold">Hotel</th>
-                  <th className="border-b border-slate-200 px-4 py-3 font-semibold">Role</th>
-                  <th className="border-b border-slate-200 px-4 py-3 font-semibold">Duty</th>
-                  <th className="border-b border-slate-200 px-4 py-3 font-semibold">Status</th>
-                  <th className="border-b border-slate-200 px-4 py-3 font-semibold">Created</th>
-                  <th className="border-b border-slate-200 px-4 py-3 font-semibold" />
-                </tr>
-              </thead>
-              <tbody>
-                {filteredUsers.map((user) => (
-                  <tr className="border-b border-slate-100 last:border-0" key={user.id}>
-                    <td className="px-4 py-3 align-middle">
-                      <div className="min-w-0">
-                        <p className="truncate font-semibold text-slate-950">{user.name}</p>
-                        <p className="truncate text-xs text-slate-500">{user.email}</p>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 align-middle">
-                      <Link className="font-medium hover:text-[#0F3D91]" href={`/platform/hotels/${user.hotel_id}`}>
-                        {hotelById.get(user.hotel_id) ?? compactId(user.hotel_id)}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3 align-middle">
-                      <div>
-                        <p className="font-medium">{user.job_role ?? titleCase(user.user_type)}</p>
-                        <p className="text-xs text-slate-500">{titleCase(user.staff_level ?? user.user_type)}</p>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 align-middle">
-                      <Badge variant={user.is_on_duty ? "green" : "default"}>
-                        {user.is_on_duty ? "On duty" : "Off duty"}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 align-middle">
-                      <Badge variant={user.is_active ? "green" : "rose"}>
-                        {user.is_active ? "Active" : "Inactive"}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 align-middle">{format(new Date(user.created_at), "dd MMM yyyy")}</td>
-                    <td className="px-4 py-3 align-middle">
-                      <div className="flex justify-end">
-                        <Button size="sm" type="button" variant="secondary" onClick={() => openEditor(user)}>
-                          <Edit3 />
-                          Edit
-                        </Button>
-                      </div>
-                    </td>
+        <div className="grid gap-3">
+          <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1080px] border-collapse text-sm">
+                <thead className="bg-slate-50 text-left text-xs uppercase tracking-normal text-slate-500">
+                  <tr>
+                    <th className="border-b border-slate-200 px-4 py-3 font-semibold">User</th>
+                    <th className="border-b border-slate-200 px-4 py-3 font-semibold">Hotel</th>
+                    <th className="border-b border-slate-200 px-4 py-3 font-semibold">Role</th>
+                    <th className="border-b border-slate-200 px-4 py-3 font-semibold">Duty</th>
+                    <th className="border-b border-slate-200 px-4 py-3 font-semibold">Status</th>
+                    <th className="border-b border-slate-200 px-4 py-3 font-semibold">Created</th>
+                    <th className="border-b border-slate-200 px-4 py-3 font-semibold" />
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {paginatedUsers.map((user) => (
+                    <tr className="border-b border-slate-100 last:border-0" key={user.id}>
+                      <td className="px-4 py-3 align-middle">
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold text-slate-950">{user.name}</p>
+                          <p className="truncate text-xs text-slate-500">{user.email}</p>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 align-middle">
+                        <Link className="font-medium hover:text-[#0F3D91]" href={`/platform/hotels/${user.hotel_id}`}>
+                          {hotelById.get(user.hotel_id) ?? "Unknown hotel"}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3 align-middle">
+                        <div>
+                          <p className="font-medium">{user.job_role ?? titleCase(user.user_type)}</p>
+                          <p className="text-xs text-slate-500">{titleCase(user.staff_level ?? user.user_type)}</p>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 align-middle">
+                        <Badge variant={user.is_on_duty ? "green" : "default"}>
+                          {user.is_on_duty ? "On duty" : "Off duty"}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 align-middle">
+                        <Badge variant={user.is_active ? "green" : "rose"}>
+                          {user.is_active ? "Active" : "Inactive"}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 align-middle">{format(new Date(user.created_at), "dd MMM yyyy")}</td>
+                      <td className="px-4 py-3 align-middle">
+                        <div className="flex justify-end gap-2">
+                          <Button size="sm" type="button" variant="secondary" onClick={() => openPasswordEditor(user)}>
+                            <KeyRound />
+                            Password
+                          </Button>
+                          <Button size="sm" type="button" variant="secondary" onClick={() => openEditor(user)}>
+                            <Edit3 />
+                            Edit
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
+          <PaginationControls
+            page={currentPage}
+            pageSize={PLATFORM_PAGE_SIZE}
+            totalItems={filteredUsers.length}
+            onPageChange={setPage}
+          />
         </div>
       )}
 
@@ -324,6 +384,57 @@ function PlatformUsersContent() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={Boolean(passwordUser)} onOpenChange={(open) => !open && setPasswordUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change Hotel User Password</DialogTitle>
+            <DialogDescription>
+              Set a new login password for {passwordUser?.name ?? "this hotel user"}.
+            </DialogDescription>
+          </DialogHeader>
+          <form className="grid gap-4" onSubmit={handlePasswordSave}>
+            <Field label="New password" id="platform-user-new-password">
+              <Input
+                id="platform-user-new-password"
+                minLength={8}
+                type="password"
+                value={passwordForm.new_password}
+                onChange={(event) =>
+                  setPasswordForm((current) => ({ ...current, new_password: event.target.value }))
+                }
+              />
+            </Field>
+            <Field label="Confirm password" id="platform-user-confirm-password">
+              <Input
+                id="platform-user-confirm-password"
+                minLength={8}
+                type="password"
+                value={passwordForm.confirm_password}
+                onChange={(event) =>
+                  setPasswordForm((current) => ({ ...current, confirm_password: event.target.value }))
+                }
+              />
+            </Field>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="secondary" onClick={() => setPasswordUser(null)}>
+                Close
+              </Button>
+              <Button
+                disabled={
+                  resetPassword.isPending ||
+                  passwordForm.new_password.length < 8 ||
+                  passwordForm.new_password !== passwordForm.confirm_password
+                }
+                type="submit"
+              >
+                {resetPassword.isPending ? <Loader2 className="animate-spin" /> : <KeyRound />}
+                Save password
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -337,6 +448,13 @@ function emptyForm(): UserFormState {
     staff_level: "",
     is_active: true,
     is_on_duty: false,
+  };
+}
+
+function emptyPasswordForm(): PasswordFormState {
+  return {
+    new_password: "",
+    confirm_password: "",
   };
 }
 

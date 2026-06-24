@@ -44,8 +44,11 @@ export const queryKeys = {
     ["reservations", hotelId, reservationId, "stays"] as const,
   reservationFolios: (hotelId: string, reservationId: string) =>
     ["reservations", hotelId, reservationId, "folios"] as const,
-  rooms: (hotelId: string) => ["rooms", hotelId] as const,
-  staff: (hotelId: string) => ["staff", hotelId] as const,
+  rooms: (hotelId: string, filters?: Record<string, string | number | undefined>) =>
+    filters ? (["rooms", hotelId, filters] as const) : (["rooms", hotelId] as const),
+  roomDetail: (hotelId: string, roomId: string) => ["rooms", hotelId, roomId] as const,
+  staff: (hotelId: string, filters?: Record<string, string | number | undefined>) =>
+    filters ? (["staff", hotelId, filters] as const) : (["staff", hotelId] as const),
   shifts: (hotelId: string) => ["shifts", hotelId] as const,
   roles: {
     all: (hotelId: string) => ["roles", hotelId] as const,

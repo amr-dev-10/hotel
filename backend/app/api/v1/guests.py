@@ -30,13 +30,15 @@ def list_guests(
     current_user: User = Depends(require_permission("guest.view")),
 ) -> dict:
     try:
-        page = GuestRepository(db).list_filtered(
+        repo = GuestRepository(db)
+        page = repo.list_filtered(
             hotel_id,
             q=q,
             status=status,
             cursor=cursor,
             limit=limit,
         )
+        total = repo.count_filtered(hotel_id, q=q, status=status)
     except ValueError:
         raise bad_request("Invalid pagination cursor") from None
     guest_context = _guest_list_context(db, hotel_id, [item.id for item in page.items])
@@ -49,7 +51,7 @@ def list_guests(
         items.append(data)
     return ok(
         items,
-        meta={"next_cursor": page.next_cursor, "has_more": page.has_more, "limit": page.limit},
+        meta={"next_cursor": page.next_cursor, "has_more": page.has_more, "limit": page.limit, "total": total},
     )
 
 

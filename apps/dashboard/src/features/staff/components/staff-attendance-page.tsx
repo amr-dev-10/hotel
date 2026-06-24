@@ -8,7 +8,7 @@ import { ArrowLeft, CheckCircle2, Clock3, LogIn, LogOut, UserCheck, X } from "lu
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
-import { compactId, titleCase } from "@/lib/utils";
+import { titleCase } from "@/lib/utils";
 import { useShifts, useStaff } from "@/features/staff/hooks/useStaff";
 import type { EmployeeShift } from "@/types/domain";
 
@@ -87,7 +87,7 @@ export function StaffAttendancePage({ hotelId }: { hotelId: string }) {
               className="grid min-w-[760px] grid-cols-[1fr_150px_150px_130px_140px] items-center gap-3 border-b border-slate-100 px-4 py-3 text-sm last:border-b-0"
               key={shift.id}
             >
-              <span className="truncate font-medium">{staffById.get(shift.user_id)?.name ?? compactId(shift.user_id)}</span>
+              <span className="truncate font-medium">{staffById.get(shift.user_id)?.name ?? "Unknown staff"}</span>
               <span className="truncate text-slate-600">{timeLabel(shift.actual_start ?? shift.shift_start)}</span>
               <span className="truncate text-slate-600">{timeLabel(shift.actual_end ?? shift.shift_end)}</span>
               <span className="truncate text-slate-600">{shiftHours(shift)}</span>

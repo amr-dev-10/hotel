@@ -8,6 +8,7 @@ export interface CursorPageMeta {
   next_cursor: string | null;
   has_more: boolean;
   limit: number;
+  total?: number;
 }
 
 export interface TokenResponse {
@@ -231,6 +232,8 @@ export interface Reservation {
   cancellation_reason: string | null;
   guest_name?: string | null;
   guest_phone?: string | null;
+  room_number?: string | null;
+  room_type?: string | null;
 }
 
 export interface Guest {

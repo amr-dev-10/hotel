@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { ExternalLink, Plus, Search } from "lucide-react";
@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
 import { Input } from "@/components/ui/input";
+import { PaginationControls } from "@/components/ui/pagination-controls";
 import { Select } from "@/components/ui/select";
 import { PlatformShell } from "@/features/platform/components/platform-shell";
 import {
@@ -16,6 +17,8 @@ import {
   usePlatformSubscriptions,
 } from "@/features/platform/hooks/usePlatform";
 import { titleCase } from "@/lib/utils";
+
+const PLATFORM_PAGE_SIZE = 50;
 
 export function PlatformHotelsPage() {
   return (
@@ -31,6 +34,7 @@ function PlatformHotelsContent() {
   const [search, setSearch] = useState("");
   const [plan, setPlan] = useState("all");
   const [status, setStatus] = useState("all");
+  const [page, setPage] = useState(1);
 
   const subscriptionByHotel = useMemo(() => {
     const byHotel = new Map<string, string>();
@@ -54,6 +58,17 @@ function PlatformHotelsContent() {
       return matchesPlan && matchesStatus && matchesSearch;
     });
   }, [hotels.data, plan, search, status]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [plan, search, status]);
+
+  const pageCount = Math.max(1, Math.ceil(filteredHotels.length / PLATFORM_PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const paginatedHotels = useMemo(() => {
+    const start = (currentPage - 1) * PLATFORM_PAGE_SIZE;
+    return filteredHotels.slice(start, start + PLATFORM_PAGE_SIZE);
+  }, [currentPage, filteredHotels]);
 
   if (hotels.isLoading || subscriptions.isLoading) {
     return <DataState isLoading />;
@@ -115,65 +130,73 @@ function PlatformHotelsContent() {
       {!filteredHotels.length ? (
         <DataState empty emptyTitle={hotels.data?.length ? "No hotels match these filters." : "No hotels found."} />
       ) : (
-        <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[920px] border-collapse text-sm">
-              <thead className="bg-slate-50 text-left text-xs uppercase tracking-normal text-slate-500">
-                <tr>
-                  <th className="border-b border-slate-200 px-4 py-3 font-semibold">Hotel</th>
-                  <th className="border-b border-slate-200 px-4 py-3 font-semibold">Plan</th>
-                  <th className="border-b border-slate-200 px-4 py-3 font-semibold">Subscription</th>
-                  <th className="border-b border-slate-200 px-4 py-3 font-semibold">Users</th>
-                  <th className="border-b border-slate-200 px-4 py-3 font-semibold">Rooms</th>
-                  <th className="border-b border-slate-200 px-4 py-3 font-semibold">Tickets</th>
-                  <th className="border-b border-slate-200 px-4 py-3 font-semibold">Created</th>
-                  <th className="border-b border-slate-200 px-4 py-3 font-semibold" />
-                </tr>
-              </thead>
-              <tbody>
-                {filteredHotels.map((hotel) => (
-                  <tr className="border-b border-slate-100 last:border-0" key={hotel.id}>
-                    <td className="px-4 py-3 align-middle">
-                      <div className="min-w-0">
-                        <Link
-                          className="font-semibold text-slate-950 hover:text-[#0F3D91]"
-                          href={`/platform/hotels/${hotel.id}`}
-                        >
-                          {hotel.name}
-                        </Link>
-                        <p className="mt-0.5 text-xs text-slate-500">{hotel.slug}</p>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 align-middle">
-                      <Badge variant={planVariant(hotel.subscription_tier)}>{titleCase(hotel.subscription_tier)}</Badge>
-                    </td>
-                    <td className="px-4 py-3 align-middle">
-                      <Badge variant={subscriptionByHotel.get(hotel.id) === "active" ? "green" : "default"}>
-                        {titleCase(subscriptionByHotel.get(hotel.id))}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 align-middle">{hotel.active_users}</td>
-                    <td className="px-4 py-3 align-middle">{hotel.total_rooms}</td>
-                    <td className="px-4 py-3 align-middle">{hotel.open_tickets}</td>
-                    <td className="px-4 py-3 align-middle">{format(new Date(hotel.created_at), "dd MMM yyyy")}</td>
-                    <td className="px-4 py-3 align-middle">
-                      <div className="flex justify-end gap-2">
-                        <Button asChild size="sm" type="button" variant="secondary">
-                          <Link href={`/${hotel.id}/overview`}>
-                            <ExternalLink />
-                            Open
-                          </Link>
-                        </Button>
-                        <Button asChild size="sm" type="button">
-                          <Link href={`/platform/hotels/${hotel.id}`}>Inspect</Link>
-                        </Button>
-                      </div>
-                    </td>
+        <div className="grid gap-3">
+          <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[920px] border-collapse text-sm">
+                <thead className="bg-slate-50 text-left text-xs uppercase tracking-normal text-slate-500">
+                  <tr>
+                    <th className="border-b border-slate-200 px-4 py-3 font-semibold">Hotel</th>
+                    <th className="border-b border-slate-200 px-4 py-3 font-semibold">Plan</th>
+                    <th className="border-b border-slate-200 px-4 py-3 font-semibold">Subscription</th>
+                    <th className="border-b border-slate-200 px-4 py-3 font-semibold">Users</th>
+                    <th className="border-b border-slate-200 px-4 py-3 font-semibold">Rooms</th>
+                    <th className="border-b border-slate-200 px-4 py-3 font-semibold">Tickets</th>
+                    <th className="border-b border-slate-200 px-4 py-3 font-semibold">Created</th>
+                    <th className="border-b border-slate-200 px-4 py-3 font-semibold" />
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {paginatedHotels.map((hotel) => (
+                    <tr className="border-b border-slate-100 last:border-0" key={hotel.id}>
+                      <td className="px-4 py-3 align-middle">
+                        <div className="min-w-0">
+                          <Link
+                            className="font-semibold text-slate-950 hover:text-[#0F3D91]"
+                            href={`/platform/hotels/${hotel.id}`}
+                          >
+                            {hotel.name}
+                          </Link>
+                          <p className="mt-0.5 text-xs text-slate-500">{hotel.slug}</p>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 align-middle">
+                        <Badge variant={planVariant(hotel.subscription_tier)}>{titleCase(hotel.subscription_tier)}</Badge>
+                      </td>
+                      <td className="px-4 py-3 align-middle">
+                        <Badge variant={subscriptionByHotel.get(hotel.id) === "active" ? "green" : "default"}>
+                          {titleCase(subscriptionByHotel.get(hotel.id))}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 align-middle">{hotel.active_users}</td>
+                      <td className="px-4 py-3 align-middle">{hotel.total_rooms}</td>
+                      <td className="px-4 py-3 align-middle">{hotel.open_tickets}</td>
+                      <td className="px-4 py-3 align-middle">{format(new Date(hotel.created_at), "dd MMM yyyy")}</td>
+                      <td className="px-4 py-3 align-middle">
+                        <div className="flex justify-end gap-2">
+                          <Button asChild size="sm" type="button" variant="secondary">
+                            <Link href={`/${hotel.id}/overview`}>
+                              <ExternalLink />
+                              Open
+                            </Link>
+                          </Button>
+                          <Button asChild size="sm" type="button">
+                            <Link href={`/platform/hotels/${hotel.id}`}>Inspect</Link>
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
+          <PaginationControls
+            page={currentPage}
+            pageSize={PLATFORM_PAGE_SIZE}
+            totalItems={filteredHotels.length}
+            onPageChange={setPage}
+          />
         </div>
       )}
     </div>

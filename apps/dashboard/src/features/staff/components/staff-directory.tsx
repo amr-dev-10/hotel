@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { DataState } from "@/components/ui/data-state";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { compactId, titleCase } from "@/lib/utils";
+import { titleCase } from "@/lib/utils";
 import { useDepartments } from "@/features/departments/hooks/useDepartments";
 import { useStaff } from "@/features/staff/hooks/useStaff";
 import { useTickets } from "@/features/tickets/hooks/useTickets";
@@ -276,7 +276,7 @@ function StaffCard({
     <article className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <Link href={`/${hotelId}/settings/staff/${user.id}`} className="hover:text-[#0F3D91]">
+          <Link href={`/${hotelId}/settings/staff/${user.id}`} className="hover:text-[#0F3D91]" prefetch={false}>
             <h2 className="truncate text-base font-semibold">{user.name}</h2>
           </Link>
           <p className="mt-1 flex items-center gap-2 truncate text-sm text-slate-500">
@@ -292,8 +292,8 @@ function StaffCard({
       <div className="mt-4 grid gap-2 text-sm">
         <DetailRow label="Role" value={user.job_role ?? "Staff"} />
         <DetailRow label="Level" value={titleCase(user.staff_level)} />
-        <DetailRow label="Department" value={departmentName ?? compactId(user.department_id)} />
-        <DetailRow label="Reports to" value={managerName ?? compactId(user.reports_to)} />
+        <DetailRow label="Department" value={departmentName ?? "Unassigned"} />
+        <DetailRow label="Reports to" value={managerName ?? "No manager"} />
       </div>
 
       <div className="mt-4 grid grid-cols-3 gap-2">
@@ -385,13 +385,13 @@ function groupLabel(
   staffById: Map<string, StaffUser>,
 ) {
   if (groupBy === "department") {
-    return user.department_id ? departments.get(user.department_id) ?? compactId(user.department_id) : "Unassigned";
+    return user.department_id ? departments.get(user.department_id) ?? "Unassigned" : "Unassigned";
   }
   if (groupBy === "role") {
     return user.job_role ?? "Staff";
   }
   if (groupBy === "manager") {
-    return user.reports_to ? staffById.get(user.reports_to)?.name ?? compactId(user.reports_to) : "No manager";
+    return user.reports_to ? staffById.get(user.reports_to)?.name ?? "No manager" : "No manager";
   }
   if (groupBy === "shift") {
     return user.is_on_duty ? "On duty" : "Off duty";

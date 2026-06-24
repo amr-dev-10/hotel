@@ -37,8 +37,8 @@ import { Can } from "@/lib/auth/can";
 import { apiErrorMessage } from "@/lib/api/client";
 import { compactId, money, titleCase } from "@/lib/utils";
 import type { Folio, Reservation, Room, StayRecord } from "@/types/domain";
-import { useGuests } from "@/features/guests/hooks/useGuests";
-import { useRooms } from "@/features/rooms/hooks/useRooms";
+import { useGuest } from "@/features/guests/hooks/useGuests";
+import { useRoom, useRooms } from "@/features/rooms/hooks/useRooms";
 import { CancelReservationDialog } from "@/features/reservations/components/cancel-reservation-dialog";
 import {
   useCancelReservation,
@@ -60,9 +60,12 @@ export function ReservationDetailPage({
   hotelId: string;
   reservationId: string;
 }) {
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const reservation = useReservation(hotelId, reservationId);
-  const guests = useGuests(hotelId);
-  const rooms = useRooms(hotelId);
+  const guestQuery = useGuest(hotelId, reservation.data?.guest_id ?? "");
+  const roomQuery = useRoom(hotelId, reservation.data?.room_id);
+  const rooms = useRooms(hotelId, { enabled: editDialogOpen, limit: 500 });
   const reservationGuests = useReservationGuests(hotelId, reservationId);
   const stays = useReservationStays(hotelId, reservationId);
   const folios = useReservationFolios(hotelId, reservationId);
@@ -70,11 +73,9 @@ export function ReservationDetailPage({
   const checkOut = useCheckOutReservation(hotelId);
   const cancelReservation = useCancelReservation(hotelId);
   const updateReservation = useUpdateReservation(hotelId);
-  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
-  const guest = reservation.data ? guests.data?.find((item) => item.id === reservation.data.guest_id) : null;
-  const room = reservation.data ? rooms.data?.find((item) => item.id === reservation.data?.room_id) : null;
+  const guest = guestQuery.data ?? null;
+  const room = roomQuery.data ?? null;
 
   async function handleCheckIn() {
     try {
@@ -104,12 +105,12 @@ export function ReservationDetailPage({
     }
   }
 
-  if (reservation.isLoading || guests.isLoading || rooms.isLoading) {
+  if (reservation.isLoading) {
     return <DataState isLoading />;
   }
 
-  if (reservation.error || guests.error || rooms.error) {
-    return <DataState error={reservation.error ?? guests.error ?? rooms.error} />;
+  if (reservation.error) {
+    return <DataState error={reservation.error} />;
   }
 
   if (!reservation.data) {
@@ -198,7 +199,7 @@ export function ReservationDetailPage({
             </div>
             {guest ? (
               <Button asChild size="sm" type="button" variant="secondary">
-                <Link href={`/${hotelId}/guests/${guest.id}`}>Open profile</Link>
+                <Link href={`/${hotelId}/guests/${guest.id}`} prefetch={false}>Open profile</Link>
               </Button>
             ) : null}
           </div>
@@ -214,18 +215,15 @@ export function ReservationDetailPage({
             <DataState error={reservationGuests.error} />
           ) : reservationGuests.data?.length ? (
             <div className="grid gap-2">
-              {reservationGuests.data.map((item) => {
-                const linkedGuest = guests.data?.find((guestItem) => guestItem.id === item.guest_id);
-                return (
-                  <div className="flex items-center justify-between gap-3 rounded-md bg-slate-50 p-3" key={item.id}>
-                    <div>
-                      <p className="font-medium">{linkedGuest?.name ?? compactId(item.guest_id)}</p>
-                      <p className="text-xs text-slate-500">{titleCase(item.relationship ?? "Guest")}</p>
-                    </div>
-                    {item.is_primary ? <Badge variant="blue">Primary</Badge> : null}
+              {reservationGuests.data.map((item) => (
+                <div className="flex items-center justify-between gap-3 rounded-md bg-slate-50 p-3" key={item.id}>
+                  <div className="min-w-0">
+                    <p className="break-all font-medium">{item.guest_id}</p>
+                    <p className="text-xs text-slate-500">{titleCase(item.relationship ?? "Guest")}</p>
                   </div>
-                );
-              })}
+                  {item.is_primary ? <Badge variant="blue">Primary</Badge> : null}
+                </div>
+              ))}
             </div>
           ) : null}
         </section>
@@ -234,7 +232,7 @@ export function ReservationDetailPage({
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[1fr_0.9fr]">
-        <StayHistory stays={stays.data ?? []} rooms={rooms.data ?? []} isLoading={stays.isLoading} error={stays.error} />
+        <StayHistory stays={stays.data ?? []} isLoading={stays.isLoading} error={stays.error} />
         <ReservationCommunication reservationId={reservationId} hotelId={hotelId} />
       </div>
 
@@ -256,6 +254,7 @@ export function ReservationDetailPage({
         isPending={updateReservation.isPending}
         open={editDialogOpen}
         reservation={reservation.data}
+        isRoomsLoading={rooms.isLoading}
         rooms={rooms.data ?? []}
         onOpenChange={setEditDialogOpen}
         onSubmit={async (payload) => {
@@ -276,6 +275,7 @@ function EditReservationDialog({
   isPending,
   open,
   reservation,
+  isRoomsLoading,
   rooms,
   onOpenChange,
   onSubmit,
@@ -283,6 +283,7 @@ function EditReservationDialog({
   isPending: boolean;
   open: boolean;
   reservation: Reservation;
+  isRoomsLoading: boolean;
   rooms: Room[];
   onOpenChange: (open: boolean) => void;
   onSubmit: (payload: {
@@ -337,6 +338,7 @@ function EditReservationDialog({
             <FormField label="Room">
               <Select value={roomId} onChange={(event) => setRoomId(event.target.value)}>
                 <option value="">Assign later</option>
+                {isRoomsLoading ? <option disabled>Loading rooms...</option> : null}
                 {roomId && !rooms.some((roomItem) => roomItem.id === roomId) ? (
                   <option value={roomId}>Room {compactId(roomId)}</option>
                 ) : null}
@@ -462,16 +464,12 @@ function PaymentSummary({
 function StayHistory({
   error,
   isLoading,
-  rooms,
   stays,
 }: {
   error: unknown;
   isLoading: boolean;
-  rooms: Room[];
   stays: StayRecord[];
 }) {
-  const roomMap = new Map(rooms.map((room) => [room.id, room.room_number]));
-
   return (
     <section className="grid gap-3 rounded-md border border-slate-200 bg-white p-4">
       <div className="flex items-center gap-2">
@@ -489,7 +487,9 @@ function StayHistory({
           {stays.map((stay) => (
             <div className="grid gap-2 rounded-md border border-slate-200 p-3" key={stay.id}>
               <div className="flex items-center justify-between gap-3">
-                <p className="font-medium">Room {stay.room_id ? roomMap.get(stay.room_id) ?? compactId(stay.room_id) : "Unassigned"}</p>
+                <p className="break-all font-medium">
+                  Room {stay.room_id ? compactId(stay.room_id) : "Unassigned"}
+                </p>
                 <Badge variant={stay.actual_checkout ? "teal" : "green"}>
                   {stay.actual_checkout ? "Checked out" : "In stay"}
                 </Badge>

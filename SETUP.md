@@ -342,6 +342,12 @@ Password: DemoPass123!
 
 The demo seed creates or reuses hotel slug `arcadia-demo` and inserts sample rooms, staff, guests, reservations, tickets, housekeeping tasks, and analytics data. It is disabled when `ENVIRONMENT=production`.
 
+All demo hotel users created by the seed use the shared demo password:
+
+```text
+DemoPass123!
+```
+
 ## 11. Seed Platform Admin
 
 Make sure `PLATFORM_ADMIN_*` values are set in `backend\.env`, then run:
@@ -426,6 +432,19 @@ Try a smaller multi-tenant run first:
 
 ```powershell
 .\.venv-win\Scripts\python.exe scripts\seed_load_data.py --size multi --hotels 2 --hotel-slug arcadia-load
+```
+
+Load seed hotel owner emails are generated from the hotel slug and use the shared demo password:
+
+```text
+owner-arcadia-load-001@arcadia.load / DemoPass123!
+owner-arcadia-load-002@arcadia.load / DemoPass123!
+```
+
+Generated load staff users also use `DemoPass123!`. Their emails follow this pattern:
+
+```text
+load-staff-0001-arcadia-load-001@arcadia.load
 ```
 
 Create multi-tenant load data:

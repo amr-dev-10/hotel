@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
 import { useEscalatedTickets } from "@/features/escalations/hooks/useEscalations";
-import { cn, compactId, titleCase } from "@/lib/utils";
+import { cn, titleCase } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth.store";
 import type { EscalatedTicket } from "@/types/domain";
 
@@ -98,14 +98,14 @@ function EscalationCard({ hotelId, item }: { hotelId: string; item: EscalatedTic
         <p className="mt-1 line-clamp-2 text-sm text-slate-600">{item.ticket.item_description}</p>
         <div className="mt-3 grid gap-2 text-xs text-slate-500 sm:grid-cols-4">
           <Detail label="Reason" value={titleCase(item.reason)} />
-          <Detail label="Assigned" value={item.ticket.assigned_to_name ?? compactId(item.ticket.assigned_to)} />
-          <Detail label="Escalated to" value={item.escalated_to_name ?? compactId(item.escalated_to)} />
-          <Detail label="Room" value={item.ticket.room_number ? `Room ${item.ticket.room_number}` : compactId(item.ticket.room_id)} />
+          <Detail label="Assigned" value={item.ticket.assigned_to_name ?? "Unassigned"} />
+          <Detail label="Escalated to" value={item.escalated_to_name ?? "Unassigned"} />
+          <Detail label="Room" value={item.ticket.room_number ? `Room ${item.ticket.room_number}` : "No room"} />
         </div>
       </div>
       <div className="flex flex-wrap gap-2 xl:justify-end">
         <Button asChild type="button" variant="secondary">
-          <Link href={`/${hotelId}/tickets/${item.ticket_id}`}>
+          <Link href={`/${hotelId}/tickets/${item.ticket_id}`} prefetch={false}>
             <ArrowUpRight />
             Open ticket
           </Link>

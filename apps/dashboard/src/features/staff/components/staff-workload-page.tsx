@@ -8,7 +8,7 @@ import { Activity, ArrowLeft, CheckCircle2, Clock3, TicketCheck } from "lucide-r
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
-import { compactId, titleCase } from "@/lib/utils";
+import { titleCase } from "@/lib/utils";
 import { useDepartments } from "@/features/departments/hooks/useDepartments";
 import { useStaff } from "@/features/staff/hooks/useStaff";
 import { useTickets } from "@/features/tickets/hooks/useTickets";
@@ -87,12 +87,12 @@ export function StaffWorkloadPage({ hotelId }: { hotelId: string }) {
               className="grid min-w-[920px] grid-cols-[1fr_150px_110px_110px_120px_140px_140px] items-center gap-3 border-b border-slate-100 px-4 py-3 text-sm last:border-b-0"
               key={user.id}
             >
-              <Link className="min-w-0 hover:text-[#0F3D91]" href={`/${hotelId}/settings/staff/${user.id}/tickets`}>
+              <Link className="min-w-0 hover:text-[#0F3D91]" href={`/${hotelId}/settings/staff/${user.id}/tickets`} prefetch={false}>
                 <p className="truncate font-semibold">{user.name}</p>
                 <p className="truncate text-xs text-slate-500">{user.job_role ?? titleCase(user.staff_level)}</p>
               </Link>
               <span className="truncate text-slate-600">
-                {user.department_id ? departmentById.get(user.department_id) ?? compactId(user.department_id) : "None"}
+                {user.department_id ? departmentById.get(user.department_id) ?? "None" : "None"}
               </span>
               <span className="font-semibold">{openTickets(assigned)}</span>
               <span className="font-semibold">{closedTickets(assigned)}</span>

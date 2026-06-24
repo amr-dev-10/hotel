@@ -9,6 +9,7 @@ from app.core.database import get_db
 from app.core.exceptions import bad_request, not_found
 from app.core.responses import ok
 from app.models.guest import Guest
+from app.models.room import Room
 from app.models.user import User
 from app.repositories.reservation_repository import (
     ReservationRepository,
@@ -47,7 +48,8 @@ def list_reservations(
     current_user: User = Depends(require_permission("guest.view")),
 ) -> dict:
     try:
-        page = ReservationRepository(db).list_filtered(
+        repo = ReservationRepository(db)
+        page = repo.list_filtered(
             hotel_id,
             q=q,
             status=status,
@@ -56,9 +58,17 @@ def list_reservations(
             cursor=cursor,
             limit=limit,
         )
+        total = repo.count_filtered(
+            hotel_id,
+            q=q,
+            status=status,
+            from_date=from_date,
+            to_date=to_date,
+        )
     except ValueError:
         raise bad_request("Invalid pagination cursor") from None
     guest_context = _guest_context(db, hotel_id, [item.guest_id for item in page.items])
+    room_context = _room_context(db, hotel_id, [item.room_id for item in page.items if item.room_id])
     items = []
     for item in page.items:
         data = ReservationListItem.model_validate(item).model_dump()
@@ -66,10 +76,14 @@ def list_reservations(
         if guest:
             data["guest_name"] = guest["name"]
             data["guest_phone"] = guest["phone"]
+        room = room_context.get(item.room_id)
+        if room:
+            data["room_number"] = room["room_number"]
+            data["room_type"] = room["room_type"]
         items.append(data)
     return ok(
         items,
-        meta={"next_cursor": page.next_cursor, "has_more": page.has_more, "limit": page.limit},
+        meta={"next_cursor": page.next_cursor, "has_more": page.has_more, "limit": page.limit, "total": total},
     )
 
 
@@ -273,3 +287,18 @@ def _guest_context(db: Session, hotel_id: str, guest_ids: list[str]) -> dict[str
         )
     ).all()
     return {guest_id: {"name": name, "phone": phone} for guest_id, name, phone in rows}
+
+
+def _room_context(db: Session, hotel_id: str, room_ids: list[str]) -> dict[str, dict[str, str | None]]:
+    if not room_ids:
+        return {}
+    rows = db.execute(
+        select(Room.id, Room.room_number, Room.room_type).where(
+            Room.hotel_id == hotel_id,
+            Room.id.in_(set(room_ids)),
+        )
+    ).all()
+    return {
+        room_id: {"room_number": room_number, "room_type": room_type}
+        for room_id, room_number, room_type in rows
+    }

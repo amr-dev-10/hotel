@@ -1,19 +1,41 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
-import { ArrowLeft, Building2, ExternalLink, Hotel, Ticket, UsersRound } from "lucide-react";
+import { ArrowLeft, Building2, Edit3, ExternalLink, Hotel, Ticket, UsersRound } from "lucide-react";
+import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import { PlatformShell } from "@/features/platform/components/platform-shell";
 import {
   usePlatformHotels,
   usePlatformSubscriptions,
   usePlatformUsers,
+  useUpdatePlatformHotel,
+  type PlatformHotelUpdatePayload,
 } from "@/features/platform/hooks/usePlatform";
+import { apiErrorMessage } from "@/lib/api/client";
 import { compactId, titleCase } from "@/lib/utils";
+
+interface HotelFormState {
+  name: string;
+  slug: string;
+  subscription_tier: string;
+  status: string;
+}
 
 export function PlatformHotelDetailPage({ hotelId }: { hotelId: string }) {
   return (
@@ -27,6 +49,9 @@ function PlatformHotelDetailContent({ hotelId }: { hotelId: string }) {
   const hotels = usePlatformHotels();
   const users = usePlatformUsers();
   const subscriptions = usePlatformSubscriptions();
+  const updateHotel = useUpdatePlatformHotel();
+  const [editOpen, setEditOpen] = useState(false);
+  const [form, setForm] = useState<HotelFormState>(() => emptyForm());
 
   if (hotels.isLoading || users.isLoading || subscriptions.isLoading) {
     return <DataState isLoading />;
@@ -44,6 +69,40 @@ function PlatformHotelDetailContent({ hotelId }: { hotelId: string }) {
     return <DataState empty emptyTitle="Hotel not found." />;
   }
 
+  function openEditor() {
+    if (!hotel) {
+      return;
+    }
+    setForm({
+      name: hotel.name,
+      slug: hotel.slug,
+      subscription_tier: hotel.subscription_tier,
+      status: hotel.status,
+    });
+    setEditOpen(true);
+  }
+
+  async function handleSave(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!hotel) {
+      return;
+    }
+    const payload: PlatformHotelUpdatePayload = {
+      name: form.name.trim(),
+      slug: form.slug.trim(),
+      subscription_tier: form.subscription_tier,
+      status: form.status,
+    };
+
+    try {
+      await updateHotel.mutateAsync({ hotelId: hotel.id, payload });
+      toast.success("Hotel updated");
+      setEditOpen(false);
+    } catch (error) {
+      toast.error(apiErrorMessage(error));
+    }
+  }
+
   return (
     <div className="grid gap-5">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
@@ -59,6 +118,10 @@ function PlatformHotelDetailContent({ hotelId }: { hotelId: string }) {
         </div>
         <div className="flex flex-wrap gap-2">
           <Badge variant={hotel.status === "active" ? "green" : "amber"}>{titleCase(hotel.status)}</Badge>
+          <Button type="button" variant="secondary" onClick={openEditor}>
+            <Edit3 />
+            Edit hotel
+          </Button>
           <Button asChild type="button">
             <Link href={`/${hotel.id}/overview`}>
               <ExternalLink />
@@ -122,6 +185,93 @@ function PlatformHotelDetailContent({ hotelId }: { hotelId: string }) {
           )}
         </section>
       </div>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Hotel</DialogTitle>
+            <DialogDescription>Update tenant identity, workspace status, and plan.</DialogDescription>
+          </DialogHeader>
+          <form className="grid gap-4" onSubmit={handleSave}>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field label="Hotel name" id="platform-hotel-name">
+                <Input
+                  id="platform-hotel-name"
+                  minLength={2}
+                  value={form.name}
+                  onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+                />
+              </Field>
+              <Field label="Slug" id="platform-hotel-slug">
+                <Input
+                  id="platform-hotel-slug"
+                  minLength={2}
+                  value={form.slug}
+                  onChange={(event) => setForm((current) => ({ ...current, slug: event.target.value }))}
+                />
+              </Field>
+              <Field label="Plan" id="platform-hotel-plan">
+                <Select
+                  id="platform-hotel-plan"
+                  value={form.subscription_tier}
+                  onChange={(event) => setForm((current) => ({ ...current, subscription_tier: event.target.value }))}
+                >
+                  <option value="starter">Starter</option>
+                  <option value="professional">Professional</option>
+                  <option value="enterprise">Enterprise</option>
+                </Select>
+              </Field>
+              <Field label="Status" id="platform-hotel-status">
+                <Select
+                  id="platform-hotel-status"
+                  value={form.status}
+                  onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}
+                >
+                  <option value="active">Active</option>
+                  <option value="trial">Trial</option>
+                  <option value="suspended">Suspended</option>
+                  <option value="inactive">Inactive</option>
+                </Select>
+              </Field>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="secondary" onClick={() => setEditOpen(false)}>
+                Close
+              </Button>
+              <Button disabled={updateHotel.isPending} type="submit">
+                <Hotel />
+                Save hotel
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function emptyForm(): HotelFormState {
+  return {
+    name: "",
+    slug: "",
+    subscription_tier: "starter",
+    status: "active",
+  };
+}
+
+function Field({
+  label,
+  id,
+  children,
+}: {
+  label: string;
+  id: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="grid gap-2">
+      <Label htmlFor={id}>{label}</Label>
+      {children}
     </div>
   );
 }
@@ -141,7 +291,7 @@ function Detail({
         <Icon className="size-3.5" />
         {label}
       </div>
-      <p className="mt-2 truncate text-sm font-semibold">{value}</p>
+      <p className="mt-2 break-all text-sm font-semibold">{value}</p>
     </div>
   );
 }
@@ -150,7 +300,7 @@ function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md bg-slate-50 p-3">
       <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">{label}</p>
-      <p className="mt-1 text-sm font-semibold">{value}</p>
+      <p className="mt-1 break-words text-sm font-semibold">{value}</p>
     </div>
   );
 }

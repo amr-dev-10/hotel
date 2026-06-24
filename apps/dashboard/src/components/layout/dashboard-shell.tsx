@@ -230,6 +230,7 @@ export function DashboardShell({
                 href={href}
                 key={item.href}
                 onClick={() => setSidebarOpen(false)}
+                prefetch={false}
               >
                 <Icon className="size-4" />
                 {item.label}
@@ -253,6 +254,7 @@ export function DashboardShell({
                 href={href}
                 key={item.href}
                 onClick={() => setSidebarOpen(false)}
+                prefetch={false}
               >
                 <Icon className="size-4" />
                 {item.label}
@@ -313,9 +315,6 @@ export function DashboardShell({
             <NotificationBell hotelId={hotelId} />
             <span className="hidden rounded bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 sm:inline-flex">
               Live sync
-            </span>
-            <span className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">
-              {hotelId.slice(0, 8)}
             </span>
           </div>
         </header>

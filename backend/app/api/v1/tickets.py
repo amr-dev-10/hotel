@@ -63,7 +63,8 @@ def list_tickets(
     rbac = RBACService(db)
     visibility_scope = rbac.ticket_visibility_scope(current_user)
     try:
-        page = TicketRepository(db).list_filtered(
+        repo = TicketRepository(db)
+        page = repo.list_filtered(
             hotel_id,
             guest_id=guest_id,
             reservation_id=reservation_id,
@@ -80,12 +81,27 @@ def list_tickets(
             cursor=cursor,
             limit=limit,
         )
+        total = repo.count_filtered(
+            hotel_id,
+            guest_id=guest_id,
+            reservation_id=reservation_id,
+            conversation_id=conversation_id,
+            stage=stage,
+            priority=priority,
+            assigned_to=assigned_to,
+            department_key=department_key,
+            sla_status=sla_status,
+            q=q,
+            visibility_scope=visibility_scope,
+            visibility_user_id=current_user.id,
+            visibility_department_id=current_user.department_id,
+        )
     except ValueError:
         raise bad_request("Invalid pagination cursor") from None
     ticket_context = _ticket_context(db, hotel_id, list(page.items))
     return ok(
         [_ticket_read(item, ticket_context).model_dump() for item in page.items],
-        meta={"next_cursor": page.next_cursor, "has_more": page.has_more, "limit": page.limit},
+        meta={"next_cursor": page.next_cursor, "has_more": page.has_more, "limit": page.limit, "total": total},
     )
 
 

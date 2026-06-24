@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import require_permission
@@ -16,10 +16,12 @@ router = APIRouter()
 @router.get("")
 def list_rooms(
     hotel_id: str,
+    q: str | None = None,
+    limit: int = Query(default=200, ge=1, le=500),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("room.view")),
 ) -> dict:
-    rooms = RoomRepository(db).list_for_hotel(hotel_id)
+    rooms = RoomRepository(db).list_for_hotel(hotel_id, limit=limit, q=q)
     return ok([RoomRead.model_validate(item).model_dump() for item in rooms])
 
 
@@ -34,6 +36,19 @@ def create_room(
         raise not_found("Room type not found")
     room = Room(hotel_id=hotel_id, **payload.model_dump())
     RoomRepository(db).add(room)
+    return ok(RoomRead.model_validate(room).model_dump())
+
+
+@router.get("/{room_id}")
+def get_room(
+    hotel_id: str,
+    room_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("room.view")),
+) -> dict:
+    room = RoomRepository(db).get_for_hotel(hotel_id, room_id)
+    if not room:
+        raise not_found("Room not found")
     return ok(RoomRead.model_validate(room).model_dump())
 
 

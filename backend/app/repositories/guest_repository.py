@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from datetime import date
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.guest import Guest, GuestConsent
@@ -54,6 +54,34 @@ class GuestRepository(BaseRepository[Guest]):
         limit: int = 50,
         cursor: str | None = None,
     ) -> CursorResult[Guest]:
+        statement = self._filtered_statement(hotel_id, q=q, status=status)
+        statement = apply_created_at_cursor(statement, Guest, cursor)
+        rows = (
+            self.db.execute(
+                statement.order_by(Guest.created_at.desc(), Guest.id.desc()).limit(limit + 1)
+            )
+            .scalars()
+            .all()
+        )
+        return paginate_created_at_desc(rows, limit)
+
+    def count_filtered(
+        self,
+        hotel_id: str,
+        q: str | None = None,
+        status: str | None = None,
+    ) -> int:
+        statement = self._filtered_statement(hotel_id, q=q, status=status)
+        return self.db.execute(
+            select(func.count()).select_from(statement.order_by(None).subquery())
+        ).scalar_one()
+
+    def _filtered_statement(
+        self,
+        hotel_id: str,
+        q: str | None = None,
+        status: str | None = None,
+    ):
         statement = select(Guest).where(
             Guest.hotel_id == hotel_id,
             Guest.deleted_at.is_(None),
@@ -71,15 +99,7 @@ class GuestRepository(BaseRepository[Guest]):
                     Guest.id.ilike(pattern),
                 )
             )
-        statement = apply_created_at_cursor(statement, Guest, cursor)
-        rows = (
-            self.db.execute(
-                statement.order_by(Guest.created_at.desc(), Guest.id.desc()).limit(limit + 1)
-            )
-            .scalars()
-            .all()
-        )
-        return paginate_created_at_desc(rows, limit)
+        return statement
 
 
 class GuestConsentRepository(BaseRepository[GuestConsent]):

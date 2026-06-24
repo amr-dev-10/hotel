@@ -66,6 +66,8 @@ class ReservationRead(ORMModel):
 class ReservationListItem(ReservationRead):
     guest_name: str | None = None
     guest_phone: str | None = None
+    room_number: str | None = None
+    room_type: str | None = None
 
 
 class ReservationDetail(ReservationRead):

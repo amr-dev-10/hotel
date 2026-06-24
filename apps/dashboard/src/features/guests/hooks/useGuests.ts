@@ -23,7 +23,7 @@ export type GuestFilters = {
 };
 
 export function useGuests(hotelId: string, filters: GuestFilters = {}) {
-  const limit = filters.limit ?? 100;
+  const limit = filters.limit ?? 50;
   const query = useInfiniteQuery<ApiEnvelope<Guest[]>, Error>({
     queryKey: queryKeys.guestsList(hotelId, compactParams({ ...filters, limit })),
     queryFn: ({ pageParam }) =>
@@ -42,7 +42,9 @@ export function useGuests(hotelId: string, filters: GuestFilters = {}) {
   return {
     ...query,
     data: query.data?.pages.flatMap((page) => page.data) ?? [],
+    pages: query.data?.pages.map((page) => page.data) ?? [],
     pageMeta: query.data?.pages.at(-1)?.meta as CursorPageMeta | null | undefined,
+    totalItems: (query.data?.pages.at(-1)?.meta as CursorPageMeta | null | undefined)?.total,
   };
 }
 

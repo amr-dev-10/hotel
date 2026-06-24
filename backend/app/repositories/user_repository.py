@@ -12,6 +12,31 @@ class UserRepository(BaseRepository[User]):
     def __init__(self, db: Session) -> None:
         super().__init__(db, User)
 
+    def list_for_hotel(
+        self,
+        hotel_id: str,
+        limit: int = 200,
+        cursor: str | None = None,
+        q: str | None = None,
+    ) -> Sequence[User]:
+        statement = select(User).where(
+            User.hotel_id == hotel_id,
+            User.deleted_at.is_(None),
+        )
+        if cursor:
+            statement = statement.where(User.id > cursor)
+        if q:
+            pattern = f"%{q.strip()}%"
+            statement = statement.where(
+                or_(
+                    User.name.ilike(pattern),
+                    User.email.ilike(pattern),
+                    User.job_role.ilike(pattern),
+                    User.staff_level.ilike(pattern),
+                )
+            )
+        return self.db.execute(statement.order_by(User.name).limit(limit)).scalars().all()
+
     def get_by_email(self, email: str) -> User | None:
         return self.db.execute(
             select(User).where(User.email == email, User.deleted_at.is_(None))

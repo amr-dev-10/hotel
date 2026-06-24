@@ -30,7 +30,7 @@ router = APIRouter()
 @router.get("/audit-logs")
 def list_audit_logs(
     hotel_id: str,
-    limit: int = Query(default=100, ge=1, le=200),
+    limit: int = Query(default=50, ge=1, le=200),
     action: str | None = None,
     entity: str | None = None,
     user_id: str | None = None,

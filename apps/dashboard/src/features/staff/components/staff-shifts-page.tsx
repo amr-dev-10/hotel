@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { apiErrorMessage } from "@/lib/api/client";
-import { compactId, titleCase } from "@/lib/utils";
+import { titleCase } from "@/lib/utils";
 import { useDepartments } from "@/features/departments/hooks/useDepartments";
 import { shiftSchema, type ShiftValues } from "@/features/staff/schemas/create-staff.schema";
 import { useCreateShift, useShifts, useStaff } from "@/features/staff/hooks/useStaff";
@@ -213,9 +213,9 @@ export function StaffShiftsPage({ hotelId }: { hotelId: string }) {
               className="grid min-w-[760px] grid-cols-[1fr_150px_170px_150px_140px] items-center gap-3 border-b border-slate-100 px-4 py-3 text-sm last:border-b-0"
               key={shift.id}
             >
-              <span className="truncate font-medium">{staffById.get(shift.user_id)?.name ?? compactId(shift.user_id)}</span>
+              <span className="truncate font-medium">{staffById.get(shift.user_id)?.name ?? "Unknown staff"}</span>
               <span className="truncate text-slate-600">
-                {shift.department_id ? departmentById.get(shift.department_id) ?? compactId(shift.department_id) : "Auto"}
+                {shift.department_id ? departmentById.get(shift.department_id) ?? "Auto" : "Auto"}
               </span>
               <span className="truncate text-slate-600">
                 {timeLabel(shift.shift_start)} - {timeLabel(shift.shift_end)}
@@ -236,7 +236,7 @@ function ShiftPill({ shift, staffMember }: { shift: EmployeeShift; staffMember?:
   return (
     <div className="rounded bg-slate-50 px-3 py-2 text-sm">
       <div className="flex items-center justify-between gap-2">
-        <span className="truncate font-medium">{staffMember?.name ?? compactId(shift.user_id)}</span>
+        <span className="truncate font-medium">{staffMember?.name ?? "Unknown staff"}</span>
         <Badge variant={shiftVariant(shift.status)}>{titleCase(shift.status)}</Badge>
       </div>
       <p className="mt-1 text-xs text-slate-500">

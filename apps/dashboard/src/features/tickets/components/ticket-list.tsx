@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { format, formatDistanceToNow } from "date-fns";
 import { ArrowUpRight, Hotel, MessageSquare, Timer, UserCheck } from "lucide-react";
 import Link from "next/link";
@@ -8,27 +8,60 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CursorPaginationControls } from "@/components/ui/cursor-pagination-controls";
 import { DataState } from "@/components/ui/data-state";
-import { compactId, titleCase } from "@/lib/utils";
+import { titleCase } from "@/lib/utils";
 import type { Ticket } from "@/types/domain";
 import { TicketDetailDialog } from "@/features/tickets/components/ticket-detail-dialog";
 import { useTickets } from "@/features/tickets/hooks/useTickets";
 
+const PAGE_SIZE = 50;
+
 export function TicketList({ hotelId }: { hotelId: string }) {
   const searchParams = useSearchParams();
+  const [page, setPage] = useState(1);
+  const q = searchParams.get("q") ?? "";
+  const stage = searchParams.get("stage") ?? "";
+  const priority = searchParams.get("priority") ?? "";
+  const assignedTo = searchParams.get("assigned_to") ?? "";
+  const departmentKey = searchParams.get("department_key") ?? "";
+  const slaStatus = searchParams.get("sla_status") ?? "";
   const filters = useMemo(
     () => ({
-      q: searchParams.get("q") ?? "",
-      stage: searchParams.get("stage") ?? "",
-      priority: searchParams.get("priority") ?? "",
-      assigned_to: searchParams.get("assigned_to") ?? "",
-      department_key: searchParams.get("department_key") ?? "",
-      sla_status: searchParams.get("sla_status") ?? "",
+      q,
+      stage,
+      priority,
+      assigned_to: assignedTo,
+      department_key: departmentKey,
+      sla_status: slaStatus,
+      limit: String(PAGE_SIZE),
     }),
-    [searchParams],
+    [assignedTo, departmentKey, priority, q, slaStatus, stage],
   );
   const tickets = useTickets(hotelId, filters);
-  const rows = tickets.data ?? [];
+  const loadedPageCount = Math.max(1, tickets.pages.length);
+  const rows = tickets.pages[page - 1] ?? [];
+
+  useEffect(() => {
+    setPage(1);
+  }, [assignedTo, departmentKey, priority, q, slaStatus, stage]);
+
+  useEffect(() => {
+    if (page > loadedPageCount) {
+      setPage(loadedPageCount);
+    }
+  }, [loadedPageCount, page]);
+
+  async function handleNextPage() {
+    if (page < tickets.pages.length) {
+      setPage((current) => current + 1);
+      return;
+    }
+    if (tickets.hasNextPage) {
+      await tickets.fetchNextPage();
+      setPage((current) => current + 1);
+    }
+  }
 
   if (tickets.isLoading) {
     return <DataState isLoading />;
@@ -76,13 +109,18 @@ export function TicketList({ hotelId }: { hotelId: string }) {
         ))}
       </div>
 
-      {tickets.hasNextPage ? (
-        <div className="mt-3 flex justify-center">
-          <Button disabled={tickets.isFetchingNextPage} type="button" variant="secondary" onClick={() => tickets.fetchNextPage()}>
-            {tickets.isFetchingNextPage ? "Loading..." : "Load more"}
-          </Button>
-        </div>
-      ) : null}
+      <div className="mt-3">
+        <CursorPaginationControls
+          hasNextPage={tickets.hasNextPage}
+          isFetchingNextPage={tickets.isFetchingNextPage}
+          loadedPages={loadedPageCount}
+          page={page}
+          pageSize={PAGE_SIZE}
+          totalItems={tickets.totalItems}
+          onNext={handleNextPage}
+          onPrevious={() => setPage((current) => Math.max(1, current - 1))}
+        />
+      </div>
 
       <TicketDetailDialog hotelId={hotelId} tickets={tickets.data ?? []} />
     </>
@@ -135,7 +173,7 @@ function TicketRow({ hotelId, ticket }: { hotelId: string; ticket: Ticket }) {
       </td>
       <td className="px-4 py-3 text-right">
         <Button asChild size="sm" type="button" variant="ghost" onClick={(event) => event.stopPropagation()}>
-          <Link href={`/${hotelId}/tickets/${ticket.id}`}>
+          <Link href={`/${hotelId}/tickets/${ticket.id}`} prefetch={false}>
             <ArrowUpRight />
           </Link>
         </Button>
@@ -155,7 +193,7 @@ function MobileTicketCard({ hotelId, ticket }: { hotelId: string; ticket: Ticket
           <p className="mt-1 line-clamp-2 text-sm text-slate-600">{ticket.item_description}</p>
         </div>
         <Button asChild size="icon" type="button" variant="ghost" onClick={(event) => event.stopPropagation()}>
-          <Link href={`/${hotelId}/tickets/${ticket.id}`} aria-label="Open full ticket">
+          <Link href={`/${hotelId}/tickets/${ticket.id}`} aria-label="Open full ticket" prefetch={false}>
             <ArrowUpRight />
           </Link>
         </Button>
@@ -233,7 +271,7 @@ function normalizeStage(stage: string) {
 }
 
 function ticketAssigneeLabel(ticket: Ticket) {
-  return ticket.assigned_to_name ?? compactId(ticket.assigned_to);
+  return ticket.assigned_to_name ?? "Unassigned";
 }
 
 function ticketContextLabel(ticket: Ticket) {
@@ -246,5 +284,5 @@ function ticketContextLabel(ticket: Ticket) {
   if (ticket.guest_name) {
     return ticket.guest_name;
   }
-  return compactId(ticket.room_id ?? ticket.reservation_id ?? ticket.guest_id);
+  return "No linked record";
 }

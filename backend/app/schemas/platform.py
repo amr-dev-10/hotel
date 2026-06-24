@@ -2,7 +2,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
 from app.schemas.common import ORMModel
 from app.schemas.hotel import HotelRead
@@ -138,6 +138,13 @@ class PlatformHotelSummary(ORMModel):
     created_at: datetime
 
 
+class PlatformHotelUpdate(BaseModel):
+    slug: str | None = Field(default=None, min_length=2, max_length=80)
+    name: str | None = Field(default=None, min_length=2, max_length=255)
+    subscription_tier: str | None = Field(default=None, min_length=2, max_length=40)
+    status: str | None = Field(default=None, min_length=2, max_length=40)
+
+
 class PlatformHotelCreateResponse(BaseModel):
     hotel: HotelRead
     owner: UserRead
@@ -157,6 +164,17 @@ class PlatformUserSummary(ORMModel):
     is_active: bool
     is_on_duty: bool
     created_at: datetime
+
+
+class PlatformUserPasswordReset(BaseModel):
+    new_password: str = Field(min_length=8)
+    confirm_password: str = Field(min_length=8)
+
+    @model_validator(mode="after")
+    def passwords_match(self) -> "PlatformUserPasswordReset":
+        if self.new_password != self.confirm_password:
+            raise ValueError("New password and confirmation do not match")
+        return self
 
 
 class PlatformSubscriptionSummary(ORMModel):

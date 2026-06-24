@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from datetime import date
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.guest import Guest
@@ -53,6 +53,50 @@ class ReservationRepository(BaseRepository[Reservation]):
         limit: int = 50,
         cursor: str | None = None,
     ) -> CursorResult[Reservation]:
+        statement = self._filtered_statement(
+            hotel_id,
+            q=q,
+            status=status,
+            from_date=from_date,
+            to_date=to_date,
+        )
+        statement = apply_created_at_cursor(statement, Reservation, cursor)
+        rows = (
+            self.db.execute(
+                statement.order_by(Reservation.created_at.desc(), Reservation.id.desc()).limit(limit + 1)
+            )
+            .scalars()
+            .all()
+        )
+        return paginate_created_at_desc(rows, limit)
+
+    def count_filtered(
+        self,
+        hotel_id: str,
+        q: str | None = None,
+        status: str | None = None,
+        from_date: date | None = None,
+        to_date: date | None = None,
+    ) -> int:
+        statement = self._filtered_statement(
+            hotel_id,
+            q=q,
+            status=status,
+            from_date=from_date,
+            to_date=to_date,
+        )
+        return self.db.execute(
+            select(func.count()).select_from(statement.order_by(None).subquery())
+        ).scalar_one()
+
+    def _filtered_statement(
+        self,
+        hotel_id: str,
+        q: str | None = None,
+        status: str | None = None,
+        from_date: date | None = None,
+        to_date: date | None = None,
+    ):
         statement = select(Reservation).where(
             Reservation.hotel_id == hotel_id,
             Reservation.deleted_at.is_(None),
@@ -65,26 +109,24 @@ class ReservationRepository(BaseRepository[Reservation]):
             statement = statement.where(Reservation.checkin_date <= to_date)
         if q:
             pattern = f"%{q.strip()}%"
-            statement = statement.outerjoin(Guest, Guest.id == Reservation.guest_id).where(
-                or_(
-                    Reservation.reservation_no.ilike(pattern),
-                    Reservation.guest_id.ilike(pattern),
-                    Reservation.room_id.ilike(pattern),
-                    Reservation.source.ilike(pattern),
-                    Guest.name.ilike(pattern),
-                    Guest.phone.ilike(pattern),
-                    Guest.whatsapp_phone.ilike(pattern),
+            statement = (
+                statement.outerjoin(Guest, Guest.id == Reservation.guest_id)
+                .outerjoin(Room, Room.id == Reservation.room_id)
+                .where(
+                    or_(
+                        Reservation.reservation_no.ilike(pattern),
+                        Reservation.guest_id.ilike(pattern),
+                        Reservation.room_id.ilike(pattern),
+                        Reservation.source.ilike(pattern),
+                        Guest.name.ilike(pattern),
+                        Guest.phone.ilike(pattern),
+                        Guest.whatsapp_phone.ilike(pattern),
+                        Room.room_number.ilike(pattern),
+                        Room.room_type.ilike(pattern),
+                    )
                 )
             )
-        statement = apply_created_at_cursor(statement, Reservation, cursor)
-        rows = (
-            self.db.execute(
-                statement.order_by(Reservation.created_at.desc(), Reservation.id.desc()).limit(limit + 1)
-            )
-            .scalars()
-            .all()
-        )
-        return paginate_created_at_desc(rows, limit)
+        return statement
 
 
 class ReservationGuestRepository(BaseRepository[ReservationGuest]):

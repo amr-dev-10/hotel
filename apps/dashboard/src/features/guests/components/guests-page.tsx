@@ -7,27 +7,53 @@ import { Mail, MessageCircle, Phone, Search, UserRound } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CursorPaginationControls } from "@/components/ui/cursor-pagination-controls";
 import { DataState } from "@/components/ui/data-state";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Can } from "@/lib/auth/can";
 import { useRouteHotelId } from "@/hooks/useRouteHotelId";
-import { compactId, titleCase } from "@/lib/utils";
+import { titleCase } from "@/lib/utils";
 import type { Guest } from "@/types/domain";
 import { CreateGuestDialog } from "@/features/guests/components/create-guest-dialog";
 import { useGuests } from "@/features/guests/hooks/useGuests";
+
+const PAGE_SIZE = 50;
 
 export function GuestsPage({ hotelId: hotelIdProp }: { hotelId?: string }) {
   const hotelId = useRouteHotelId(hotelIdProp);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
+  const [page, setPage] = useState(1);
   const debouncedSearch = useDebouncedValue(search.trim(), 300);
   const guests = useGuests(hotelId, {
     q: debouncedSearch || undefined,
     status: status === "all" ? undefined : status,
-    limit: 50,
+    limit: PAGE_SIZE,
   });
-  const filteredGuests = guests.data ?? [];
+  const loadedPageCount = Math.max(1, guests.pages.length);
+  const filteredGuests = guests.pages[page - 1] ?? [];
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, status]);
+
+  useEffect(() => {
+    if (page > loadedPageCount) {
+      setPage(loadedPageCount);
+    }
+  }, [loadedPageCount, page]);
+
+  async function handleNextPage() {
+    if (page < guests.pages.length) {
+      setPage((current) => current + 1);
+      return;
+    }
+    if (guests.hasNextPage) {
+      await guests.fetchNextPage();
+      setPage((current) => current + 1);
+    }
+  }
 
   if (guests.isLoading) {
     return <DataState isLoading />;
@@ -56,7 +82,7 @@ export function GuestsPage({ hotelId: hotelIdProp }: { hotelId?: string }) {
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <Input
               className="pl-9"
-              placeholder="Search by name, phone, email, or ID"
+              placeholder="Search by name, phone, or email"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
@@ -99,13 +125,16 @@ export function GuestsPage({ hotelId: hotelIdProp }: { hotelId?: string }) {
               </table>
             </div>
           </div>
-          {guests.hasNextPage ? (
-            <div className="flex justify-center">
-              <Button disabled={guests.isFetchingNextPage} type="button" variant="secondary" onClick={() => guests.fetchNextPage()}>
-                {guests.isFetchingNextPage ? "Loading..." : "Load more"}
-              </Button>
-            </div>
-          ) : null}
+          <CursorPaginationControls
+            hasNextPage={guests.hasNextPage}
+            isFetchingNextPage={guests.isFetchingNextPage}
+            loadedPages={loadedPageCount}
+            page={page}
+            pageSize={PAGE_SIZE}
+            totalItems={guests.totalItems}
+            onNext={handleNextPage}
+            onPrevious={() => setPage((current) => Math.max(1, current - 1))}
+          />
         </div>
       )}
     </div>
@@ -130,10 +159,10 @@ function GuestRow({
             <Link
               className="truncate font-semibold text-slate-950 hover:text-[#0F3D91]"
               href={`/${hotelId}/guests/${guest.id}`}
+              prefetch={false}
             >
               {guest.name}
             </Link>
-            <p className="text-xs text-slate-500">{compactId(guest.id)}</p>
           </div>
         </div>
       </td>
@@ -170,7 +199,7 @@ function GuestRow({
       <td className="px-4 py-3 align-middle">
         <div className="flex justify-end">
           <Button asChild size="sm" type="button" variant="secondary">
-            <Link href={`/${hotelId}/guests/${guest.id}`}>Profile</Link>
+            <Link href={`/${hotelId}/guests/${guest.id}`} prefetch={false}>Profile</Link>
           </Button>
         </div>
       </td>

@@ -216,7 +216,12 @@ function groupByFloor(rooms: Room[]) {
   const grouped = new Map<string, Room[]>();
   for (const room of rooms) {
     const floor = room.floor || "Unassigned";
-    grouped.set(floor, [...(grouped.get(floor) ?? []), room]);
+    const floorRooms = grouped.get(floor);
+    if (floorRooms) {
+      floorRooms.push(room);
+    } else {
+      grouped.set(floor, [room]);
+    }
   }
 
   return [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }));

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { CreditCard, Edit3, Search } from "lucide-react";
@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PaginationControls } from "@/components/ui/pagination-controls";
 import { Select } from "@/components/ui/select";
 import { PlatformShell } from "@/features/platform/components/platform-shell";
 import {
@@ -27,7 +28,7 @@ import {
   type PlatformSubscriptionUpdatePayload,
 } from "@/features/platform/hooks/usePlatform";
 import { apiErrorMessage } from "@/lib/api/client";
-import { compactId, titleCase } from "@/lib/utils";
+import { titleCase } from "@/lib/utils";
 import type { PlatformSubscriptionSummary } from "@/types/domain";
 
 interface SubscriptionFormState {
@@ -36,6 +37,8 @@ interface SubscriptionFormState {
   billing_cycle: string;
   renewal_date: string;
 }
+
+const PLATFORM_PAGE_SIZE = 50;
 
 export function PlatformSubscriptionsPage() {
   return (
@@ -52,6 +55,7 @@ function PlatformSubscriptionsContent() {
   const [search, setSearch] = useState("");
   const [planFilter, setPlanFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [page, setPage] = useState(1);
   const [editingSubscription, setEditingSubscription] = useState<PlatformSubscriptionSummary | null>(null);
   const [form, setForm] = useState<SubscriptionFormState>(() => emptyForm());
 
@@ -78,6 +82,17 @@ function PlatformSubscriptionsContent() {
       return matchesPlan && matchesStatus && matchesSearch;
     });
   }, [hotelById, planFilter, search, statusFilter, subscriptions.data]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [planFilter, search, statusFilter]);
+
+  const pageCount = Math.max(1, Math.ceil(filteredSubscriptions.length / PLATFORM_PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const paginatedSubscriptions = useMemo(() => {
+    const start = (currentPage - 1) * PLATFORM_PAGE_SIZE;
+    return filteredSubscriptions.slice(start, start + PLATFORM_PAGE_SIZE);
+  }, [currentPage, filteredSubscriptions]);
 
   function openEditor(subscription: PlatformSubscriptionSummary) {
     setEditingSubscription(subscription);
@@ -173,52 +188,60 @@ function PlatformSubscriptionsContent() {
           emptyTitle={subscriptions.data?.length ? "No subscriptions match these filters." : "No subscriptions found."}
         />
       ) : (
-        <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[960px] border-collapse text-sm">
-              <thead className="bg-slate-50 text-left text-xs uppercase tracking-normal text-slate-500">
-                <tr>
-                  <th className="border-b border-slate-200 px-4 py-3 font-semibold">Hotel</th>
-                  <th className="border-b border-slate-200 px-4 py-3 font-semibold">Plan</th>
-                  <th className="border-b border-slate-200 px-4 py-3 font-semibold">Status</th>
-                  <th className="border-b border-slate-200 px-4 py-3 font-semibold">Billing</th>
-                  <th className="border-b border-slate-200 px-4 py-3 font-semibold">Renewal</th>
-                  <th className="border-b border-slate-200 px-4 py-3 font-semibold">Created</th>
-                  <th className="border-b border-slate-200 px-4 py-3 font-semibold" />
-                </tr>
-              </thead>
-              <tbody>
-                {filteredSubscriptions.map((subscription) => (
-                  <tr className="border-b border-slate-100 last:border-0" key={subscription.id}>
-                    <td className="px-4 py-3 align-middle">
-                      <Link className="font-semibold hover:text-[#0F3D91]" href={`/platform/hotels/${subscription.hotel_id}`}>
-                        {hotelById.get(subscription.hotel_id) ?? compactId(subscription.hotel_id)}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3 align-middle">
-                      <Badge variant={planVariant(subscription.plan)}>{titleCase(subscription.plan)}</Badge>
-                    </td>
-                    <td className="px-4 py-3 align-middle">
-                      <Badge variant={statusVariant(subscription.status)}>{titleCase(subscription.status)}</Badge>
-                    </td>
-                    <td className="px-4 py-3 align-middle">{titleCase(subscription.billing_cycle)}</td>
-                    <td className="px-4 py-3 align-middle">
-                      {subscription.renewal_date ? format(new Date(subscription.renewal_date), "dd MMM yyyy") : "Not set"}
-                    </td>
-                    <td className="px-4 py-3 align-middle">{format(new Date(subscription.created_at), "dd MMM yyyy")}</td>
-                    <td className="px-4 py-3 align-middle">
-                      <div className="flex justify-end">
-                        <Button size="sm" type="button" variant="secondary" onClick={() => openEditor(subscription)}>
-                          <Edit3 />
-                          Edit
-                        </Button>
-                      </div>
-                    </td>
+        <div className="grid gap-3">
+          <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[960px] border-collapse text-sm">
+                <thead className="bg-slate-50 text-left text-xs uppercase tracking-normal text-slate-500">
+                  <tr>
+                    <th className="border-b border-slate-200 px-4 py-3 font-semibold">Hotel</th>
+                    <th className="border-b border-slate-200 px-4 py-3 font-semibold">Plan</th>
+                    <th className="border-b border-slate-200 px-4 py-3 font-semibold">Status</th>
+                    <th className="border-b border-slate-200 px-4 py-3 font-semibold">Billing</th>
+                    <th className="border-b border-slate-200 px-4 py-3 font-semibold">Renewal</th>
+                    <th className="border-b border-slate-200 px-4 py-3 font-semibold">Created</th>
+                    <th className="border-b border-slate-200 px-4 py-3 font-semibold" />
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {paginatedSubscriptions.map((subscription) => (
+                    <tr className="border-b border-slate-100 last:border-0" key={subscription.id}>
+                      <td className="px-4 py-3 align-middle">
+                        <Link className="font-semibold hover:text-[#0F3D91]" href={`/platform/hotels/${subscription.hotel_id}`}>
+                          {hotelById.get(subscription.hotel_id) ?? "Unknown hotel"}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3 align-middle">
+                        <Badge variant={planVariant(subscription.plan)}>{titleCase(subscription.plan)}</Badge>
+                      </td>
+                      <td className="px-4 py-3 align-middle">
+                        <Badge variant={statusVariant(subscription.status)}>{titleCase(subscription.status)}</Badge>
+                      </td>
+                      <td className="px-4 py-3 align-middle">{titleCase(subscription.billing_cycle)}</td>
+                      <td className="px-4 py-3 align-middle">
+                        {subscription.renewal_date ? format(new Date(subscription.renewal_date), "dd MMM yyyy") : "Not set"}
+                      </td>
+                      <td className="px-4 py-3 align-middle">{format(new Date(subscription.created_at), "dd MMM yyyy")}</td>
+                      <td className="px-4 py-3 align-middle">
+                        <div className="flex justify-end">
+                          <Button size="sm" type="button" variant="secondary" onClick={() => openEditor(subscription)}>
+                            <Edit3 />
+                            Edit
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
+          <PaginationControls
+            page={currentPage}
+            pageSize={PLATFORM_PAGE_SIZE}
+            totalItems={filteredSubscriptions.length}
+            onPageChange={setPage}
+          />
         </div>
       )}
 

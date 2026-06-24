@@ -39,6 +39,13 @@ export interface PlatformUserUpdatePayload {
   is_on_duty?: boolean;
 }
 
+export interface PlatformHotelUpdatePayload {
+  slug?: string;
+  name?: string;
+  subscription_tier?: string;
+  status?: string;
+}
+
 export interface PlatformSubscriptionUpdatePayload {
   plan?: string;
   status?: string;
@@ -51,6 +58,11 @@ export interface PlatformSubscriptionUpdatePayload {
 
 export interface PasswordChangePayload {
   current_password: string;
+  new_password: string;
+  confirm_password: string;
+}
+
+export interface PlatformUserPasswordResetPayload {
   new_password: string;
   confirm_password: string;
 }
@@ -108,6 +120,20 @@ export function useCreatePlatformHotel() {
   });
 }
 
+export function useUpdatePlatformHotel() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ hotelId, payload }: { hotelId: string; payload: PlatformHotelUpdatePayload }) =>
+      platformPatch<PlatformHotelSummary>(`/platform/hotels/${hotelId}`, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: platformKeys.dashboard });
+      queryClient.invalidateQueries({ queryKey: platformKeys.hotels });
+      queryClient.invalidateQueries({ queryKey: platformKeys.subscriptions });
+    },
+  });
+}
+
 export function useSavePlatformSettings() {
   const queryClient = useQueryClient();
 
@@ -130,6 +156,13 @@ export function useUpdatePlatformUser() {
       queryClient.invalidateQueries({ queryKey: platformKeys.users });
       queryClient.invalidateQueries({ queryKey: platformKeys.hotels });
     },
+  });
+}
+
+export function useResetPlatformUserPassword() {
+  return useMutation({
+    mutationFn: ({ userId, payload }: { userId: string; payload: PlatformUserPasswordResetPayload }) =>
+      platformPost<{ password_changed: boolean }>(`/platform/users/${userId}/password`, payload),
   });
 }
 

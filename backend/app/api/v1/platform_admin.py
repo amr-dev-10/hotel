@@ -24,10 +24,12 @@ from app.schemas.platform import (
     PlatformHotelCreate,
     PlatformHotelCreateResponse,
     PlatformHotelSummary,
+    PlatformHotelUpdate,
     PlatformSettingRead,
     PlatformSettingsUpdate,
     PlatformSubscriptionUpdate,
     PlatformSubscriptionSummary,
+    PlatformUserPasswordReset,
     PlatformUserSummary,
 )
 from app.schemas.user import UserRead, UserUpdate
@@ -198,6 +200,60 @@ def create_platform_hotel(
     return ok(response.model_dump())
 
 
+@router.patch("/hotels/{hotel_id}")
+def update_platform_hotel(
+    hotel_id: str,
+    payload: PlatformHotelUpdate,
+    db: Session = Depends(get_db),
+    admin: PlatformAdmin = Depends(get_platform_admin),
+) -> dict:
+    hotel = db.get(Hotel, hotel_id)
+    if not hotel or hotel.deleted_at is not None:
+        raise not_found("Hotel not found")
+
+    update_data = payload.model_dump(exclude_unset=True)
+    if not update_data:
+        return ok(_platform_hotel_summary(db, hotel).model_dump())
+
+    if update_data.get("slug"):
+        slug_owner = db.execute(
+            select(Hotel).where(Hotel.slug == update_data["slug"], Hotel.id != hotel.id)
+        ).scalar_one_or_none()
+        if slug_owner:
+            raise bad_request("Hotel slug is already in use")
+
+    old_payload = {
+        "slug": hotel.slug,
+        "name": hotel.name,
+        "subscription_tier": hotel.subscription_tier,
+        "status": hotel.status,
+    }
+
+    for field, value in update_data.items():
+        setattr(hotel, field, value)
+
+    if "subscription_tier" in update_data:
+        subscription = db.execute(
+            select(Subscription).where(Subscription.hotel_id == hotel.id)
+        ).scalar_one_or_none()
+        if subscription:
+            subscription.plan = hotel.subscription_tier
+
+    AuditService(db).log(
+        hotel.id,
+        "hotel.updated",
+        "hotel",
+        hotel.id,
+        None,
+        payload={"source": "platform_admin", "platform_admin_id": admin.id},
+        old_payload=old_payload,
+        new_payload=update_data,
+    )
+    db.commit()
+    db.refresh(hotel)
+    return ok(_platform_hotel_summary(db, hotel).model_dump())
+
+
 @router.get("/users")
 def list_platform_users(
     db: Session = Depends(get_db),
@@ -227,6 +283,32 @@ def update_platform_user(
         audit_payload={"source": "platform_admin", "platform_admin_id": admin.id},
     )
     return ok(PlatformUserSummary.model_validate(updated).model_dump())
+
+
+@router.post("/users/{user_id}/password")
+def reset_platform_user_password(
+    user_id: str,
+    payload: PlatformUserPasswordReset,
+    db: Session = Depends(get_db),
+    admin: PlatformAdmin = Depends(get_platform_admin),
+) -> dict:
+    user = db.get(User, user_id)
+    if not user or user.deleted_at is not None:
+        raise not_found("User not found")
+    if verify_password(payload.new_password, user.hashed_password):
+        raise bad_request("New password must be different from current password")
+
+    user.hashed_password = hash_password(payload.new_password)
+    AuditService(db).log(
+        user.hotel_id,
+        "user.password_reset",
+        "user",
+        user.id,
+        None,
+        payload={"source": "platform_admin", "platform_admin_id": admin.id},
+    )
+    db.commit()
+    return ok({"password_changed": True})
 
 
 @router.get("/subscriptions")
@@ -350,3 +432,17 @@ def _count_open_tickets(db: Session, hotel_id: str) -> int:
             Ticket.stage.notin_(["approved", "cancelled", "closed"]),
         )
     ).scalar_one()
+
+
+def _platform_hotel_summary(db: Session, hotel: Hotel) -> PlatformHotelSummary:
+    return PlatformHotelSummary(
+        id=hotel.id,
+        slug=hotel.slug,
+        name=hotel.name,
+        subscription_tier=hotel.subscription_tier,
+        status=hotel.status,
+        active_users=_count_active_users(db, hotel.id),
+        total_rooms=_count_rooms(db, hotel.id),
+        open_tickets=_count_open_tickets(db, hotel.id),
+        created_at=hotel.created_at,
+    )

@@ -75,7 +75,7 @@ export function KitchenPage({ hotelId }: { hotelId: string }) {
                   <KitchenOrderCard
                     key={order.id}
                     order={order}
-                    roomLabel={order.room_id ? `Room ${roomMap.get(order.room_id) ?? order.room_id.slice(0, 8)}` : "Table/POS"}
+                    roomLabel={order.room_id ? `Room ${roomMap.get(order.room_id) ?? "assigned"}` : "Table/POS"}
                     onMove={(status) => updateStatus.mutate({ orderId: order.id, status })}
                   />
                 ))

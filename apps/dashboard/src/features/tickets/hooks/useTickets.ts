@@ -34,7 +34,7 @@ export type TicketUpdatePayload = {
 };
 
 export function useTickets(hotelId: string, filters: TicketFilters) {
-  const limit = Number(filters.limit ?? 100);
+  const limit = Number(filters.limit ?? 50);
   const query = useInfiniteQuery<ApiEnvelope<Ticket[]>, Error>({
     queryKey: queryKeys.tickets.list(hotelId, compactFilters({ ...filters, limit: String(limit) })),
     queryFn: ({ pageParam }) =>
@@ -52,7 +52,9 @@ export function useTickets(hotelId: string, filters: TicketFilters) {
   return {
     ...query,
     data: query.data?.pages.flatMap((page) => page.data) ?? [],
+    pages: query.data?.pages.map((page) => page.data) ?? [],
     pageMeta: query.data?.pages.at(-1)?.meta as CursorPageMeta | null | undefined,
+    totalItems: (query.data?.pages.at(-1)?.meta as CursorPageMeta | null | undefined)?.total,
   };
 }
 

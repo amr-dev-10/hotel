@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { addDays, format } from "date-fns";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Plus, Search, UserCheck, UserPlus, X } from "lucide-react";
@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { EntitySearchSelect, type EntitySearchOption } from "@/components/ui/entity-search-select";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -34,11 +35,18 @@ import type { Guest } from "@/types/domain";
 export function CreateReservationDialog({ hotelId }: { hotelId: string }) {
   const [open, setOpen] = useState(false);
   const [guestSearch, setGuestSearch] = useState("");
+  const [roomSearch, setRoomSearch] = useState("");
+  const [selectedRoomLabel, setSelectedRoomLabel] = useState("");
   const [selectedGuest, setSelectedGuest] = useState<Guest | null>(null);
   const [showGuestSearch, setShowGuestSearch] = useState(false);
+  const debouncedRoomSearch = useDebouncedValue(roomSearch.trim(), 250);
 
-  const rooms = useRooms(hotelId);
-  const guests = useGuests(hotelId);
+  const rooms = useRooms(hotelId, {
+    enabled: open && debouncedRoomSearch.length > 0,
+    q: debouncedRoomSearch,
+    limit: 8,
+  });
+  const guests = useGuests(hotelId, { q: guestSearch.trim() || undefined, limit: 6 });
   const createReservation = useCreateReservation(hotelId);
 
   const form = useForm<CreateReservationValues>({
@@ -56,20 +64,18 @@ export function CreateReservationDialog({ hotelId }: { hotelId: string }) {
     },
   });
 
-  // Filter guests based on search query
   const filteredGuests = useMemo(() => {
-    if (!guestSearch.trim() || !guests.data) return [];
-    const q = guestSearch.toLowerCase();
-    return guests.data
-      .filter(
-        (g) =>
-          g.name?.toLowerCase().includes(q) ||
-          g.phone?.includes(q) ||
-          g.whatsapp_phone?.includes(q) ||
-          g.email?.toLowerCase().includes(q)
-      )
-      .slice(0, 6);
+    if (!guestSearch.trim()) {
+      return [];
+    }
+    return guests.data ?? [];
   }, [guestSearch, guests.data]);
+
+  const roomOptions: EntitySearchOption[] = (rooms.data ?? []).map((room) => ({
+    value: room.id,
+    label: `Room ${room.room_number}`,
+    description: [room.room_type, room.floor ? `Floor ${room.floor}` : null, room.status].filter(Boolean).join(" - "),
+  }));
 
   function handleSelectGuest(guest: Guest) {
     setSelectedGuest(guest);
@@ -103,6 +109,8 @@ export function CreateReservationDialog({ hotelId }: { hotelId: string }) {
       toast.success("Reservation created");
       form.reset();
       setSelectedGuest(null);
+      setRoomSearch("");
+      setSelectedRoomLabel("");
       setOpen(false);
     } catch (error) {
       toast.error(apiErrorMessage(error));
@@ -249,14 +257,21 @@ export function CreateReservationDialog({ hotelId }: { hotelId: string }) {
 
           <div className="grid gap-2">
             <Label htmlFor="room_id">Room</Label>
-            <Select id="room_id" {...form.register("room_id")}>
-              <option value="">Assign later</option>
-              {(rooms.data ?? []).map((room) => (
-                <option key={room.id} value={room.id}>
-                  {room.room_number} {room.room_type ? `- ${room.room_type}` : ""}
-                </option>
-              ))}
-            </Select>
+            <EntitySearchSelect
+              emptyText="No rooms found"
+              id="room_id"
+              isLoading={rooms.isFetching}
+              options={roomOptions}
+              placeholder="Type room number or leave blank"
+              search={roomSearch}
+              selectedLabel={selectedRoomLabel}
+              value={form.watch("room_id") ?? ""}
+              onSearchChange={setRoomSearch}
+              onValueChange={(value, option) => {
+                form.setValue("room_id", value, { shouldValidate: true });
+                setSelectedRoomLabel(option?.label ?? "");
+              }}
+            />
           </div>
 
           <div className="grid gap-2">
@@ -281,4 +296,16 @@ export function CreateReservationDialog({ hotelId }: { hotelId: string }) {
       </DialogContent>
     </Dialog>
   );
+}
+
+function useDebouncedValue<T>(value: T, delayMs: number) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => setDebouncedValue(value), delayMs);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [delayMs, value]);
+
+  return debouncedValue;
 }

@@ -168,6 +168,6 @@ def list_requests(
         context.hotel_id,
         guest_id=context.guest_id,
         reservation_id=context.reservation_id,
-        limit=100,
+        limit=50,
     )
     return ok([TicketRead.model_validate(item).model_dump() for item in page.items if item.source == "PORTAL"])

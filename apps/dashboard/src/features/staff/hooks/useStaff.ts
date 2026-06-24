@@ -16,11 +16,20 @@ export type ShiftUpdatePayload = {
   notes?: string | null;
 };
 
-export function useStaff(hotelId: string) {
+export type StaffQueryOptions = {
+  enabled?: boolean;
+  limit?: number;
+  q?: string;
+};
+
+export function useStaff(hotelId: string, options: StaffQueryOptions = {}) {
+  const limit = options.limit ?? 200;
+  const q = options.q?.trim() || undefined;
+
   return useQuery({
-    queryKey: queryKeys.staff(hotelId),
-    queryFn: () => apiGet<StaffUser[]>(`/hotels/${hotelId}/users`),
-    enabled: Boolean(hotelId),
+    queryKey: queryKeys.staff(hotelId, { limit, q }),
+    queryFn: () => apiGet<StaffUser[]>(`/hotels/${hotelId}/users`, { params: { limit, q } }),
+    enabled: Boolean(hotelId) && (options.enabled ?? true),
   });
 }
 

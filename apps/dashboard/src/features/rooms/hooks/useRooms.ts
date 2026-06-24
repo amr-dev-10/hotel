@@ -13,11 +13,29 @@ export type RoomUpdatePayload = {
   notes?: string | null;
 };
 
-export function useRooms(hotelId: string) {
+export type RoomQueryOptions = {
+  enabled?: boolean;
+  limit?: number;
+  q?: string;
+};
+
+export function useRooms(hotelId: string, options: RoomQueryOptions = {}) {
+  const limit = options.limit ?? 200;
+  const q = options.q?.trim() || undefined;
+
   return useQuery({
-    queryKey: queryKeys.rooms(hotelId),
-    queryFn: () => apiGet<Room[]>(`/hotels/${hotelId}/rooms`),
-    enabled: Boolean(hotelId),
+    queryKey: queryKeys.rooms(hotelId, { limit, q }),
+    queryFn: () => apiGet<Room[]>(`/hotels/${hotelId}/rooms`, { params: { limit, q } }),
+    enabled: Boolean(hotelId) && (options.enabled ?? true),
+    staleTime: 30_000,
+  });
+}
+
+export function useRoom(hotelId: string, roomId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.roomDetail(hotelId, roomId ?? ""),
+    queryFn: () => apiGet<Room>(`/hotels/${hotelId}/rooms/${roomId}`),
+    enabled: Boolean(hotelId && roomId),
   });
 }
 

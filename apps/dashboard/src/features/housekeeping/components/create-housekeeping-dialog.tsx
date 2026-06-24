@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Plus } from "lucide-react";
@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { EntitySearchSelect, type EntitySearchOption } from "@/components/ui/entity-search-select";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { apiErrorMessage } from "@/lib/api/client";
@@ -31,8 +32,22 @@ import { useCreateHousekeeping } from "@/features/housekeeping/hooks/useHousekee
 
 export function CreateHousekeepingDialog({ hotelId }: { hotelId: string }) {
   const [open, setOpen] = useState(false);
-  const rooms = useRooms(hotelId);
-  const staff = useStaff(hotelId);
+  const [roomSearch, setRoomSearch] = useState("");
+  const [staffSearch, setStaffSearch] = useState("");
+  const [selectedRoomLabel, setSelectedRoomLabel] = useState("");
+  const [selectedStaffLabel, setSelectedStaffLabel] = useState("");
+  const debouncedRoomSearch = useDebouncedValue(roomSearch.trim(), 250);
+  const debouncedStaffSearch = useDebouncedValue(staffSearch.trim(), 250);
+  const rooms = useRooms(hotelId, {
+    enabled: open && debouncedRoomSearch.length > 0,
+    q: debouncedRoomSearch,
+    limit: 8,
+  });
+  const staff = useStaff(hotelId, {
+    enabled: open && debouncedStaffSearch.length > 0,
+    q: debouncedStaffSearch,
+    limit: 8,
+  });
   const createTask = useCreateHousekeeping(hotelId);
   const form = useForm<CreateHousekeepingValues>({
     resolver: zodResolver(createHousekeepingSchema),
@@ -58,14 +73,37 @@ export function CreateHousekeepingDialog({ hotelId }: { hotelId: string }) {
       });
       toast.success("Housekeeping task created");
       form.reset();
+      setRoomSearch("");
+      setStaffSearch("");
+      setSelectedRoomLabel("");
+      setSelectedStaffLabel("");
       setOpen(false);
     } catch (error) {
       toast.error(apiErrorMessage(error));
     }
   });
 
+  function handleOpenChange(nextOpen: boolean) {
+    setOpen(nextOpen);
+    if (!nextOpen) {
+      setRoomSearch("");
+      setStaffSearch("");
+    }
+  }
+
+  const roomOptions: EntitySearchOption[] = (rooms.data ?? []).map((room) => ({
+    value: room.id,
+    label: `Room ${room.room_number}`,
+    description: [room.room_type, room.floor ? `Floor ${room.floor}` : null, room.status].filter(Boolean).join(" - "),
+  }));
+  const staffOptions: EntitySearchOption[] = (staff.data ?? []).map((user) => ({
+    value: user.id,
+    label: user.name,
+    description: [user.job_role, user.email].filter(Boolean).join(" - "),
+  }));
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button type="button">
           <Plus />
@@ -82,25 +120,42 @@ export function CreateHousekeepingDialog({ hotelId }: { hotelId: string }) {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
               <Label htmlFor="room_id">Room</Label>
-              <Select id="room_id" {...form.register("room_id")}>
-                <option value="">Select room</option>
-                {(rooms.data ?? []).map((room) => (
-                  <option key={room.id} value={room.id}>
-                    {room.room_number}
-                  </option>
-                ))}
-              </Select>
+              <EntitySearchSelect
+                emptyText="No rooms found"
+                id="room_id"
+                isLoading={rooms.isFetching}
+                options={roomOptions}
+                placeholder="Type room number..."
+                search={roomSearch}
+                selectedLabel={selectedRoomLabel}
+                value={form.watch("room_id")}
+                onSearchChange={setRoomSearch}
+                onValueChange={(value, option) => {
+                  form.setValue("room_id", value, { shouldValidate: true });
+                  setSelectedRoomLabel(option?.label ?? "");
+                }}
+              />
+              {form.formState.errors.room_id ? (
+                <p className="text-xs text-rose-700">{form.formState.errors.room_id.message}</p>
+              ) : null}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="assigned_to">Assign to</Label>
-              <Select id="assigned_to" {...form.register("assigned_to")}>
-                <option value="">Unassigned</option>
-                {(staff.data ?? []).map((user) => (
-                  <option key={user.id} value={user.id}>
-                    {user.name}
-                  </option>
-                ))}
-              </Select>
+              <EntitySearchSelect
+                emptyText="No staff found"
+                id="assigned_to"
+                isLoading={staff.isFetching}
+                options={staffOptions}
+                placeholder="Type staff name..."
+                search={staffSearch}
+                selectedLabel={selectedStaffLabel}
+                value={form.watch("assigned_to") ?? ""}
+                onSearchChange={setStaffSearch}
+                onValueChange={(value, option) => {
+                  form.setValue("assigned_to", value, { shouldValidate: true });
+                  setSelectedStaffLabel(option?.label ?? "");
+                }}
+              />
             </div>
           </div>
 
@@ -152,4 +207,16 @@ export function CreateHousekeepingDialog({ hotelId }: { hotelId: string }) {
       </DialogContent>
     </Dialog>
   );
+}
+
+function useDebouncedValue<T>(value: T, delayMs: number) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => setDebouncedValue(value), delayMs);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [delayMs, value]);
+
+  return debouncedValue;
 }

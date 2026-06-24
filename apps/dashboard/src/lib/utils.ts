@@ -20,7 +20,7 @@ export function compactId(value: string | null | undefined) {
     return "None";
   }
 
-  return value.length > 10 ? `${value.slice(0, 8)}...` : value;
+  return value;
 }
 
 export function percent(value: number | null | undefined) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { DndContext, type DragEndEvent, useDraggable, useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { formatDistanceToNow } from "date-fns";
@@ -10,6 +10,7 @@ import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CursorPaginationControls } from "@/components/ui/cursor-pagination-controls";
 import { DataState } from "@/components/ui/data-state";
 import {
   DropdownMenu,
@@ -19,7 +20,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Can } from "@/lib/auth/can";
 import { apiErrorMessage } from "@/lib/api/client";
-import { cn, compactId, titleCase } from "@/lib/utils";
+import { cn, titleCase } from "@/lib/utils";
 import type { Ticket } from "@/types/domain";
 import {
   useAcceptTicket,
@@ -29,6 +30,8 @@ import {
   useUpdateTicketStage,
 } from "@/features/tickets/hooks/useTickets";
 import { TicketDetailDialog } from "@/features/tickets/components/ticket-detail-dialog";
+
+const PAGE_SIZE = 50;
 
 const columns = [
   { key: "created", title: "Created", aliases: ["Open", "created"] },
@@ -41,20 +44,50 @@ const columns = [
 
 export function TicketBoard({ hotelId }: { hotelId: string }) {
   const searchParams = useSearchParams();
+  const [page, setPage] = useState(1);
+  const q = searchParams.get("q") ?? "";
+  const stage = searchParams.get("stage") ?? "";
+  const priority = searchParams.get("priority") ?? "";
+  const assignedTo = searchParams.get("assigned_to") ?? "";
+  const departmentKey = searchParams.get("department_key") ?? "";
+  const slaStatus = searchParams.get("sla_status") ?? "";
   const filters = useMemo(
     () => ({
-      q: searchParams.get("q") ?? "",
-      stage: searchParams.get("stage") ?? "",
-      priority: searchParams.get("priority") ?? "",
-      assigned_to: searchParams.get("assigned_to") ?? "",
-      department_key: searchParams.get("department_key") ?? "",
-      sla_status: searchParams.get("sla_status") ?? "",
+      q,
+      stage,
+      priority,
+      assigned_to: assignedTo,
+      department_key: departmentKey,
+      sla_status: slaStatus,
+      limit: String(PAGE_SIZE),
     }),
-    [searchParams],
+    [assignedTo, departmentKey, priority, q, slaStatus, stage],
   );
   const tickets = useTickets(hotelId, filters);
   const updateStage = useUpdateTicketStage(hotelId);
-  const rows = tickets.data ?? [];
+  const loadedPageCount = Math.max(1, tickets.pages.length);
+  const rows = tickets.pages[page - 1] ?? [];
+
+  useEffect(() => {
+    setPage(1);
+  }, [assignedTo, departmentKey, priority, q, slaStatus, stage]);
+
+  useEffect(() => {
+    if (page > loadedPageCount) {
+      setPage(loadedPageCount);
+    }
+  }, [loadedPageCount, page]);
+
+  async function handleNextPage() {
+    if (page < tickets.pages.length) {
+      setPage((current) => current + 1);
+      return;
+    }
+    if (tickets.hasNextPage) {
+      await tickets.fetchNextPage();
+      setPage((current) => current + 1);
+    }
+  }
 
   async function handleDragEnd(event: DragEndEvent) {
     const ticket = event.active.data.current?.ticket as Ticket | undefined;
@@ -89,13 +122,18 @@ export function TicketBoard({ hotelId }: { hotelId: string }) {
           })}
         </div>
       </DndContext>
-      {tickets.hasNextPage ? (
-        <div className="mt-3 flex justify-center">
-          <Button disabled={tickets.isFetchingNextPage} type="button" variant="secondary" onClick={() => tickets.fetchNextPage()}>
-            {tickets.isFetchingNextPage ? "Loading..." : "Load more"}
-          </Button>
-        </div>
-      ) : null}
+      <div className="mt-3">
+        <CursorPaginationControls
+          hasNextPage={tickets.hasNextPage}
+          isFetchingNextPage={tickets.isFetchingNextPage}
+          loadedPages={loadedPageCount}
+          page={page}
+          pageSize={PAGE_SIZE}
+          totalItems={tickets.totalItems}
+          onNext={handleNextPage}
+          onPrevious={() => setPage((current) => Math.max(1, current - 1))}
+        />
+      </div>
       <TicketDetailDialog hotelId={hotelId} tickets={tickets.data ?? []} />
     </>
   );
@@ -200,7 +238,7 @@ function TicketCard({ ticket, isDragging }: { ticket: Ticket; isDragging: boolea
         </span>
         <span className="flex items-center gap-2">
           <UserCheck className="size-3.5" />
-          {ticket.assigned_to_name ?? compactId(ticket.assigned_to)}
+          {ticket.assigned_to_name ?? "Unassigned"}
         </span>
       </div>
     </article>

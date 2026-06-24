@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import require_any_permission, require_permission
@@ -20,12 +20,14 @@ router = APIRouter()
 @router.get("")
 def list_users(
     hotel_id: str,
+    q: str | None = None,
+    limit: int = Query(default=200, ge=1, le=500),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("user.view")),
 ) -> dict:
     rbac = RBACService(db)
     scope = rbac.staff_visibility_scope(current_user)
-    users = UserRepository(db).list_for_hotel(hotel_id)
+    users = UserRepository(db).list_for_hotel(hotel_id, q=q, limit=limit)
     if scope == "department":
         users = [user for user in users if current_user.department_id and user.department_id == current_user.department_id]
     elif scope == "own":

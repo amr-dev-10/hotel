@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createColumnHelper, flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table";
 import { format } from "date-fns";
@@ -9,12 +9,13 @@ import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CursorPaginationControls } from "@/components/ui/cursor-pagination-controls";
 import { DataState } from "@/components/ui/data-state";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Can } from "@/lib/auth/can";
 import { apiErrorMessage } from "@/lib/api/client";
-import { compactId, titleCase } from "@/lib/utils";
+import { titleCase } from "@/lib/utils";
 import type { Reservation } from "@/types/domain";
 import { CancelReservationDialog } from "@/features/reservations/components/cancel-reservation-dialog";
 import {
@@ -25,6 +26,7 @@ import {
 } from "@/features/reservations/hooks/useReservations";
 
 const columnHelper = createColumnHelper<Reservation>();
+const PAGE_SIZE = 50;
 
 export function ReservationsTable({ hotelId }: { hotelId: string }) {
   const [reservationToCancel, setReservationToCancel] = useState<Reservation | null>(null);
@@ -32,16 +34,40 @@ export function ReservationsTable({ hotelId }: { hotelId: string }) {
   const [status, setStatus] = useState("all");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [page, setPage] = useState(1);
   const reservations = useReservations(hotelId, {
     q: search.trim() || undefined,
     status: status === "all" ? undefined : status,
     from: fromDate || undefined,
     to: toDate || undefined,
+    limit: PAGE_SIZE,
   });
-  const rows = reservations.data ?? [];
+  const loadedPageCount = Math.max(1, reservations.pages.length);
+  const rows = reservations.pages[page - 1] ?? [];
   const checkIn = useCheckInReservation(hotelId);
   const checkOut = useCheckOutReservation(hotelId);
   const cancelReservation = useCancelReservation(hotelId);
+
+  useEffect(() => {
+    setPage(1);
+  }, [fromDate, search, status, toDate]);
+
+  useEffect(() => {
+    if (page > loadedPageCount) {
+      setPage(loadedPageCount);
+    }
+  }, [loadedPageCount, page]);
+
+  async function handleNextPage() {
+    if (page < reservations.pages.length) {
+      setPage((current) => current + 1);
+      return;
+    }
+    if (reservations.hasNextPage) {
+      await reservations.fetchNextPage();
+      setPage((current) => current + 1);
+    }
+  }
 
   const columns = [
     columnHelper.accessor("reservation_no", {
@@ -50,6 +76,7 @@ export function ReservationsTable({ hotelId }: { hotelId: string }) {
         <Link
           className="font-semibold text-slate-950 hover:text-[#0F3D91]"
           href={`/${hotelId}/reservations/${info.row.original.id}`}
+          prefetch={false}
         >
           {info.getValue()}
         </Link>
@@ -63,11 +90,12 @@ export function ReservationsTable({ hotelId }: { hotelId: string }) {
             <Link
               className="font-medium text-slate-900 hover:text-[#0F3D91]"
               href={`/${hotelId}/guests/${info.getValue()}`}
+              prefetch={false}
             >
-              {info.row.original.guest_name ?? compactId(info.getValue())}
+              {info.row.original.guest_name ?? "Unknown guest"}
             </Link>
             <p className="mt-0.5 text-xs text-slate-500">
-              {info.row.original.guest_phone ?? compactId(info.getValue())}
+              {info.row.original.guest_phone ?? "No phone"}
             </p>
           </div>
         );
@@ -75,7 +103,13 @@ export function ReservationsTable({ hotelId }: { hotelId: string }) {
     }),
     columnHelper.accessor("room_id", {
       header: "Room",
-      cell: (info) => compactId(info.getValue()),
+      cell: (info) => {
+        const reservation = info.row.original;
+        if (reservation.room_number) {
+          return `Room ${reservation.room_number}`;
+        }
+        return reservation.room_id ? "Assigned room" : "Assign later";
+      },
     }),
     columnHelper.accessor("checkin_date", {
       header: "Check-in",
@@ -100,7 +134,7 @@ export function ReservationsTable({ hotelId }: { hotelId: string }) {
         return (
           <div className="flex justify-end gap-2">
             <Button asChild size="sm" type="button" variant="secondary">
-              <Link href={`/${hotelId}/reservations/${row.original.id}`}>
+              <Link href={`/${hotelId}/reservations/${row.original.id}`} prefetch={false}>
                 <Eye />
                 Detail
               </Link>
@@ -242,18 +276,16 @@ export function ReservationsTable({ hotelId }: { hotelId: string }) {
               </table>
             </div>
           </div>
-          {reservations.hasNextPage ? (
-            <div className="flex justify-center">
-              <Button
-                disabled={reservations.isFetchingNextPage}
-                type="button"
-                variant="secondary"
-                onClick={() => reservations.fetchNextPage()}
-              >
-                {reservations.isFetchingNextPage ? "Loading..." : "Load more"}
-              </Button>
-            </div>
-          ) : null}
+          <CursorPaginationControls
+            hasNextPage={reservations.hasNextPage}
+            isFetchingNextPage={reservations.isFetchingNextPage}
+            loadedPages={loadedPageCount}
+            page={page}
+            pageSize={PAGE_SIZE}
+            totalItems={reservations.totalItems}
+            onNext={handleNextPage}
+            onPrevious={() => setPage((current) => Math.max(1, current - 1))}
+          />
         </div>
       )}
 
