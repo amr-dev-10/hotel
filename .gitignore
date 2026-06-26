@@ -20,3 +20,4 @@ backend/uvicorn.*.log
 .codex-run/
 .venv-win
 count_line_of_code.py
+gha-creds-*.json

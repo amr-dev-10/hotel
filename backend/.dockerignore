@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv
+.venv-win
+.pytest_cache
+*.db
+.env
+gha-creds-*.json
