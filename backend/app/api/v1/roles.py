@@ -10,6 +10,7 @@ from app.schemas.rbac import (
     PermissionGroupRead,
     PermissionRead,
     RoleCreate,
+    RolePermissionsUpdate,
     RoleRead,
     RoleUpdate,
     UserRoleAssign,
@@ -25,6 +26,20 @@ def list_permissions(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("role.view")),
 ) -> dict:
+    RBACService(db).seed_permissions()
+    db.commit()
+    permissions = PermissionRepository(db).list_assignable()
+    return ok([PermissionRead.model_validate(item).model_dump() for item in permissions])
+
+
+@router.get("/permissions/all")
+def list_all_permissions(
+    hotel_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("role.view")),
+) -> dict:
+    RBACService(db).seed_permissions()
+    db.commit()
     permissions = PermissionRepository(db).list_all()
     return ok([PermissionRead.model_validate(item).model_dump() for item in permissions])
 
@@ -47,7 +62,23 @@ def list_roles(
     current_user: User = Depends(require_permission("role.view")),
 ) -> dict:
     roles = RoleRepository(db).list_for_hotel(hotel_id)
-    return ok([RoleRead.model_validate(item).model_dump() for item in roles])
+    rbac = RBACService(db)
+    return ok([role_read(rbac, item) for item in roles])
+
+
+@router.get("/{role_id}")
+def get_role(
+    hotel_id: str,
+    role_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("role.view")),
+) -> dict:
+    role = RoleRepository(db).get_for_hotel(hotel_id, role_id)
+    if not role:
+        from app.core.exceptions import not_found
+
+        raise not_found("Role not found")
+    return ok(role_read(RBACService(db), role))
 
 
 @router.post("")
@@ -62,9 +93,10 @@ def create_role(
         payload.name,
         payload.description,
         payload.permission_codes,
+        payload.permission_scopes,
         current_user.id,
     )
-    return ok(RoleRead.model_validate(role).model_dump())
+    return ok(role_read(RBACService(db), role))
 
 
 @router.post("/users/{user_id}")
@@ -93,9 +125,28 @@ def update_role(
         payload.name,
         payload.description,
         payload.permission_codes,
+        payload.permission_scopes,
         current_user.id,
     )
-    return ok(RoleRead.model_validate(role).model_dump())
+    return ok(role_read(RBACService(db), role))
+
+
+@router.put("/{role_id}/permissions")
+def replace_role_permissions(
+    hotel_id: str,
+    role_id: str,
+    payload: RolePermissionsUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("role.manage")),
+) -> dict:
+    role = RBACService(db).replace_role_permissions(
+        hotel_id,
+        role_id,
+        payload.requested_codes(),
+        payload.permission_scopes,
+        current_user.id,
+    )
+    return ok(role_read(RBACService(db), role))
 
 
 @router.delete("/{role_id}")
@@ -107,3 +158,14 @@ def delete_role(
 ) -> dict:
     RBACService(db).delete_role(hotel_id, role_id, current_user.id)
     return ok({"deleted": True, "role_id": role_id})
+
+
+def role_read(rbac: RBACService, role) -> dict:
+    return {
+        "id": role.id,
+        "hotel_id": role.hotel_id,
+        "name": role.name,
+        "description": role.description,
+        "is_system_role": role.is_system_role,
+        "permissions": rbac.role_permission_reads(role),
+    }

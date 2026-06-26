@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from datetime import date, time
 
-from sqlalchemy import select
+from sqlalchemy import false, select
 from sqlalchemy.orm import Session
 
 from app.models.staff import EmployeeShift
@@ -12,6 +12,29 @@ from app.repositories.base import BaseRepository
 class EmployeeShiftRepository(BaseRepository[EmployeeShift]):
     def __init__(self, db: Session) -> None:
         super().__init__(db, EmployeeShift)
+
+    def list_visible(
+        self,
+        hotel_id: str,
+        visibility_scope: str,
+        user_id: str | None = None,
+        department_id: str | None = None,
+        limit: int = 500,
+    ) -> Sequence[EmployeeShift]:
+        statement = select(EmployeeShift).where(EmployeeShift.hotel_id == hotel_id)
+        if visibility_scope == "own":
+            statement = statement.where(EmployeeShift.user_id == user_id) if user_id else statement.where(false())
+        elif visibility_scope == "department":
+            statement = (
+                statement.where(EmployeeShift.department_id == department_id)
+                if department_id
+                else statement.where(false())
+            )
+        elif visibility_scope != "all":
+            statement = statement.where(false())
+        return self.db.execute(
+            statement.order_by(EmployeeShift.shift_date.desc(), EmployeeShift.shift_start).limit(limit)
+        ).scalars().all()
 
     def active_staff(
         self,

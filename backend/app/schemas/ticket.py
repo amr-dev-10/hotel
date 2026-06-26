@@ -7,14 +7,18 @@ from app.schemas.common import ORMModel
 
 class TicketCreate(BaseModel):
     guest_id: str | None = None
+    reservation_id: str | None = None
+    conversation_id: str | None = None
     room_id: str | None = None
     department_id: str | None = None
     department_key: str | None = None
     assigned_to: str | None = None
     type: str = "Ticket"
+    task_category_id: str | None = None
     task_category: str | None = None
     item_description: str = Field(min_length=2)
-    source: str = "dashboard"
+    source: str = "DASHBOARD"
+    followers: list[str] = Field(default_factory=list)
     priority: int = Field(default=2, ge=1, le=5)
 
 
@@ -23,24 +27,77 @@ class TicketStageUpdate(BaseModel):
     note: str | None = None
 
 
+class TicketUpdate(BaseModel):
+    guest_id: str | None = None
+    reservation_id: str | None = None
+    conversation_id: str | None = None
+    room_id: str | None = None
+    department_id: str | None = None
+    department_key: str | None = None
+    assigned_to: str | None = None
+    type: str | None = Field(default=None, min_length=2, max_length=40)
+    task_category_id: str | None = None
+    task_category: str | None = None
+    item_description: str | None = Field(default=None, min_length=2)
+    source: str | None = None
+    followers: list[str] | None = None
+    priority: int | None = Field(default=None, ge=1, le=5)
+
+
+class TicketRejectRequest(BaseModel):
+    reason: str | None = Field(default=None, max_length=255)
+
+
 class TicketRead(ORMModel):
     id: str
     ticket_code: str
     hotel_id: str
     guest_id: str | None = None
+    reservation_id: str | None = None
+    conversation_id: str | None = None
     room_id: str | None = None
     department_id: str | None = None
     assigned_to: str | None = None
+    assigned_to_name: str | None = None
+    room_number: str | None = None
+    guest_name: str | None = None
+    reservation_no: str | None = None
     stage: str
     type: str
+    task_category_id: str | None = None
     task_category: str | None = None
+    task_category_name: str | None = None
     item_description: str
     source: str
+    followers: list[str]
     priority: int
     sla_due_at: datetime | None = None
     resolved_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
+
+
+class TicketListItem(TicketRead):
+    pass
+
+
+class TicketDetail(TicketRead):
+    pass
+
+
+class EscalatedTicketRead(BaseModel):
+    escalation_id: str
+    ticket_id: str
+    rule_id: str
+    escalation_level: int
+    escalated_from: str | None = None
+    escalated_from_name: str | None = None
+    escalated_to: str | None = None
+    escalated_to_name: str | None = None
+    reason: str
+    notes: str | None = None
+    escalated_at: datetime
+    ticket: TicketRead
 
 
 class TicketAcceptanceRead(ORMModel):
@@ -52,6 +109,7 @@ class TicketAcceptanceRead(ORMModel):
     responded_at: datetime | None = None
     auto_expired: bool
     expire_after_minutes: int
+    rejection_reason: str | None = None
 
 
 class TicketEventRead(ORMModel):
@@ -61,4 +119,31 @@ class TicketEventRead(ORMModel):
     actor_id: str | None = None
     event_type: str
     payload: dict
+    created_at: datetime
+
+
+class TicketMessageCreate(BaseModel):
+    content: str = Field(min_length=1, max_length=2000)
+    sender_type: str = Field(default="staff", max_length=40)
+
+
+class TicketMessageRead(ORMModel):
+    id: str
+    hotel_id: str
+    ticket_id: str
+    sender_type: str
+    sender_id: str | None = None
+    content: str
+    is_read: bool = False
+    created_at: datetime
+
+
+class TicketTimelineItem(BaseModel):
+    id: str
+    item_type: str
+    event_type: str | None = None
+    sender_type: str | None = None
+    sender_id: str | None = None
+    content: str
+    payload: dict | None = None
     created_at: datetime

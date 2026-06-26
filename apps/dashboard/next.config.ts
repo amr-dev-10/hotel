@@ -1,0 +1,19 @@
+import type { NextConfig } from "next";
+import path from "node:path";
+
+const apiProxyTarget = process.env.API_PROXY_TARGET ?? process.env.API_INTERNAL_BASE_URL ?? "http://localhost:8000";
+
+const nextConfig: NextConfig = {
+  reactStrictMode: true,
+  outputFileTracingRoot: path.join(process.cwd(), "../.."),
+  async rewrites() {
+    return [
+      {
+        source: "/api/v1/:path*",
+        destination: `${apiProxyTarget}/api/v1/:path*`,
+      },
+    ];
+  },
+};
+
+export default nextConfig;

@@ -125,6 +125,7 @@ class BotService:
                 direction="outbound",
                 message_type=reply["kind"],
                 text=reply.get("text"),
+                ticket_id=ticket_id,
             )
         self.db.commit()
         return {
@@ -178,13 +179,18 @@ class BotService:
         messages: dict[str, str],
         replies: list[dict[str, Any]],
     ) -> None:
-        guest = self.guests.find_active_by_phone(hotel_id, session.phone)
+        guest = self.guests.find_by_phone(hotel_id, session.phone)
         if guest:
             session.guest_id = guest.id
-            session.room_id = self._current_room_id_for_guest(hotel_id, guest.id)
-            session.state = "active"
-            replies.append(self._text(messages.get("active_welcome", "Welcome, {guest_name}.").format(guest_name=guest.name)))
-            replies.append(self._main_menu(guest.name))
+            room_id = self._current_room_id_for_guest(hotel_id, guest.id)
+            if room_id:
+                session.room_id = room_id
+                session.state = "active"
+                replies.append(self._text(messages.get("active_welcome", "Welcome back, {guest_name}.").format(guest_name=guest.name)))
+                replies.append(self._main_menu(guest.name))
+            else:
+                session.state = "live_chat"
+                replies.append(self._text(f"Hello {guest.name}, welcome to {hotel_name}. A staff member will be with you shortly."))
             return
 
         session.state = "awaiting_name"
@@ -435,6 +441,7 @@ class BotService:
             session,
             {
                 "department_key": "front_office",
+                "category_key": "guest_request",
                 "item": text.strip() or "Guest query",
                 "priority": 2,
             },
@@ -495,14 +502,18 @@ class BotService:
         if form_responses:
             details = ", ".join(f"{key}: {value}" for key, value in form_responses.items())
             description = f"{description} ({details})"
+        conversation = self.conversations.get_or_create(hotel_id, session.phone, session.guest_id)
         ticket = self.ticket_service.create_ticket(
             hotel_id,
             TicketCreate(
                 guest_id=session.guest_id,
+                reservation_id=self._active_reservation_id(hotel_id, session.guest_id),
+                conversation_id=conversation.id,
                 room_id=session.room_id,
                 department_key=service.get("department_key"),
+                task_category=service.get("category_key") or service.get("task_category") or self._category_key_for_service(service),
                 item_description=description,
-                source="whatsapp",
+                source="WHATSAPP",
                 type="Ticket",
                 priority=int(service.get("priority") or 2),
             ),
@@ -518,6 +529,31 @@ class BotService:
             )
         )
         return ticket.id
+
+    def _category_key_for_service(self, service: dict[str, Any]) -> str | None:
+        service_id = service.get("id")
+        if service_id:
+            mapped = {
+                "extra_towels": "towel_request",
+                "drinking_water": "drinking_water",
+                "extra_pillows": "extra_pillow",
+                "ac_not_working": "ac_repair",
+                "tv_not_working": "tv_repair",
+                "plumbing_issue": "plumbing",
+                "taxi_cab": "taxi_booking",
+            }.get(service_id)
+            if mapped:
+                return mapped
+        department_key = service.get("department_key")
+        if department_key == "front_office":
+            return "guest_request"
+        if department_key == "housekeeping":
+            return "housekeeping"
+        if department_key == "engineering":
+            return "maintenance"
+        if department_key == "food_beverage":
+            return "room_service"
+        return None
 
     def _send_my_requests(
         self,
@@ -608,23 +644,44 @@ class BotService:
         session: WhatsAppSession,
         direction: str,
         message_type: str,
-        text: str | None,
+        text: str | None = None,
+        interactive_id: str | None = None,
+        ticket_id: str | None = None,
     ) -> None:
         conversation = self.conversations.get_or_create(hotel_id, session.phone, session.guest_id)
-        self.db.add(
-            WhatsAppMessage(
-                hotel_id=hotel_id,
-                conversation_id=conversation.id,
-                direction=direction,
-                message_type=message_type,
-                message_text=text,
-                status="sent",
-                created_at=utcnow(),
-            )
+        if direction == "inbound" and conversation.status == "resolved":
+            conversation.status = "open"
+            conversation.resolved_at = None
+        
+        message = WhatsAppMessage(
+            hotel_id=hotel_id,
+            conversation_id=conversation.id,
+            reservation_id=self._active_reservation_id(hotel_id, session.guest_id),
+            ticket_id=ticket_id,
+            direction=direction,
+            message_type=message_type,
+            message_text=text,
+            status="received" if direction == "inbound" else "sent",
+            created_at=utcnow(),
         )
+        self.db.add(message)
         ConversationWindowService(self.db).track_message(
             hotel_id,
             session.phone,
             category="service",
             commit=False,
         )
+
+    def _active_reservation_id(self, hotel_id: str, guest_id: str | None) -> str | None:
+        if not guest_id:
+            return None
+        reservation = self.reservations.db.execute(
+            select(Reservation)
+            .where(
+                Reservation.hotel_id == hotel_id,
+                Reservation.guest_id == guest_id,
+                Reservation.status.in_(["checked_in", "pre_arrival", "confirmed"]),
+            )
+            .order_by(Reservation.checkin_date.desc())
+        ).scalars().first()
+        return reservation.id if reservation else None

@@ -52,10 +52,19 @@ class BaseRepository(Generic[ModelT]):
             self.db.refresh(instance)
         return instance
 
-    def soft_delete(self, instance: ModelT, deleted_at: datetime) -> ModelT:
+    def soft_delete(
+        self,
+        instance: ModelT,
+        deleted_at: datetime,
+        deleted_by: str | None = None,
+    ) -> ModelT:
         if not hasattr(instance, "deleted_at"):
             self.db.delete(instance)
         else:
             instance.deleted_at = deleted_at
+            if hasattr(instance, "is_deleted"):
+                instance.is_deleted = True
+            if deleted_by and hasattr(instance, "deleted_by"):
+                instance.deleted_by = deleted_by
         self.db.commit()
         return instance

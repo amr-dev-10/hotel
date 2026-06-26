@@ -25,6 +25,8 @@ class NotificationCreate(BaseModel):
     channel: str = "websocket"
     title: str = Field(min_length=1, max_length=180)
     message: str = Field(min_length=1)
+    notification_type: str = "general"
+    reference_id: str | None = None
     metadata: dict = Field(default_factory=dict)
 
 
@@ -36,6 +38,8 @@ class NotificationRead(ORMModel):
     title: str
     message: str
     status: str
+    notification_type: str
+    reference_id: str | None = None
     metadata: dict = Field(default_factory=dict, validation_alias="metadata_json")
     read_at: datetime | None = None
     created_at: datetime

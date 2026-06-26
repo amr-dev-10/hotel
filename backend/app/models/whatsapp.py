@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, ForeignKey, Integer, JSON, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, JSON, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -79,12 +79,21 @@ class WhatsAppConversation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "whatsapp_conversations"
     __table_args__ = (
         UniqueConstraint("hotel_id", "guest_id", name="uq_whatsapp_conversation_guest"),
+        Index("ix_wa_conv_hotel_phone", "hotel_id", "phone"),
+        Index("ix_wa_conv_hotel_last_msg", "hotel_id", "last_message_at", "id"),
+        Index("ix_wa_conv_hotel_status", "hotel_id", "status"),
     )
 
     hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
     guest_id: Mapped[str | None] = mapped_column(ForeignKey("guests.id"))
     phone: Mapped[str] = mapped_column(String(40), index=True)
     status: Mapped[str] = mapped_column(String(40), default="open")
+    priority: Mapped[str] = mapped_column(String(40), default="normal")
+    assigned_staff_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
+    assigned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    resolved_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
+    unread_count: Mapped[int] = mapped_column(Integer, default=0)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     last_message_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
@@ -95,6 +104,14 @@ class WhatsAppMessage(UUIDPrimaryKeyMixin, Base):
     hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
     conversation_id: Mapped[str] = mapped_column(
         ForeignKey("whatsapp_conversations.id"),
+        index=True,
+    )
+    reservation_id: Mapped[str | None] = mapped_column(
+        ForeignKey("reservations.id"),
+        index=True,
+    )
+    ticket_id: Mapped[str | None] = mapped_column(
+        ForeignKey("tickets.id"),
         index=True,
     )
     direction: Mapped[str] = mapped_column(String(20))

@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 
-from app.core.exceptions import bad_request, forbidden, not_found
+from app.core.exceptions import bad_request, not_found
 from app.models.ticket import Ticket
 from app.models.workflow import WorkflowDefinition, WorkflowState, WorkflowTransition
 from app.repositories.ticket_repository import TicketRepository
@@ -89,10 +89,8 @@ class WorkflowService:
         required_permission = (
             transition.required_permission if transition else target_state.required_permission
         )
-        if required_permission and actor and not actor.is_hotel_owner:
-            permissions = RBACService(self.db).permission_codes_for_user(actor)
-            if required_permission not in permissions:
-                raise forbidden(f"Missing permission: {required_permission}")
+        if required_permission and actor:
+            RBACService(self.db).require(actor, required_permission)
         old_stage = ticket.stage
         ticket.stage = target_state.state_key
         if target_state.state_type == "terminal":

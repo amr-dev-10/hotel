@@ -1,11 +1,13 @@
 from collections.abc import Sequence
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.base import utcnow
-from app.models.ticket import Ticket, TicketEvent
+from app.models.department import Department
+from app.models.ticket import Ticket, TicketEvent, TicketMessage
 from app.repositories.base import BaseRepository
+from app.repositories.pagination import CursorResult, apply_created_at_cursor, paginate_created_at_desc
 
 
 class TicketRepository(BaseRepository[Ticket]):
@@ -21,6 +23,166 @@ class TicketRepository(BaseRepository[Ticket]):
                 Ticket.deleted_at.is_(None),
             )
         ).scalars().all()
+
+    def list_filtered(
+        self,
+        hotel_id: str,
+        guest_id: str | None = None,
+        reservation_id: str | None = None,
+        conversation_id: str | None = None,
+        stage: str | None = None,
+        priority: int | None = None,
+        assigned_to: str | None = None,
+        department_key: str | None = None,
+        sla_status: str | None = None,
+        q: str | None = None,
+        visibility_scope: str = "all",
+        visibility_user_id: str | None = None,
+        visibility_department_id: str | None = None,
+        limit: int = 50,
+        cursor: str | None = None,
+    ) -> CursorResult[Ticket]:
+        statement = self._filtered_statement(
+            hotel_id,
+            guest_id=guest_id,
+            reservation_id=reservation_id,
+            conversation_id=conversation_id,
+            stage=stage,
+            priority=priority,
+            assigned_to=assigned_to,
+            department_key=department_key,
+            sla_status=sla_status,
+            q=q,
+            visibility_scope=visibility_scope,
+            visibility_user_id=visibility_user_id,
+            visibility_department_id=visibility_department_id,
+        )
+        statement = apply_created_at_cursor(statement, Ticket, cursor)
+        rows = (
+            self.db.execute(
+                statement.order_by(Ticket.created_at.desc(), Ticket.id.desc()).limit(limit + 1)
+            )
+            .scalars()
+            .all()
+        )
+        return paginate_created_at_desc(rows, limit)
+
+    def count_filtered(
+        self,
+        hotel_id: str,
+        guest_id: str | None = None,
+        reservation_id: str | None = None,
+        conversation_id: str | None = None,
+        stage: str | None = None,
+        priority: int | None = None,
+        assigned_to: str | None = None,
+        department_key: str | None = None,
+        sla_status: str | None = None,
+        q: str | None = None,
+        visibility_scope: str = "all",
+        visibility_user_id: str | None = None,
+        visibility_department_id: str | None = None,
+    ) -> int:
+        statement = self._filtered_statement(
+            hotel_id,
+            guest_id=guest_id,
+            reservation_id=reservation_id,
+            conversation_id=conversation_id,
+            stage=stage,
+            priority=priority,
+            assigned_to=assigned_to,
+            department_key=department_key,
+            sla_status=sla_status,
+            q=q,
+            visibility_scope=visibility_scope,
+            visibility_user_id=visibility_user_id,
+            visibility_department_id=visibility_department_id,
+        )
+        return self.db.execute(
+            select(func.count()).select_from(statement.order_by(None).subquery())
+        ).scalar_one()
+
+    def _filtered_statement(
+        self,
+        hotel_id: str,
+        guest_id: str | None = None,
+        reservation_id: str | None = None,
+        conversation_id: str | None = None,
+        stage: str | None = None,
+        priority: int | None = None,
+        assigned_to: str | None = None,
+        department_key: str | None = None,
+        sla_status: str | None = None,
+        q: str | None = None,
+        visibility_scope: str = "all",
+        visibility_user_id: str | None = None,
+        visibility_department_id: str | None = None,
+    ):
+        statement = select(Ticket).where(
+            Ticket.hotel_id == hotel_id,
+            Ticket.deleted_at.is_(None),
+        )
+        if visibility_scope == "own":
+            if not visibility_user_id:
+                statement = statement.where(Ticket.id == "__no_visible_tickets__")
+            else:
+                statement = statement.where(
+                    or_(
+                        Ticket.assigned_to == visibility_user_id,
+                        Ticket.followers.contains([visibility_user_id]),
+                    )
+                )
+        elif visibility_scope == "department":
+            if not visibility_department_id:
+                statement = statement.where(Ticket.id == "__no_visible_tickets__")
+            else:
+                statement = statement.where(Ticket.department_id == visibility_department_id)
+        elif visibility_scope != "all":
+            statement = statement.where(Ticket.id == "__no_visible_tickets__")
+        if guest_id:
+            statement = statement.where(Ticket.guest_id == guest_id)
+        if reservation_id:
+            statement = statement.where(Ticket.reservation_id == reservation_id)
+        if conversation_id:
+            statement = statement.where(Ticket.conversation_id == conversation_id)
+        if stage:
+            stage_aliases = {
+                "created": ("created", "Open"),
+                "accepted": ("accepted", "reopened"),
+                "approved": ("approved", "Completed"),
+            }
+            statement = statement.where(Ticket.stage.in_(stage_aliases.get(stage, (stage,))))
+        if priority:
+            statement = statement.where(Ticket.priority == priority)
+        if assigned_to == "unassigned":
+            statement = statement.where(Ticket.assigned_to.is_(None))
+        elif assigned_to:
+            statement = statement.where(Ticket.assigned_to == assigned_to)
+        if department_key:
+            statement = statement.join(Department, Ticket.department_id == Department.id).where(
+                Department.hotel_id == hotel_id,
+                Department.key == department_key,
+                Department.deleted_at.is_(None),
+            )
+        if sla_status == "breached":
+            statement = statement.where(
+                Ticket.sla_due_at.is_not(None),
+                Ticket.sla_due_at < utcnow(),
+                Ticket.stage.not_in(("approved", "Completed", "Cancelled", "closed", "resolved")),
+            )
+        if q:
+            pattern = f"%{q.strip()}%"
+            statement = statement.where(
+                or_(
+                    Ticket.ticket_code.ilike(pattern),
+                    Ticket.item_description.ilike(pattern),
+                    Ticket.stage.ilike(pattern),
+                    Ticket.room_id.ilike(pattern),
+                    Ticket.assigned_to.ilike(pattern),
+                    Ticket.source.ilike(pattern),
+                )
+            )
+        return statement
 
     def list_unresolved(self, hotel_id: str | None = None) -> Sequence[Ticket]:
         terminal = (
@@ -70,3 +232,18 @@ class TicketRepository(BaseRepository[Ticket]):
             self.db.commit()
             self.db.refresh(event)
         return event
+
+
+class TicketMessageRepository(BaseRepository[TicketMessage]):
+    def __init__(self, db: Session) -> None:
+        super().__init__(db, TicketMessage)
+
+    def list_for_ticket(self, hotel_id: str, ticket_id: str) -> Sequence[TicketMessage]:
+        return self.db.execute(
+            select(TicketMessage)
+            .where(
+                TicketMessage.hotel_id == hotel_id,
+                TicketMessage.ticket_id == ticket_id,
+            )
+            .order_by(TicketMessage.created_at)
+        ).scalars().all()

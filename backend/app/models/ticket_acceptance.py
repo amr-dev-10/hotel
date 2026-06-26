@@ -17,3 +17,4 @@ class TicketAcceptance(UUIDPrimaryKeyMixin, Base):
     responded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     auto_expired: Mapped[bool] = mapped_column(Boolean, default=False)
     expire_after_minutes: Mapped[int] = mapped_column(Integer, default=2)
+    rejection_reason: Mapped[str | None] = mapped_column(String(255))

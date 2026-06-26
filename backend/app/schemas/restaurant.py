@@ -38,7 +38,22 @@ class RestaurantOrderCreate(BaseModel):
     folio_id: str | None = None
     special_instructions: str | None = None
     tax: Decimal = Decimal("0")
+    ordered_by_guest: bool = False
     items: list[RestaurantOrderItemCreate] = Field(default_factory=list)
+
+
+class RestaurantOrderUpdate(BaseModel):
+    source: str | None = None
+    table_id: str | None = None
+    guest_id: str | None = None
+    room_id: str | None = None
+    ticket_id: str | None = None
+    folio_id: str | None = None
+    special_instructions: str | None = None
+    tax: Decimal | None = None
+    ordered_by_guest: bool | None = None
+    status: str | None = None
+    items: list[RestaurantOrderItemCreate] | None = None
 
 
 class RestaurantOrderRead(ORMModel):
@@ -51,6 +66,7 @@ class RestaurantOrderRead(ORMModel):
     room_id: str | None = None
     ticket_id: str | None = None
     folio_id: str | None = None
+    ordered_by_guest: bool
     status: str
     subtotal: Decimal
     tax: Decimal
@@ -75,3 +91,8 @@ class RestaurantOrderItemRead(ORMModel):
 
 class RestaurantOrderStatusUpdate(BaseModel):
     status: str
+
+
+class RestaurantOrderDetail(BaseModel):
+    order: RestaurantOrderRead
+    items: list[RestaurantOrderItemRead]

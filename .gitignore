@@ -1,6 +1,12 @@
 node_modules/
 dist/
+.next/
+out/
+coverage/
+.turbo/
 .env
+apps/dashboard/.env.local
+apps/dashboard/next-dev*.log
 backend/.env
 .venv/
 __pycache__/
@@ -11,3 +17,11 @@ __pycache__/
 npm-debug.log*
 backend/uvicorn.pid
 backend/uvicorn.*.log
+.codex-run/
+.venv-win
+count_line_of_code.py
+gha-creds-*.json
+github-variables.txt
+github-secrets.txt
+bootstrap-summary.txt
+secret-manager-summary.txt

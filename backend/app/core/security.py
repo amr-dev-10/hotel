@@ -41,6 +41,26 @@ def create_access_token(
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
+def create_platform_access_token(
+    subject: str,
+    claims: dict[str, Any] | None = None,
+    expires_delta: timedelta | None = None,
+) -> str:
+    now = datetime.now(UTC)
+    expire = now + (
+        expires_delta or timedelta(minutes=settings.access_token_expire_minutes)
+    )
+    payload: dict[str, Any] = {
+        "sub": subject,
+        "scope": "platform",
+        "iat": int(now.timestamp()),
+        "exp": int(expire.timestamp()),
+    }
+    if claims:
+        payload.update(claims)
+    return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+
+
 def decode_access_token(token: str) -> dict[str, Any]:
     try:
         return jwt.decode(

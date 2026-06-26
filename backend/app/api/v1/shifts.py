@@ -1,12 +1,15 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import require_permission
+from app.api.dependencies import require_any_permission, require_permission
 from app.core.database import get_db
+from app.core.exceptions import forbidden, not_found
+from app.core.permissions import Permissions
 from app.core.responses import ok
 from app.models.user import User
 from app.repositories.staff_repository import EmployeeShiftRepository
 from app.schemas.staff import ShiftBulkCreate, ShiftCreate, ShiftRead, ShiftUpdate
+from app.services.rbac_service import RBACService
 from app.services.staff_service import ShiftService
 
 router = APIRouter()
@@ -16,9 +19,24 @@ router = APIRouter()
 def list_shifts(
     hotel_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("shift.manage")),
+    current_user: User = Depends(
+        require_any_permission(
+            Permissions.SHIFT_MANAGE,
+            Permissions.SHIFT_VIEW,
+            Permissions.SHIFT_VIEW_DEPT,
+            Permissions.SHIFT_VIEW_OWN,
+            Permissions.SHIFT_UPDATE,
+            Permissions.SHIFT_UPDATE_OWN,
+        )
+    ),
 ) -> dict:
-    shifts = EmployeeShiftRepository(db).list_for_hotel(hotel_id)
+    visibility_scope = RBACService(db).shift_visibility_scope(current_user)
+    shifts = EmployeeShiftRepository(db).list_visible(
+        hotel_id,
+        visibility_scope,
+        user_id=current_user.id,
+        department_id=current_user.department_id,
+    )
     return ok([ShiftRead.model_validate(item).model_dump() for item in shifts])
 
 
@@ -50,7 +68,17 @@ def update_shift(
     shift_id: str,
     payload: ShiftUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("shift.manage")),
+    current_user: User = Depends(require_any_permission(Permissions.SHIFT_MANAGE, Permissions.SHIFT_UPDATE, Permissions.SHIFT_UPDATE_OWN)),
 ) -> dict:
+    rbac = RBACService(db)
+    if not rbac.has_any(current_user, [Permissions.SHIFT_MANAGE]):
+        shift = EmployeeShiftRepository(db).get_for_hotel(hotel_id, shift_id)
+        if not shift:
+            raise not_found("Shift not found")
+        scope = rbac.permission_scope(current_user, Permissions.SHIFT_UPDATE)
+        can_update_department = scope == "department" and current_user.department_id and shift.department_id == current_user.department_id
+        can_update_own = scope == "own" and shift.user_id == current_user.id
+        if scope != "hotel" and not can_update_department and not can_update_own:
+            raise forbidden("Shift is outside your access scope")
     shift = ShiftService(db).update(hotel_id, shift_id, payload, current_user.id)
     return ok(ShiftRead.model_validate(shift).model_dump())

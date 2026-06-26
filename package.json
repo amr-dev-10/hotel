@@ -1,0 +1,11 @@
+{
+  "name": "arcadia-hotel-platform",
+  "private": true,
+  "packageManager": "pnpm@10.13.1",
+  "scripts": {
+    "dev:dashboard": "pnpm --filter @arcadia/dashboard dev",
+    "build:dashboard": "pnpm --filter @arcadia/dashboard build",
+    "lint:dashboard": "pnpm --filter @arcadia/dashboard lint",
+    "typecheck:dashboard": "pnpm --filter @arcadia/dashboard typecheck"
+  }
+}

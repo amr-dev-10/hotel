@@ -2,20 +2,26 @@ from datetime import timedelta
 from uuid import uuid4
 
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 
 from app.core.exceptions import bad_request, not_found
+from app.models.guest import Guest
+from app.models.reservation import Reservation
 from app.models.base import utcnow
-from app.models.ticket import Ticket
+from app.models.room import Room
+from app.models.ticket import Ticket, TicketEvent, TicketMessage
 from app.models.user import User
+from app.models.whatsapp import WhatsAppConversation
 from app.repositories.bot_config_repository import BotConfigRepository
 from app.repositories.department_repository import DepartmentRepository
 from app.repositories.knowledge_repository import DepartmentConfigRepository
 from app.repositories.routing_rule_repository import RoutingRuleRepository
+from app.repositories.ticket_category_repository import TicketCategoryRepository
 from app.repositories.ticket_acceptance_repository import TicketAcceptanceRepository
-from app.repositories.ticket_repository import TicketRepository
+from app.repositories.ticket_repository import TicketMessageRepository, TicketRepository
 from app.repositories.user_repository import UserRepository
 from app.repositories.workflow_repository import WorkflowDefinitionRepository, WorkflowStateRepository
-from app.schemas.ticket import TicketCreate
+from app.schemas.ticket import TicketCreate, TicketMessageCreate, TicketTimelineItem, TicketUpdate
 from app.schemas.ops import NotificationCreate
 from app.services.audit_service import AuditService
 from app.services.hierarchy_service import HierarchyService
@@ -32,10 +38,12 @@ class TicketService:
     def __init__(self, db: Session) -> None:
         self.db = db
         self.tickets = TicketRepository(db)
+        self.ticket_messages = TicketMessageRepository(db)
         self.departments = DepartmentRepository(db)
         self.users = UserRepository(db)
         self.acceptances = TicketAcceptanceRepository(db)
         self.routing_rules = RoutingRuleRepository(db)
+        self.categories = TicketCategoryRepository(db)
         self.workflow_definitions = WorkflowDefinitionRepository(db)
         self.workflow_states = WorkflowStateRepository(db)
         self.bot_configs = BotConfigRepository(db)
@@ -54,8 +62,12 @@ class TicketService:
         commit: bool = True,
     ) -> Ticket:
         UsageService(self.db).check_and_increment(hotel_id, "tickets", commit=False)
+        self._validate_context(hotel_id, payload)
+        category = self._resolve_category(hotel_id, payload.task_category_id, payload.task_category)
         department = None
-        if payload.department_id:
+        if category and category.department_id:
+            department = self.departments.get_for_hotel(hotel_id, category.department_id)
+        if not department and payload.department_id:
             department = self.departments.get_for_hotel(hotel_id, payload.department_id)
         if not department and payload.department_key:
             department = self.departments.get_by_key(hotel_id, payload.department_key)
@@ -93,19 +105,29 @@ class TicketService:
 
         initial_stage = self._initial_ticket_stage(hotel_id)
         uses_acceptance = bool(assignee and self._supports_state(hotel_id, "pending_accept"))
-        sla_config = self.slas.get_sla_config(hotel_id, department.id, payload.task_category)
+        task_category = category.key if category else payload.task_category
+        sla_config = self.slas.get_sla_config(
+            hotel_id,
+            department.id,
+            task_category,
+            category.id if category else None,
+        )
         ticket = Ticket(
             hotel_id=hotel_id,
             ticket_code=self._ticket_code(),
             guest_id=payload.guest_id,
+            reservation_id=payload.reservation_id,
+            conversation_id=payload.conversation_id,
             room_id=payload.room_id,
             department_id=department.id,
             assigned_to=None if uses_acceptance else (assignee.id if assignee else None),
             stage=initial_stage,
             type=payload.type,
-            task_category=payload.task_category,
+            task_category_id=category.id if category else None,
+            task_category=task_category,
             item_description=payload.item_description,
-            source=payload.source,
+            source=self._normalize_source(payload.source),
+            followers=list(dict.fromkeys([*payload.followers, *([assignee.id] if assignee else [])])),
             priority=(routing_rule.priority_override if fast_tracked and routing_rule and routing_rule.priority_override else payload.priority),
             sla_due_at=None if uses_acceptance else now + timedelta(minutes=sla_config.sla_minutes),
         )
@@ -115,10 +137,14 @@ class TicketService:
             ticket,
             "created",
             {
-                "source": payload.source,
+                "source": ticket.source,
+                "guest_id": payload.guest_id,
+                "reservation_id": payload.reservation_id,
+                "conversation_id": payload.conversation_id,
                 "item_description": payload.item_description,
                 "priority": payload.priority,
-                "task_category": payload.task_category,
+                "task_category": task_category,
+                "task_category_id": category.id if category else None,
             },
             actor_id=actor_id,
         )
@@ -134,8 +160,14 @@ class TicketService:
                 },
                 actor_id=actor_id,
             )
-        if assignee and uses_acceptance:
-            self.offer_ticket(ticket.id, assignee.id, actor_id=actor_id, commit=False)
+        if ticket.assigned_to is None:
+            from app.services.dispatch_service import DispatchService
+
+            DispatchService(self.db).dispatch_ticket(
+                ticket,
+                preferred_user_id=assignee.id if assignee else None,
+                commit=False,
+            )
         elif assignee:
             self.tickets.add_event(
                 ticket,
@@ -186,6 +218,66 @@ class TicketService:
             self._publish_created(ticket, assignee_name=assignee.name if assignee else None)
         return ticket
 
+    def list_messages(self, hotel_id: str, ticket_id: str) -> list[TicketMessage]:
+        self._get_ticket(hotel_id, ticket_id)
+        return list(self.ticket_messages.list_for_ticket(hotel_id, ticket_id))
+
+    def create_message(
+        self,
+        hotel_id: str,
+        ticket_id: str,
+        payload: TicketMessageCreate,
+        actor_id: str | None,
+    ) -> TicketMessage:
+        ticket = self._get_ticket(hotel_id, ticket_id)
+        message = TicketMessage(
+            hotel_id=hotel_id,
+            ticket_id=ticket.id,
+            sender_type=payload.sender_type,
+            sender_id=actor_id,
+            content=payload.content,
+            is_read=False,
+            created_at=utcnow(),
+        )
+        self.db.add(message)
+        self.db.commit()
+        self.db.refresh(message)
+        return message
+
+    def timeline(self, hotel_id: str, ticket_id: str) -> list[TicketTimelineItem]:
+        self._get_ticket(hotel_id, ticket_id)
+        events = self.db.execute(
+            select(TicketEvent).where(
+                TicketEvent.hotel_id == hotel_id,
+                TicketEvent.ticket_id == ticket_id,
+            )
+        ).scalars().all()
+        messages = self.ticket_messages.list_for_ticket(hotel_id, ticket_id)
+        items = [
+            TicketTimelineItem(
+                id=event.id,
+                item_type="event",
+                event_type=event.event_type,
+                content=self._event_label(event.event_type),
+                payload=event.payload,
+                created_at=event.created_at,
+            )
+            for event in events
+        ]
+        items.extend(
+            TicketTimelineItem(
+                id=message.id,
+                item_type="message",
+                sender_type=message.sender_type,
+                sender_id=message.sender_id,
+                content=message.content,
+                payload=None,
+                created_at=message.created_at,
+            )
+            for message in messages
+        )
+        return sorted(items, key=lambda item: item.created_at)
+
     def offer_ticket(
         self,
         ticket_id: str,
@@ -204,7 +296,12 @@ class TicketService:
             current.response = "expired"
             current.auto_expired = True
             current.responded_at = utcnow()
-        config = self.slas.get_sla_config(ticket.hotel_id, ticket.department_id, ticket.task_category)
+        config = self.slas.get_sla_config(
+            ticket.hotel_id,
+            ticket.department_id,
+            ticket.task_category,
+            ticket.task_category_id,
+        )
         acceptance = TicketAcceptance(
             ticket_id=ticket.id,
             offered_to=offered_to,
@@ -249,46 +346,14 @@ class TicketService:
         return acceptance
 
     def accept_ticket(self, hotel_id: str, ticket_id: str, user_id: str) -> Ticket:
-        ticket = self._get_ticket(hotel_id, ticket_id)
-        acceptance = self.acceptances.update_response(ticket.id, user_id, "accepted", utcnow())
-        if not acceptance and ticket.assigned_to != user_id:
-            raise bad_request("Ticket is not pending acceptance for this user")
-        config = self.slas.get_sla_config(hotel_id, ticket.department_id, ticket.task_category)
-        ticket.assigned_to = user_id
-        ticket.stage = "accepted"
-        ticket.sla_due_at = utcnow() + timedelta(minutes=config.sla_minutes)
-        self.tickets.add_event(
-            ticket,
-            "accepted",
-            {"accepted_by": user_id, "sla_minutes": config.sla_minutes},
-            actor_id=user_id,
-        )
-        self.audit.log(
-            hotel_id,
-            "ticket.accepted",
-            "ticket",
-            ticket.id,
-            user_id,
-            {"sla_due_at": ticket.sla_due_at.isoformat() if ticket.sla_due_at else None},
-        )
-        self.db.commit()
-        self.db.refresh(ticket)
-        self.notifications.publish_ticket_event(
-            hotel_id,
-            {"event": "ticket.accepted", "ticket_id": ticket.id, "accepted_by": user_id},
-        )
-        return ticket
+        from app.services.dispatch_service import DispatchService
 
-    def reject_ticket(self, hotel_id: str, ticket_id: str, user_id: str) -> Ticket:
-        ticket = self._get_ticket(hotel_id, ticket_id)
-        acceptance = self.acceptances.update_response(ticket.id, user_id, "rejected", utcnow())
-        if not acceptance and ticket.assigned_to != user_id:
-            raise bad_request("Ticket is not pending acceptance for this user")
-        self.tickets.add_event(ticket, "rejected", {"rejected_by": user_id}, actor_id=user_id)
-        self._offer_next_after_decline(ticket, user_id, actor_id=user_id)
-        self.db.commit()
-        self.db.refresh(ticket)
-        return ticket
+        return DispatchService(self.db).handle_acceptance(hotel_id, ticket_id, user_id)
+
+    def reject_ticket(self, hotel_id: str, ticket_id: str, user_id: str, reason: str | None = None) -> Ticket:
+        from app.services.dispatch_service import DispatchService
+
+        return DispatchService(self.db).handle_rejection(hotel_id, ticket_id, user_id, reason)
 
     def complete_ticket(self, hotel_id: str, ticket_id: str, user_id: str) -> Ticket:
         ticket = self._get_ticket(hotel_id, ticket_id)
@@ -340,26 +405,11 @@ class TicketService:
         return ticket
 
     def expire_pending_acceptances(self) -> list[Ticket]:
-        expired_tickets: list[Ticket] = []
-        now = utcnow()
-        for acceptance in self.acceptances.pending_due(now):
-            ticket = self.tickets.get(acceptance.ticket_id)
-            if not ticket:
-                continue
-            acceptance.response = "expired"
-            acceptance.auto_expired = True
-            acceptance.responded_at = now
-            self.tickets.add_event(
-                ticket,
-                "acceptance_expired",
-                {"offered_to": acceptance.offered_to},
-                actor_id=acceptance.offered_to,
-            )
-            self._offer_next_after_decline(ticket, acceptance.offered_to, actor_id=acceptance.offered_to)
-            expired_tickets.append(ticket)
-        if expired_tickets:
-            self.db.commit()
-        return expired_tickets
+        from app.services.dispatch_service import DispatchService
+
+        logs = DispatchService(self.db).check_expired_offers()
+        ticket_ids = {log.ticket_id for log in logs}
+        return [ticket for ticket_id in ticket_ids if (ticket := self.tickets.get(ticket_id))]
 
     def update_stage(
         self,
@@ -416,6 +466,82 @@ class TicketService:
         )
         return ticket
 
+    def update_ticket(
+        self,
+        hotel_id: str,
+        ticket_id: str,
+        payload: TicketUpdate,
+        actor_id: str | None = None,
+    ) -> Ticket:
+        ticket = self.tickets.get_for_hotel(hotel_id, ticket_id)
+        if not ticket:
+            raise not_found("Ticket not found")
+
+        changes = payload.model_dump(exclude_unset=True)
+        if "department_key" in changes:
+            department_key = changes.pop("department_key")
+            if department_key:
+                department = self.departments.get_by_key(hotel_id, department_key)
+                if not department:
+                    raise not_found("Department not found")
+                changes["department_id"] = department.id
+
+        self._validate_update_context(hotel_id, changes)
+        if "source" in changes and changes["source"]:
+            changes["source"] = self._normalize_source(changes["source"])
+        if "task_category_id" in changes:
+            category = self._resolve_category(hotel_id, changes.get("task_category_id"), changes.get("task_category"))
+            if category:
+                changes["task_category_id"] = category.id
+                changes["task_category"] = category.key
+                changes.setdefault("department_id", category.department_id)
+        elif "task_category" in changes and changes["task_category"]:
+            category = self._resolve_category(hotel_id, None, changes["task_category"])
+            if category:
+                changes["task_category_id"] = category.id
+                changes["task_category"] = category.key
+        if "followers" in changes and changes["followers"] is not None:
+            changes["followers"] = list(dict.fromkeys(changes["followers"]))
+
+        old_payload = {
+            "guest_id": ticket.guest_id,
+            "reservation_id": ticket.reservation_id,
+            "conversation_id": ticket.conversation_id,
+            "room_id": ticket.room_id,
+            "department_id": ticket.department_id,
+            "assigned_to": ticket.assigned_to,
+            "type": ticket.type,
+            "task_category": ticket.task_category,
+            "item_description": ticket.item_description,
+            "source": ticket.source,
+            "followers": ticket.followers,
+            "priority": ticket.priority,
+        }
+        for key, value in changes.items():
+            setattr(ticket, key, value)
+
+        self.tickets.add_event(ticket, "updated", {"changes": changes}, actor_id=actor_id)
+        self.audit.log(
+            hotel_id,
+            "ticket.updated",
+            "ticket",
+            ticket.id,
+            actor_id,
+            old_payload=old_payload,
+            new_payload=changes,
+        )
+        self.db.commit()
+        self.db.refresh(ticket)
+        self.notifications.publish_ticket_event(
+            hotel_id,
+            {
+                "event": "ticket.updated",
+                "ticket_id": ticket.id,
+                "changes": list(changes.keys()),
+            },
+        )
+        return ticket
+
     def _sla_minutes(self, hotel_id: str, department_key: str) -> int:
         department = self.departments.get_by_key(hotel_id, department_key)
         if department:
@@ -436,6 +562,87 @@ class TicketService:
         if not ticket:
             raise not_found("Ticket not found")
         return ticket
+
+    def _resolve_category(
+        self,
+        hotel_id: str,
+        category_id: str | None,
+        category_key: str | None,
+    ):
+        if category_id:
+            category = self.categories.get_for_hotel(hotel_id, category_id)
+            if not category or not category.is_active:
+                raise not_found("Ticket category not found")
+            return category
+        if category_key:
+            return self.categories.get_by_key(hotel_id, category_key)
+        return None
+
+    def _validate_context(self, hotel_id: str, payload: TicketCreate) -> None:
+        if payload.guest_id and not self.db.execute(
+            select(Guest.id).where(Guest.hotel_id == hotel_id, Guest.id == payload.guest_id)
+        ).scalar_one_or_none():
+            raise not_found("Guest not found")
+        if payload.reservation_id and not self.db.execute(
+            select(Reservation.id).where(
+                Reservation.hotel_id == hotel_id,
+                Reservation.id == payload.reservation_id,
+                Reservation.deleted_at.is_(None),
+            )
+        ).scalar_one_or_none():
+            raise not_found("Reservation not found")
+        if payload.conversation_id and not self.db.execute(
+            select(WhatsAppConversation.id).where(
+                WhatsAppConversation.hotel_id == hotel_id,
+                WhatsAppConversation.id == payload.conversation_id,
+            )
+        ).scalar_one_or_none():
+            raise not_found("WhatsApp conversation not found")
+
+    def _validate_update_context(self, hotel_id: str, changes: dict) -> None:
+        if changes.get("guest_id") and not self.db.execute(
+            select(Guest.id).where(Guest.hotel_id == hotel_id, Guest.id == changes["guest_id"])
+        ).scalar_one_or_none():
+            raise not_found("Guest not found")
+        if changes.get("reservation_id") and not self.db.execute(
+            select(Reservation.id).where(
+                Reservation.hotel_id == hotel_id,
+                Reservation.id == changes["reservation_id"],
+                Reservation.deleted_at.is_(None),
+            )
+        ).scalar_one_or_none():
+            raise not_found("Reservation not found")
+        if changes.get("conversation_id") and not self.db.execute(
+            select(WhatsAppConversation.id).where(
+                WhatsAppConversation.hotel_id == hotel_id,
+                WhatsAppConversation.id == changes["conversation_id"],
+            )
+        ).scalar_one_or_none():
+            raise not_found("WhatsApp conversation not found")
+        if changes.get("room_id") and not self.db.execute(
+            select(Room.id).where(Room.hotel_id == hotel_id, Room.id == changes["room_id"], Room.deleted_at.is_(None))
+        ).scalar_one_or_none():
+            raise not_found("Room not found")
+        if changes.get("department_id") and not self.departments.get_for_hotel(hotel_id, changes["department_id"]):
+            raise not_found("Department not found")
+        if changes.get("assigned_to") and not self.users.get_for_hotel(hotel_id, changes["assigned_to"]):
+            raise not_found("Assigned user not found")
+
+    def _normalize_source(self, source: str) -> str:
+        normalized = source.strip()
+        mapping = {
+            "dashboard": "DASHBOARD",
+            "whatsapp": "WHATSAPP",
+            "staff": "STAFF",
+            "email": "EMAIL",
+            "phone": "PHONE",
+            "walk_in": "WALK_IN",
+            "walk-in": "WALK_IN",
+        }
+        return mapping.get(normalized.lower(), normalized)
+
+    def _event_label(self, event_type: str) -> str:
+        return event_type.replace("_", " ").replace(".", " ").title()
 
     def _offer_next_after_decline(
         self,
@@ -494,6 +701,8 @@ class TicketService:
                 "department_id": ticket.department_id,
                 "room_id": ticket.room_id,
                 "guest_id": ticket.guest_id,
+                "reservation_id": ticket.reservation_id,
+                "conversation_id": ticket.conversation_id,
                 "item": ticket.item_description,
                 "assigned_to": ticket.assigned_to,
                 "assigned_to_name": assignee_name,

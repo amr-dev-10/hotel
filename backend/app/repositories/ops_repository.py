@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.models.ops import (
@@ -27,18 +27,72 @@ class AuditLogRepository(BaseRepository[AuditLog]):
     def __init__(self, db: Session) -> None:
         super().__init__(db, AuditLog)
 
+    def list_for_hotel(
+        self,
+        hotel_id: str,
+        limit: int = 100,
+        cursor: str | None = None,
+        action: str | None = None,
+        entity: str | None = None,
+        user_id: str | None = None,
+        search: str | None = None,
+    ) -> Sequence[AuditLog]:
+        statement = select(AuditLog).where(AuditLog.hotel_id == hotel_id)
+        if cursor:
+            statement = statement.where(AuditLog.id > cursor)
+        if action:
+            statement = statement.where(AuditLog.action == action)
+        if entity:
+            statement = statement.where(AuditLog.entity == entity)
+        if user_id:
+            statement = statement.where(AuditLog.user_id == user_id)
+        if search:
+            pattern = f"%{search.strip()}%"
+            statement = statement.where(
+                or_(
+                    AuditLog.action.ilike(pattern),
+                    AuditLog.entity.ilike(pattern),
+                    AuditLog.entity_id.ilike(pattern),
+                    AuditLog.user_id.ilike(pattern),
+                    AuditLog.ip_address.ilike(pattern),
+                )
+            )
+        return self.db.execute(statement.order_by(AuditLog.created_at.desc()).limit(limit)).scalars().all()
+
 
 class NotificationRepository(BaseRepository[Notification]):
     def __init__(self, db: Session) -> None:
         super().__init__(db, Notification)
 
-    def list_for_user(self, hotel_id: str, user_id: str) -> Sequence[Notification]:
-        return self.db.execute(
-            select(Notification).where(
-                Notification.hotel_id == hotel_id,
-                Notification.user_id == user_id,
-            )
-        ).scalars().all()
+    def list_for_user(
+        self,
+        hotel_id: str,
+        user_id: str,
+        unread_only: bool = False,
+        limit: int = 50,
+    ) -> Sequence[Notification]:
+        statement = select(Notification).where(
+            Notification.hotel_id == hotel_id,
+            Notification.user_id == user_id,
+        )
+        if unread_only:
+            statement = statement.where(Notification.read_at.is_(None))
+        return self.db.execute(statement.order_by(Notification.created_at.desc()).limit(limit)).scalars().all()
+
+    def list_visible_for_user(
+        self,
+        hotel_id: str,
+        user_id: str,
+        unread_only: bool = False,
+        limit: int = 50,
+    ) -> Sequence[Notification]:
+        statement = select(Notification).where(
+            Notification.hotel_id == hotel_id,
+            or_(Notification.user_id == user_id, Notification.user_id.is_(None)),
+        )
+        if unread_only:
+            statement = statement.where(Notification.read_at.is_(None))
+        return self.db.execute(statement.order_by(Notification.created_at.desc()).limit(limit)).scalars().all()
 
 
 class MediaFileRepository(BaseRepository[MediaFile]):

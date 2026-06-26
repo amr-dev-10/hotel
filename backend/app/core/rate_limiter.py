@@ -2,12 +2,15 @@ from fastapi import HTTPException, Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
+from app.core.config import settings
 from app.core.database import SessionLocal
 from app.services.rate_limit_service import RateLimitService
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
+        if not settings.rate_limit_enabled:
+            return await call_next(request)
         if request.url.path in {"/health", "/docs", "/openapi.json"}:
             return await call_next(request)
         group = self._group(request.url.path)
@@ -26,6 +29,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
     def _group(self, path: str) -> str:
+        if path.endswith("/auth/me"):
+            return "general"
         if "/auth/" in path:
             return "auth"
         if "/tickets" in path:

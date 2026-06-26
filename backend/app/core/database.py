@@ -1,6 +1,8 @@
 from collections.abc import Generator
+from contextvars import ContextVar
+from time import perf_counter
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.core.config import settings
@@ -8,6 +10,12 @@ from app.core.config import settings
 
 class Base(DeclarativeBase):
     pass
+
+
+_query_stats: ContextVar[dict[str, float]] = ContextVar(
+    "query_stats",
+    default={"count": 0.0, "time_ms": 0.0},
+)
 
 
 def _connect_args() -> dict[str, object]:
@@ -21,6 +29,29 @@ engine = create_engine(
     connect_args=_connect_args(),
     pool_pre_ping=not settings.database_url.startswith("sqlite"),
 )
+
+
+@event.listens_for(engine, "before_cursor_execute")
+def _before_cursor_execute(conn, cursor, statement, parameters, context, executemany) -> None:
+    context._arcadia_query_start = perf_counter()
+
+
+@event.listens_for(engine, "after_cursor_execute")
+def _after_cursor_execute(conn, cursor, statement, parameters, context, executemany) -> None:
+    started_at = getattr(context, "_arcadia_query_start", None)
+    stats = _query_stats.get()
+    stats["count"] += 1
+    if started_at is not None:
+        stats["time_ms"] += (perf_counter() - started_at) * 1000
+
+
+def reset_query_stats() -> None:
+    _query_stats.set({"count": 0.0, "time_ms": 0.0})
+
+
+def get_query_stats() -> tuple[int, float]:
+    stats = _query_stats.get()
+    return int(stats["count"]), stats["time_ms"]
 
 SessionLocal = sessionmaker(
     bind=engine,

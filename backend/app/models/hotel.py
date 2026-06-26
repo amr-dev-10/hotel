@@ -22,4 +22,6 @@ class Hotel(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     )
     subscription_tier: Mapped[str] = mapped_column(String(40), default="starter")
     status: Mapped[str] = mapped_column(String(40), default="active")
-    owner_user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
+    owner_user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", name="fk_hotels_owner_user_id_users", use_alter=True)
+    )

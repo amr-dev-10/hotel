@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import ensure_hotel_access, get_current_user, require_permission
+from app.api.dependencies import ensure_hotel_access, get_current_user, require_hotel_admin, require_permission
 from app.core.database import get_db
 from app.core.responses import ok
 from app.models.user import User
@@ -30,10 +30,22 @@ router = APIRouter()
 @router.get("/audit-logs")
 def list_audit_logs(
     hotel_id: str,
+    limit: int = Query(default=50, ge=1, le=200),
+    action: str | None = None,
+    entity: str | None = None,
+    user_id: str | None = None,
+    search: str | None = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("hotel.settings.manage")),
+    current_user: User = Depends(require_hotel_admin),
 ) -> dict:
-    logs = AuditLogRepository(db).list_for_hotel(hotel_id)
+    logs = AuditLogRepository(db).list_for_hotel(
+        hotel_id,
+        limit=limit,
+        action=action,
+        entity=entity,
+        user_id=user_id,
+        search=search,
+    )
     return ok([AuditLogRead.model_validate(item).model_dump() for item in logs])
 
 
@@ -61,16 +73,37 @@ def create_notification(
 @router.get("/notifications/me")
 def my_notifications(
     hotel_id: str,
+    unread_only: bool = False,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict:
     ensure_hotel_access(hotel_id, current_user)
-    notifications = NotificationRepository(db).list_for_user(hotel_id, current_user.id)
+    notifications = NotificationRepository(db).list_visible_for_user(
+        hotel_id,
+        current_user.id,
+        unread_only=unread_only,
+    )
     return ok([NotificationRead.model_validate(item).model_dump() for item in notifications])
 
 
 @router.put("/notifications/{notification_id}/read")
 def mark_notification_read(
+    hotel_id: str,
+    notification_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    ensure_hotel_access(hotel_id, current_user)
+    notification = NotificationCenterService(db).mark_read(
+        hotel_id,
+        notification_id,
+        current_user.id,
+    )
+    return ok(NotificationRead.model_validate(notification).model_dump())
+
+
+@router.post("/notifications/{notification_id}/read")
+def mark_notification_read_post(
     hotel_id: str,
     notification_id: str,
     db: Session = Depends(get_db),

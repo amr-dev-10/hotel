@@ -122,15 +122,31 @@ class RefundRead(ORMModel):
 
 class TaxConfigCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
+    description: str | None = None
+    tax_type: str = "percentage"
     rate_percent: Decimal = Decimal("0")
+    fixed_amount: Decimal = Decimal("0")
     applies_to: str = "all"
     is_active: bool = True
+
+
+class TaxConfigUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    description: str | None = None
+    tax_type: str | None = None
+    rate_percent: Decimal | None = None
+    fixed_amount: Decimal | None = None
+    applies_to: str | None = None
+    is_active: bool | None = None
 
 
 class TaxConfigRead(ORMModel):
     id: str
     hotel_id: str
     name: str
+    description: str | None = None
+    tax_type: str
     rate_percent: Decimal
+    fixed_amount: Decimal
     applies_to: str
     is_active: bool

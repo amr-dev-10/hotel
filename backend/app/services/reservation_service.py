@@ -3,7 +3,7 @@ from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
-from app.core.exceptions import bad_request, not_found
+from app.core.exceptions import bad_request, conflict, not_found
 from app.models.base import utcnow
 from app.models.guest import Guest
 from app.models.reservation import Reservation, ReservationGuest, ReservationRoomType, StayRecord
@@ -88,18 +88,31 @@ class ReservationService:
         if not primary_guest_id:
             if not payload.guest_name:
                 raise bad_request("guest_name is required when guests list is empty")
-            guest = Guest(
-                hotel_id=hotel_id,
-                name=payload.guest_name,
-                phone=payload.phone,
-                whatsapp_phone=payload.whatsapp_phone,
-                check_in_date=payload.checkin_date,
-                check_out_date=payload.checkout_date,
-                status="pre_arrival",
-            )
-            self.db.add(guest)
-            self.db.flush()
-            primary_guest_id = guest.id
+            # Try to match an existing guest by phone number first
+            phone = payload.whatsapp_phone or payload.phone
+            existing_guest = self.guests.find_by_phone_for_hotel(hotel_id, phone) if phone else None
+
+            if existing_guest:
+                # Reuse existing guest - update dates and status
+                existing_guest.check_in_date = payload.checkin_date
+                existing_guest.check_out_date = payload.checkout_date
+                existing_guest.status = "pre_arrival"
+                self.db.flush()
+                primary_guest_id = existing_guest.id
+            else:
+                # Create a new guest
+                guest = Guest(
+                    hotel_id=hotel_id,
+                    name=payload.guest_name,
+                    phone=payload.phone,
+                    whatsapp_phone=payload.whatsapp_phone,
+                    check_in_date=payload.checkin_date,
+                    check_out_date=payload.checkout_date,
+                    status="pre_arrival",
+                )
+                self.db.add(guest)
+                self.db.flush()
+                primary_guest_id = guest.id
 
         reservation = Reservation(
             hotel_id=hotel_id,
@@ -150,7 +163,63 @@ class ReservationService:
         if commit:
             self.db.commit()
             self.db.refresh(reservation)
+            # Send WhatsApp confirmation if guest has a conversation
+            self._send_reservation_confirmation(hotel_id, reservation, primary_guest_id)
         return reservation
+
+    def _send_reservation_confirmation(
+        self,
+        hotel_id: str,
+        reservation: Reservation,
+        guest_id: str,
+    ) -> None:
+        """Send a WhatsApp confirmation message if the guest has a linked conversation."""
+        try:
+            from sqlalchemy import select as sa_select
+            from app.models.whatsapp import WhatsAppConversation
+            from app.services.whatsapp_account_service import WhatsAppAccountService
+
+            conversation = self.db.execute(
+                sa_select(WhatsAppConversation).where(
+                    WhatsAppConversation.hotel_id == hotel_id,
+                    WhatsAppConversation.guest_id == guest_id,
+                )
+            ).scalar_one_or_none()
+
+            if not conversation:
+                # Also check by phone
+                guest = self.guests.get_for_hotel(hotel_id, guest_id)
+                if guest:
+                    phone = guest.whatsapp_phone or guest.phone
+                    if phone:
+                        conversation = self.db.execute(
+                            sa_select(WhatsAppConversation).where(
+                                WhatsAppConversation.hotel_id == hotel_id,
+                                WhatsAppConversation.phone == phone,
+                            )
+                        ).scalar_one_or_none()
+
+            if not conversation:
+                return  # No WhatsApp conversation — skip silently
+
+            message = (
+                f"✅ *Reservation Confirmed!*\n\n"
+                f"Reservation No: *{reservation.reservation_no}*\n"
+                f"Check-in: *{reservation.checkin_date.strftime('%d %b %Y')}*\n"
+                f"Check-out: *{reservation.checkout_date.strftime('%d %b %Y')}*\n\n"
+                f"We look forward to welcoming you. Please contact us if you need any assistance."
+            )
+
+            WhatsAppAccountService(self.db).send_conversation_message(
+                hotel_id=hotel_id,
+                conversation_id=conversation.id,
+                message=message,
+                actor_id=None,
+                reservation_id=reservation.id,
+            )
+        except Exception:
+            # Never let notification failure break the reservation creation
+            pass
 
     def update_reservation(
         self,
@@ -325,6 +394,62 @@ class ReservationService:
         self.availability.release_by_reference(hotel_id, "reservation", reservation.id)
         FolioService(self.db).close(hotel_id, reservation.id, actor_id)
         self.audit.log(hotel_id, "reservation.checked_out", "reservation", reservation.id, actor_id)
+        self.db.commit()
+        self.db.refresh(reservation)
+        return reservation
+
+    def cancel_reservation(
+        self,
+        hotel_id: str,
+        reservation_id: str,
+        reason: str | None = None,
+        actor_id: str | None = None,
+    ) -> Reservation:
+        reservation = self.reservations.get_for_hotel(hotel_id, reservation_id)
+        if not reservation:
+            raise not_found("Reservation not found")
+        if reservation.status == "cancelled":
+            raise conflict("Reservation is already cancelled")
+        if reservation.status in {"checked_in", "checked_out", "completed"}:
+            raise bad_request("Reservation cannot be cancelled after check-in or checkout")
+
+        old_payload = {
+            "status": reservation.status,
+            "room_id": reservation.room_id,
+            "cancelled_at": reservation.cancelled_at.isoformat() if reservation.cancelled_at else None,
+            "cancelled_by": reservation.cancelled_by,
+            "cancellation_reason": reservation.cancellation_reason,
+        }
+        reservation.status = "cancelled"
+        reservation.cancelled_at = utcnow()
+        reservation.cancelled_by = actor_id
+        reservation.cancellation_reason = reason
+
+        guest = self.guests.get_for_hotel(hotel_id, reservation.guest_id)
+        if guest and guest.status not in {"checked_in", "checked_out"}:
+            guest.status = "cancelled"
+
+        self.availability.release_by_reference(hotel_id, "reservation", reservation.id)
+        if reservation.room_id:
+            room = self.rooms.get_for_hotel(hotel_id, reservation.room_id)
+            if room and room.status != "occupied":
+                room.status = "available"
+
+        self.audit.log(
+            hotel_id,
+            "reservation.cancelled",
+            "reservation",
+            reservation.id,
+            actor_id,
+            payload={"reason": reason},
+            old_payload=old_payload,
+            new_payload={
+                "status": reservation.status,
+                "cancelled_at": reservation.cancelled_at.isoformat(),
+                "cancelled_by": reservation.cancelled_by,
+                "cancellation_reason": reservation.cancellation_reason,
+            },
+        )
         self.db.commit()
         self.db.refresh(reservation)
         return reservation

@@ -20,6 +20,7 @@ class TaskTypeSLA(UUIDPrimaryKeyMixin, Base):
 
     hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
     department_id: Mapped[str] = mapped_column(ForeignKey("departments.id"), index=True)
+    ticket_category_id: Mapped[str | None] = mapped_column(ForeignKey("ticket_categories.id"), index=True)
     task_category: Mapped[str] = mapped_column(String(80), index=True)
     sla_minutes: Mapped[int] = mapped_column(Integer)
     accept_timeout_minutes: Mapped[int] = mapped_column(Integer, default=2)

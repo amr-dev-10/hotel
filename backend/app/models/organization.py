@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -18,7 +18,6 @@ class Organization(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
 class OrganizationHotel(Base):
     __tablename__ = "organization_hotels"
-    __table_args__ = (UniqueConstraint("organization_id", "hotel_id", name="uq_org_hotel"),)
 
     organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), primary_key=True)
     hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), primary_key=True)
@@ -28,7 +27,6 @@ class OrganizationHotel(Base):
 
 class OrganizationUser(Base):
     __tablename__ = "organization_users"
-    __table_args__ = (UniqueConstraint("organization_id", "user_id", name="uq_org_user"),)
 
     organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), primary_key=True)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)

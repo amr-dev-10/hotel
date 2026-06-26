@@ -1,4 +1,6 @@
-from sqlalchemy import select
+from collections.abc import Sequence
+
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.models.room import Room, RoomType
@@ -33,6 +35,31 @@ class RoomTypeRepository(BaseRepository[RoomType]):
 class RoomRepository(BaseRepository[Room]):
     def __init__(self, db: Session) -> None:
         super().__init__(db, Room)
+
+    def list_for_hotel(
+        self,
+        hotel_id: str,
+        limit: int = 50,
+        cursor: str | None = None,
+        q: str | None = None,
+    ) -> Sequence[Room]:
+        statement = select(Room).where(
+            Room.hotel_id == hotel_id,
+            Room.deleted_at.is_(None),
+        )
+        if cursor:
+            statement = statement.where(Room.id > cursor)
+        if q:
+            pattern = f"%{q.strip()}%"
+            statement = statement.where(
+                or_(
+                    Room.room_number.ilike(pattern),
+                    Room.room_type.ilike(pattern),
+                    Room.floor.ilike(pattern),
+                    Room.status.ilike(pattern),
+                )
+            )
+        return self.db.execute(statement.order_by(Room.room_number).limit(limit)).scalars().all()
 
     def get_by_number(self, hotel_id: str, room_number: str) -> Room | None:
         return self.db.execute(
