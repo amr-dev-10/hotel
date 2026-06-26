@@ -60,6 +60,7 @@ The scripts use these defaults:
 | GitHub repo | `amr-dev-10/hotel` |
 | Artifact Registry | `arcadia-repo` |
 | Cloud SQL instance | `arcadia-db-staging` |
+| Cloud SQL edition | `enterprise` |
 | Cloud SQL tier | `db-g1-small` |
 | Redis instance | `arcadia-redis-staging` |
 | VPC connector | `arcadia-vpc-staging` |
@@ -72,6 +73,7 @@ To override a value, export it before running:
 export PROJECT_ID="arcadia-hotel-staging"
 export REGION="asia-south2"
 export GITHUB_REPO="amr-dev-10/hotel"
+export DB_EDITION="enterprise"
 export DB_TIER="db-g1-small"
 bash infra/staging/full-setup.sh
 ```

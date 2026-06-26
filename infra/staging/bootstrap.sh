@@ -15,6 +15,7 @@ export BACKEND_IMAGE_NAME="${BACKEND_IMAGE_NAME:-backend-api}"
 export DB_INSTANCE="${DB_INSTANCE:-arcadia-db-staging}"
 export DB_NAME="${DB_NAME:-arcadia}"
 export DB_USER="${DB_USER:-arcadia_app}"
+export DB_EDITION="${DB_EDITION:-enterprise}"
 export DB_TIER="${DB_TIER:-db-g1-small}"
 export DB_PASSWORD_SECRET="${DB_PASSWORD_SECRET:-arcadia-staging-db-password}"
 
@@ -105,6 +106,7 @@ log "Creating or reusing Cloud SQL PostgreSQL"
 if ! gcloud sql instances describe "$DB_INSTANCE" >/dev/null 2>&1; then
   gcloud sql instances create "$DB_INSTANCE" \
     --database-version=POSTGRES_16 \
+    --edition="$DB_EDITION" \
     --tier="$DB_TIER" \
     --region="$REGION" \
     --storage-size=10GB \
