@@ -2,333 +2,173 @@
 
 This guide deploys the Arcadia FastAPI backend to Google Cloud Run with:
 
+- Cloud Run for the backend service.
+- Cloud Run Jobs for Alembic migrations.
 - Cloud SQL for PostgreSQL.
 - Memorystore for Redis.
 - Artifact Registry for Docker images.
-- GitHub Actions CI/CD.
-- Alembic migrations run automatically before each Cloud Run service deploy.
+- Secret Manager for application secrets.
+- GitHub Actions with Workload Identity Federation.
 
-Use this order:
-
-1. Set up staging first.
-2. Push backend code to `develop` to deploy staging.
-3. Repeat the setup for production.
-4. Push or merge backend code to `main` to deploy production.
-
-You do not need the Google Cloud CLI installed in WSL for the first setup. Use Google Cloud Shell in the browser. Docker in WSL is useful for local testing, but GitHub Actions will build the production image in GitHub.
+The staging setup is now script-driven and safe to rerun. Random values such as the DB password, `JWT_SECRET`, `ENCRYPTION_KEY`, and `VAULT_MASTER_KEY` are generated once, stored in Secret Manager, and reused on later runs.
 
 ## Deployment Model
 
-The workflow file is `.github/workflows/deploy-backend.yml`.
-
 | Git branch | GitHub environment | Cloud Run service | Database |
 | --- | --- | --- | --- |
-| `develop` | `staging` | `arcadia-backend-staging` | staging Cloud SQL |
+| `staging` | `staging` | `arcadia-backend-staging` | staging Cloud SQL |
 | `main` | `production` | `arcadia-backend` | production Cloud SQL |
 
-Each deployment does this:
+The workflow file is `.github/workflows/deploy-backend.yml`.
 
-1. Validates required GitHub environment variables and secrets.
-2. Installs backend dependencies.
-3. Runs `python -m pytest backend/tests`.
-4. Builds the Docker image from `backend/Dockerfile`.
-5. Pushes the image to Artifact Registry.
-6. Deploys or updates a Cloud Run Job for migrations.
-7. Runs `alembic -c alembic.ini upgrade head` in that job and waits for it to finish.
-8. Deploys the Cloud Run service only if migrations succeed.
-9. Calls `/health` as a smoke test.
+Each deploy:
 
-## Before You Start
+1. Validates GitHub environment variables.
+2. Runs backend tests.
+3. Builds and pushes the Docker image.
+4. Deploys or updates the migration Cloud Run Job.
+5. Runs `alembic -c alembic.ini upgrade head`.
+6. Deploys the Cloud Run service only if migrations succeed.
+7. Smoke-tests `/health`.
 
-You need:
+App secrets are not stored in GitHub. GitHub stores only Secret Manager secret names, and Cloud Run reads the actual values from Secret Manager at runtime.
 
-- A Google Cloud account with billing enabled.
-- A Google Cloud project for staging, for example `arcadia-hotel-staging`.
-- A GitHub repository containing this code.
-- Permission to create Google Cloud IAM service accounts, Cloud SQL, Redis, Artifact Registry, Cloud Run, and Workload Identity Federation resources.
+## Staging: One-Command Setup
 
-Recommended production setup: use a separate Google Cloud project, for example `arcadia-hotel-production`, so staging cannot touch production data.
+Open Google Cloud Shell, then run:
 
-## Step 1: Open Cloud Shell
+```bash
+git clone https://github.com/amr-dev-10/hotel.git
+cd hotel
+bash infra/staging/full-setup.sh
+```
 
-In Google Cloud Console, click the **Activate Cloud Shell** icon in the top bar.
+If the repo is already cloned:
 
-Cloud Shell already has `gcloud`, so you can bootstrap staging even though the CLI is not installed in WSL.
+```bash
+cd hotel
+git pull
+bash infra/staging/full-setup.sh
+```
 
-Set your staging variables:
+The scripts use these defaults:
+
+| Setting | Value |
+| --- | --- |
+| Project | `arcadia-hotel-staging` |
+| Region | `asia-south2` |
+| GitHub repo | `amr-dev-10/hotel` |
+| Artifact Registry | `arcadia-repo` |
+| Cloud SQL instance | `arcadia-db-staging` |
+| Cloud SQL tier | `db-g1-small` |
+| Redis instance | `arcadia-redis-staging` |
+| VPC connector | `arcadia-vpc-staging` |
+| Runtime service account | `arcadia-backend-runner-staging` |
+| Deploy service account | `arcadia-github-deployer-staging` |
+
+To override a value, export it before running:
 
 ```bash
 export PROJECT_ID="arcadia-hotel-staging"
-export REGION="us-central1"
-export GITHUB_REPO="YOUR_GITHUB_OWNER/YOUR_REPO_NAME"
-
-export ARTIFACT_REPOSITORY="arcadia-repo"
-export DB_INSTANCE="arcadia-db-staging"
-export DB_NAME="arcadia"
-export DB_USER="arcadia_app"
-export DB_PASSWORD="$(openssl rand -base64 24 | tr -d '/+=' | cut -c1-24)"
-export REDIS_INSTANCE="arcadia-redis-staging"
-export VPC_CONNECTOR="arcadia-vpc-staging"
-
-export RUNTIME_SA="arcadia-backend-runner-staging"
-export DEPLOY_SA="arcadia-github-deployer-staging"
-export WIF_POOL="github-actions-pool"
-export WIF_PROVIDER="github-actions-provider"
-
-gcloud config set project "$PROJECT_ID"
-export PROJECT_NUMBER="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')"
+export REGION="asia-south2"
+export GITHUB_REPO="amr-dev-10/hotel"
+export DB_TIER="db-g1-small"
+bash infra/staging/full-setup.sh
 ```
 
-Important: replace `YOUR_GITHUB_OWNER/YOUR_REPO_NAME` with the exact GitHub repo, for example `myname/arcadia-hotel-platform`.
+## What The Scripts Do
 
-## Step 2: Enable Google Cloud APIs
+`infra/staging/bootstrap.sh` creates or reuses:
 
-```bash
-gcloud services enable \
-  run.googleapis.com \
-  sqladmin.googleapis.com \
-  redis.googleapis.com \
-  artifactregistry.googleapis.com \
-  iam.googleapis.com \
-  iamcredentials.googleapis.com \
-  cloudresourcemanager.googleapis.com \
-  compute.googleapis.com \
-  vpcaccess.googleapis.com
-```
+- Required Google Cloud APIs.
+- Artifact Registry.
+- Cloud SQL PostgreSQL.
+- PostgreSQL database and user.
+- Memorystore Redis.
+- Serverless VPC Access connector.
+- Runtime and deploy service accounts.
+- IAM roles.
+- Workload Identity Federation pool and provider.
+- DB password Secret Manager secret.
 
-## Step 3: Create Artifact Registry
+`infra/staging/configure-secrets.sh` creates or updates:
 
-```bash
-gcloud artifacts repositories create "$ARTIFACT_REPOSITORY" \
-  --repository-format=docker \
-  --location="$REGION" \
-  --description="Arcadia backend Docker images"
-```
+- `DATABASE_URL` secret.
+- `REDIS_URL` secret.
+- `CELERY_BROKER_URL` secret.
+- `CELERY_RESULT_BACKEND` secret.
+- `JWT_SECRET` secret.
+- `ENCRYPTION_KEY` secret.
+- `VAULT_MASTER_KEY` secret.
+- `github-variables.txt`.
+- `github-secrets.txt`.
 
-If the repository already exists, continue.
+`infra/staging/full-setup.sh` runs both scripts.
 
-## Step 4: Create Staging Cloud SQL
+## No-Regeneration Behavior
 
-For staging, use a small instance. For production, choose a stronger tier and enable stronger backup and availability settings.
+These secrets are generated once and reused:
 
-```bash
-gcloud sql instances create "$DB_INSTANCE" \
-  --database-version=POSTGRES_16 \
-  --tier=db-f1-micro \
-  --region="$REGION" \
-  --storage-size=10GB \
-  --availability-type=ZONAL \
-  --no-deletion-protection
+- `arcadia-staging-db-password`
+- `arcadia-staging-jwt-secret`
+- `arcadia-staging-encryption-key`
+- `arcadia-staging-vault-master-key`
 
-gcloud sql databases create "$DB_NAME" \
-  --instance="$DB_INSTANCE"
+These secrets are derived from current infrastructure and get a new Secret Manager version only if their value changes:
 
-gcloud sql users create "$DB_USER" \
-  --instance="$DB_INSTANCE" \
-  --password="$DB_PASSWORD"
+- `arcadia-staging-database-url`
+- `arcadia-staging-redis-url`
+- `arcadia-staging-celery-broker-url`
+- `arcadia-staging-celery-result-backend`
 
-export CLOUD_SQL_CONNECTION_NAME="$(gcloud sql instances describe "$DB_INSTANCE" --format='value(connectionName)')"
-echo "Cloud SQL connection name: $CLOUD_SQL_CONNECTION_NAME"
-echo "Database password: $DB_PASSWORD"
-```
+This prevents accidental user logouts from a regenerated JWT secret and prevents accidental database outages from a changed DB password.
 
-Save the printed database password now. You will paste it into GitHub as part of `DATABASE_URL`.
+## GitHub Environment Setup
 
-Cloud Run should connect to Cloud SQL through the Cloud SQL Unix socket, not `localhost`. For this app, the final SQLAlchemy URL format is:
+After `full-setup.sh` finishes, Cloud Shell creates:
 
 ```text
-postgresql+psycopg://arcadia_app:DB_PASSWORD@/arcadia?host=/cloudsql/PROJECT_ID:REGION:INSTANCE_NAME
+github-variables.txt
+github-secrets.txt
 ```
-
-If your password contains special URL characters like `@`, `/`, `:`, `?`, `#`, or `&`, URL-encode the password before putting it in `DATABASE_URL`.
-
-## Step 5: Create Staging Redis and VPC Connector
-
-Memorystore Redis uses a private IP address. Cloud Run needs private VPC egress to reach it. This guide uses a Serverless VPC Access connector.
-
-```bash
-gcloud redis instances create "$REDIS_INSTANCE" \
-  --region="$REGION" \
-  --size=1 \
-  --tier=basic \
-  --redis-version=redis_7_0
-
-export REDIS_HOST="$(gcloud redis instances describe "$REDIS_INSTANCE" --region="$REGION" --format='value(host)')"
-echo "Redis host: $REDIS_HOST"
-```
-
-Create the VPC connector:
-
-```bash
-gcloud compute networks vpc-access connectors create "$VPC_CONNECTOR" \
-  --region="$REGION" \
-  --network=default \
-  --range=10.8.0.0/28
-```
-
-If `10.8.0.0/28` is already used in your VPC, choose another unused `/28` range.
-
-## Step 6: Create Runtime and Deploy Service Accounts
-
-The runtime service account is used by the Cloud Run service and migration job. The deploy service account is impersonated by GitHub Actions.
-
-```bash
-gcloud iam service-accounts create "$RUNTIME_SA" \
-  --display-name="Arcadia Backend Runtime Staging"
-
-gcloud iam service-accounts create "$DEPLOY_SA" \
-  --display-name="GitHub Actions Deploy Staging"
-
-export RUNTIME_SA_EMAIL="${RUNTIME_SA}@${PROJECT_ID}.iam.gserviceaccount.com"
-export DEPLOY_SA_EMAIL="${DEPLOY_SA}@${PROJECT_ID}.iam.gserviceaccount.com"
-```
-
-Grant runtime permissions:
-
-```bash
-gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:${RUNTIME_SA_EMAIL}" \
-  --role="roles/cloudsql.client"
-
-gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:${RUNTIME_SA_EMAIL}" \
-  --role="roles/vpcaccess.user"
-```
-
-Grant deploy permissions:
-
-```bash
-gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:${DEPLOY_SA_EMAIL}" \
-  --role="roles/run.admin"
-
-gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:${DEPLOY_SA_EMAIL}" \
-  --role="roles/artifactregistry.writer"
-
-gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:${DEPLOY_SA_EMAIL}" \
-  --role="roles/vpcaccess.user"
-
-gcloud iam service-accounts add-iam-policy-binding "$RUNTIME_SA_EMAIL" \
-  --member="serviceAccount:${DEPLOY_SA_EMAIL}" \
-  --role="roles/iam.serviceAccountUser"
-```
-
-## Step 7: Connect GitHub Actions Without a JSON Key
-
-Use Workload Identity Federation instead of a long-lived service account key.
-
-Create the pool and provider:
-
-```bash
-gcloud iam workload-identity-pools create "$WIF_POOL" \
-  --project="$PROJECT_ID" \
-  --location="global" \
-  --display-name="GitHub Actions"
-
-gcloud iam workload-identity-pools providers create-oidc "$WIF_PROVIDER" \
-  --project="$PROJECT_ID" \
-  --location="global" \
-  --workload-identity-pool="$WIF_POOL" \
-  --display-name="GitHub Actions provider" \
-  --issuer-uri="https://token.actions.githubusercontent.com" \
-  --attribute-mapping="google.subject=assertion.sub,attribute.actor=assertion.actor,attribute.repository=assertion.repository,attribute.ref=assertion.ref" \
-  --attribute-condition="assertion.repository=='${GITHUB_REPO}'"
-```
-
-Allow only this GitHub repo to impersonate the deploy service account:
-
-```bash
-gcloud iam service-accounts add-iam-policy-binding "$DEPLOY_SA_EMAIL" \
-  --project="$PROJECT_ID" \
-  --role="roles/iam.workloadIdentityUser" \
-  --member="principalSet://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/${WIF_POOL}/attribute.repository/${GITHUB_REPO}"
-
-export WIF_PROVIDER_RESOURCE="projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/${WIF_POOL}/providers/${WIF_PROVIDER}"
-echo "Workload Identity Provider: $WIF_PROVIDER_RESOURCE"
-echo "Deploy service account: $DEPLOY_SA_EMAIL"
-```
-
-Save the printed `Workload Identity Provider` and deploy service account email for GitHub.
-
-## Step 8: Add the GitHub Staging Environment
 
 In GitHub:
 
-1. Open the repository.
+1. Open `amr-dev-10/hotel`.
 2. Go to **Settings -> Environments**.
 3. Create an environment named `staging`.
-4. Add these environment variables:
+4. Add every line from `github-variables.txt` as an environment variable.
+5. Read `github-secrets.txt`.
 
-| Variable | Value |
-| --- | --- |
-| `GCP_PROJECT_ID` | `arcadia-hotel-staging` |
-| `GCP_REGION` | `us-central1` |
-| `ARTIFACT_REPOSITORY` | `arcadia-repo` |
-| `BACKEND_IMAGE_NAME` | `backend-api` |
-| `CLOUD_RUN_SERVICE` | `arcadia-backend-staging` |
-| `CLOUD_RUN_MIGRATION_JOB` | `arcadia-backend-migrate-staging` |
-| `CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT` | `arcadia-backend-runner-staging@arcadia-hotel-staging.iam.gserviceaccount.com` |
-| `CLOUD_SQL_CONNECTION_NAME` | the value printed in Step 4 |
-| `VPC_CONNECTOR` | `arcadia-vpc-staging` |
-| `VPC_EGRESS` | `private-ranges-only` |
-| `GCP_WORKLOAD_IDENTITY_PROVIDER` | the provider resource printed in Step 7 |
-| `GCP_DEPLOY_SERVICE_ACCOUNT` | the deploy service account printed in Step 7 |
-| `CORS_ORIGINS` | your staging frontend URL, or `*` while testing |
-| `DEFAULT_TIMEZONE` | `Asia/Kolkata` |
-| `WHATSAPP_DRY_RUN` | `true` |
+For the backend deploy workflow, `github-secrets.txt` should say that no GitHub environment secrets are required. App secrets live in Google Secret Manager.
 
-Add these environment secrets:
+## Deploy Staging
 
-| Secret | Value |
-| --- | --- |
-| `DATABASE_URL` | `postgresql+psycopg://arcadia_app:DB_PASSWORD@/arcadia?host=/cloudsql/CLOUD_SQL_CONNECTION_NAME` |
-| `REDIS_URL` | `redis://REDIS_HOST:6379/0` |
-| `CELERY_BROKER_URL` | `redis://REDIS_HOST:6379/1` |
-| `CELERY_RESULT_BACKEND` | `redis://REDIS_HOST:6379/2` |
-| `JWT_SECRET` | output of `openssl rand -hex 32` |
-| `ENCRYPTION_KEY` | output of `openssl rand -hex 32` |
-| `VAULT_MASTER_KEY` | output of `openssl rand -hex 32` |
-
-Replace `DB_PASSWORD`, `CLOUD_SQL_CONNECTION_NAME`, and `REDIS_HOST` with your real staging values. Do not include quotes around the secret values.
-
-## Step 9: Deploy Staging from GitHub
-
-Push backend changes to `develop`:
+Push backend changes to `staging`:
 
 ```bash
-git checkout -b develop
-git push origin develop
+git checkout staging
+git push origin staging
 ```
 
-If the branch already exists:
+Then open **GitHub -> Actions -> Backend CI/CD**.
 
-```bash
-git checkout develop
-git pull
-git push origin develop
-```
+You can also run the workflow manually:
 
-Then open **GitHub -> Actions -> Backend CI/CD**. The run should:
+1. Open **Actions -> Backend CI/CD**.
+2. Click **Run workflow**.
+3. Select `target: staging`.
 
-- Run tests.
-- Push the Docker image.
-- Run Alembic migrations.
-- Deploy `arcadia-backend-staging`.
-- Print the Cloud Run service URL.
+## Production Setup
 
-You can also run it manually from GitHub Actions with **Run workflow -> target: staging**.
-
-## Step 10: Production Setup
-
-After staging works, repeat Steps 1 through 8 for production.
+Production should use a separate Google Cloud project.
 
 Recommended production values:
 
 | Item | Production example |
 | --- | --- |
 | Project | `arcadia-hotel-production` |
+| Region | `asia-south2` |
 | Cloud Run service | `arcadia-backend` |
 | Migration job | `arcadia-backend-migrate-production` |
 | Cloud SQL instance | `arcadia-db-production` |
@@ -337,84 +177,72 @@ Recommended production values:
 | Runtime service account | `arcadia-backend-runner-production` |
 | Deploy service account | `arcadia-github-deployer-production` |
 
-Create a GitHub environment named `production` and add the production variables and secrets.
+Create production scripts by copying `infra/staging`, changing defaults to production names, and creating a GitHub environment named `production`.
 
-By default, pushes to `main` deploy production. If you want a manual approval before production deploys, enable required reviewers on the GitHub `production` environment.
+Pushes to `main` deploy production. Manual production deployments must also run from the `main` branch. Enable required reviewers on the GitHub `production` environment before public use.
 
-Manual production deployments must be run from the `main` branch. This keeps production tied to the same branch that deploys automatically.
+## Platform Admin Bootstrap
 
-## Important Production Rules
+Do not store `PLATFORM_ADMIN_PASSWORD` as a long-lived GitHub or Cloud Run environment variable.
 
-- Set `AUTO_CREATE_TABLES=false`. The workflow already does this.
-- Use Alembic migrations for schema changes.
-- Keep migrations backward compatible when possible. The migration runs before the new service revision receives traffic.
-- Back up production before risky migrations.
-- A failed migration stops the service deployment, so the existing Cloud Run revision keeps serving.
-- Rolling back a Cloud Run revision does not automatically roll back database migrations.
-- Keep staging and production in separate Google Cloud projects or at least separate Cloud SQL instances.
-- Replace `CORS_ORIGINS=*` with your real frontend domain before public testing.
+For the first platform admin, use a one-time bootstrap process:
 
-## Optional: Install Google Cloud CLI in WSL
+1. Generate a temporary password.
+2. Run the admin seed once through a controlled one-off job or local authenticated database connection.
+3. Store the password in a password manager for the real admin user.
+4. Remove the plain-text password from shell history and any files.
 
-This is not required for CI/CD because Cloud Shell handles setup and GitHub Actions handles deployment.
+Do not leave a plain-text admin password in Cloud Run env vars or GitHub secrets.
 
-If you want local `gcloud` inside WSL later, follow the official Linux install guide:
+## Useful Commands
 
-```text
-https://cloud.google.com/sdk/docs/install#linux
-```
-
-After installing:
-
-```bash
-gcloud auth login
-gcloud config set project arcadia-hotel-staging
-```
-
-## Useful Checks
-
-View the deployed staging service:
+View the staging service URL:
 
 ```bash
 gcloud run services describe arcadia-backend-staging \
-  --region=us-central1 \
-  --format='value(status.url)'
+  --project=arcadia-hotel-staging \
+  --region=asia-south2 \
+  --format="value(status.url)"
 ```
 
-View migration job logs:
+View recent migration executions:
 
 ```bash
 gcloud run jobs executions list \
-  --job=arcadia-backend-migrate-staging \
-  --region=us-central1
+  --project=arcadia-hotel-staging \
+  --region=asia-south2 \
+  --job=arcadia-backend-migrate-staging
 ```
 
-Check Alembic state through a one-off job execution:
+View Secret Manager secret names:
 
 ```bash
-gcloud run jobs execute arcadia-backend-migrate-staging \
-  --region=us-central1 \
-  --wait
+gcloud secrets list \
+  --project=arcadia-hotel-staging \
+  --filter="labels.app=arcadia AND labels.env=staging"
 ```
 
-## Troubleshooting
+Rerun secret configuration only:
 
-| Problem | Check |
-| --- | --- |
-| GitHub auth fails | `GITHUB_REPO` must exactly match `owner/repo`; check `GCP_WORKLOAD_IDENTITY_PROVIDER` and `GCP_DEPLOY_SERVICE_ACCOUNT`. |
-| Docker push fails | Deploy service account needs `roles/artifactregistry.writer`. |
-| Cloud Run deploy fails with service account error | Deploy service account needs `roles/iam.serviceAccountUser` on the runtime service account. |
-| Alembic cannot find migrations | The image must include `backend/alembic.ini`; this repo now keeps it in the Docker build context. |
-| Cloud SQL connection fails | Use `postgresql+psycopg://...@/arcadia?host=/cloudsql/PROJECT:REGION:INSTANCE`, and grant runtime service account `roles/cloudsql.client`. |
-| Redis times out | Set `VPC_CONNECTOR` and `VPC_EGRESS=private-ranges-only`; verify the Redis private IP. |
-| Service starts locally but not on Cloud Run | The container must listen on `$PORT`; `backend/Dockerfile` now does this. |
+```bash
+bash infra/staging/configure-secrets.sh
+```
+
+## Important Rules
+
+- Keep `AUTO_CREATE_TABLES=false` in Cloud Run. The workflow sets it automatically.
+- Use Alembic migrations for schema changes.
+- A failed migration stops deployment, so the existing Cloud Run revision continues serving.
+- Rolling back Cloud Run does not roll back database migrations.
+- Keep staging and production in separate projects or at least separate databases.
+- Replace `CORS_ORIGINS=*` with the real frontend domain before external testing.
+- Do not rotate `JWT_SECRET`, `ENCRYPTION_KEY`, `VAULT_MASTER_KEY`, or the DB password casually.
 
 ## Official References
 
-- Google Cloud Workload Identity Federation for deployment pipelines: https://cloud.google.com/iam/docs/workload-identity-federation-with-deployment-pipelines
-- Google GitHub Action for auth: https://github.com/google-github-actions/auth
-- Google GitHub Action for setup-gcloud: https://github.com/google-github-actions/setup-gcloud
+- Workload Identity Federation: https://cloud.google.com/iam/docs/workload-identity-federation-with-deployment-pipelines
+- Cloud Run secrets: https://cloud.google.com/run/docs/configuring/services/secrets
 - Cloud Run deploy command: https://cloud.google.com/sdk/gcloud/reference/run/deploy
 - Cloud Run jobs deploy command: https://cloud.google.com/sdk/gcloud/reference/run/jobs/deploy
-- Cloud Run jobs execute command: https://cloud.google.com/sdk/gcloud/reference/run/jobs/execute
 - Cloud SQL for PostgreSQL from Cloud Run: https://cloud.google.com/sql/docs/postgres/connect-run
+- Memorystore Redis regions: https://cloud.google.com/memorystore/docs/redis/regions

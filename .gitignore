@@ -21,3 +21,7 @@ backend/uvicorn.*.log
 .venv-win
 count_line_of_code.py
 gha-creds-*.json
+github-variables.txt
+github-secrets.txt
+bootstrap-summary.txt
+secret-manager-summary.txt
