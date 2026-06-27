@@ -3,7 +3,7 @@ from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.database import get_db
+from app.core.database import get_db, set_tenant_context
 from app.core.encryption import decrypt_secret
 from app.core.responses import ok
 from app.repositories.whatsapp_repository import WhatsAppAccountRepository
@@ -42,30 +42,40 @@ async def receive_whatsapp_webhook(
     bot = BotService(db)
     outbound: list[dict] = []
     processed = 0
-    for incoming in bot.parse_webhook_payload(payload):
-        account = None
-        if incoming.phone_number_id:
-            account = WhatsAppAccountRepository(db).get_by_phone_number_id(incoming.phone_number_id)
-            if account:
-                WhatsAppHealthService(db).record_webhook(account.hotel_id, account.id, commit=False)
-                WhatsAppUsageService(db).increment(account.hotel_id, "messages_received", commit=False)
+    accounts = WhatsAppAccountRepository(db)
+    incoming_messages = bot.parse_webhook_payload(payload)
+    resolved_messages = []
+    for incoming in incoming_messages:
+        if not incoming.phone_number_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="WhatsApp phone_number_id is missing from webhook metadata",
+            )
+        account = accounts.get_by_phone_number_id(incoming.phone_number_id)
+        if not account:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="WhatsApp phone_number_id is not mapped to an active hotel account",
+            )
+        resolved_messages.append((incoming, account))
+
+    for incoming, account in resolved_messages:
+        set_tenant_context(db, account.hotel_id)
+        WhatsAppHealthService(db).record_webhook(account.hotel_id, account.id, commit=False)
+        WhatsAppUsageService(db).increment(account.hotel_id, "messages_received", commit=False)
         result = bot.handle_message(incoming)
         processed += 1
+        access_token = _account_access_token(account)
         for reply in result["replies"]:
             send_result = _send_reply(
                 whatsapp,
                 incoming,
                 reply,
-                access_token=(
-                    account.access_token or decrypt_secret(account.access_token_encrypted)
-                    if account
-                    else None
-                ),
+                access_token=access_token,
             )
-            if account:
-                WhatsAppHealthService(db).record_sent(account.hotel_id, account.id, commit=False)
-                WhatsAppUsageService(db).increment(account.hotel_id, "messages_sent", commit=False)
-                WhatsAppUsageService(db).increment(account.hotel_id, "api_calls", commit=False)
+            WhatsAppHealthService(db).record_sent(account.hotel_id, account.id, commit=False)
+            WhatsAppUsageService(db).increment(account.hotel_id, "messages_sent", commit=False)
+            WhatsAppUsageService(db).increment(account.hotel_id, "api_calls", commit=False)
             outbound.append(
                 {
                     "incoming": incoming.__dict__,
@@ -76,6 +86,12 @@ async def receive_whatsapp_webhook(
     db.commit()
 
     return ok({"processed": processed, "outbound": outbound})
+
+
+def _account_access_token(account) -> str | None:
+    if account.access_token_encrypted:
+        return decrypt_secret(account.access_token_encrypted)
+    return account.access_token
 
 
 def _send_reply(

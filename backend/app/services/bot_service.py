@@ -162,14 +162,12 @@ class BotService:
         return messages
 
     def _resolve_hotel(self, phone_number_id: str | None):
-        if phone_number_id:
-            account = self.whatsapp_accounts.get_by_phone_number_id(phone_number_id)
-            if account:
-                return self.hotels.get(account.hotel_id)
-            hotel = self.hotels.get_by_phone_number_id(phone_number_id)
-            if hotel:
-                return hotel
-        return self.hotels.first_active()
+        if not phone_number_id:
+            return None
+        account = self.whatsapp_accounts.get_by_phone_number_id(phone_number_id)
+        if not account:
+            return None
+        return self.hotels.get(account.hotel_id)
 
     def _start_onboarding(
         self,

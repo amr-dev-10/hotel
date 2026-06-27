@@ -156,8 +156,19 @@ async def notifications_v3(websocket: WebSocket) -> None:
 
 @router.websocket("/ws/{hotel_id}/tickets")
 async def ticket_updates(websocket: WebSocket, hotel_id: str) -> None:
+    await websocket.accept()
+    db = SessionLocal()
+    auth = await _authenticate_websocket(websocket, db, "ticket.view")
+    if not auth:
+        db.close()
+        return
+    auth_hotel_id, _ = auth
+    if auth_hotel_id != hotel_id:
+        await websocket.close(code=4003, reason="Forbidden")
+        db.close()
+        return
     channel = f"hotel:{hotel_id}:tickets"
-    await manager.connect(channel, websocket)
+    manager.active.setdefault(channel, []).append(websocket)
     try:
         await websocket.send_json({"event": "connected", "channel": channel})
         while True:
@@ -165,12 +176,25 @@ async def ticket_updates(websocket: WebSocket, hotel_id: str) -> None:
             await manager.broadcast(channel, data)
     except WebSocketDisconnect:
         manager.disconnect(channel, websocket)
+    finally:
+        db.close()
 
 
 @router.websocket("/ws/{hotel_id}/chat/{ticket_id}")
 async def chat_updates(websocket: WebSocket, hotel_id: str, ticket_id: str) -> None:
+    await websocket.accept()
+    db = SessionLocal()
+    auth = await _authenticate_websocket(websocket, db, "ticket.view")
+    if not auth:
+        db.close()
+        return
+    auth_hotel_id, _ = auth
+    if auth_hotel_id != hotel_id:
+        await websocket.close(code=4003, reason="Forbidden")
+        db.close()
+        return
     channel = f"hotel:{hotel_id}:chat:{ticket_id}"
-    await manager.connect(channel, websocket)
+    manager.active.setdefault(channel, []).append(websocket)
     try:
         await websocket.send_json({"event": "connected", "channel": channel})
         while True:
@@ -178,3 +202,5 @@ async def chat_updates(websocket: WebSocket, hotel_id: str, ticket_id: str) -> N
             await manager.broadcast(channel, data)
     except WebSocketDisconnect:
         manager.disconnect(channel, websocket)
+    finally:
+        db.close()

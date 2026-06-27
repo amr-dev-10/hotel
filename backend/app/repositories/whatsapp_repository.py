@@ -40,6 +40,17 @@ class WhatsAppAccountRepository(BaseRepository[WhatsAppAccount]):
             select(WhatsAppAccount).where(WhatsAppAccount.status == "active")
         ).scalars().all()
 
+    def first_active_for_hotel(self, hotel_id: str) -> WhatsAppAccount | None:
+        return self.db.execute(
+            select(WhatsAppAccount)
+            .where(
+                WhatsAppAccount.hotel_id == hotel_id,
+                WhatsAppAccount.status == "active",
+            )
+            .order_by(WhatsAppAccount.created_at)
+            .limit(1)
+        ).scalars().first()
+
 
 class WhatsAppTemplateRepository(BaseRepository[WhatsAppTemplate]):
     def __init__(self, db: Session) -> None:

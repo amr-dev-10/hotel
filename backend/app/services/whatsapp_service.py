@@ -93,9 +93,12 @@ class WhatsAppService:
         payload: dict[str, Any],
         access_token: str | None = None,
     ) -> dict[str, Any]:
-        token = access_token or settings.whatsapp_access_token
-        if settings.whatsapp_dry_run or not token or not phone_number_id:
+        if settings.whatsapp_dry_run:
             return {"dry_run": True, "payload": payload}
+        if not phone_number_id:
+            raise RuntimeError("WhatsApp phone_number_id is required")
+        if not access_token:
+            raise RuntimeError("WhatsApp access token is required for this account")
 
         url = (
             f"https://graph.facebook.com/{settings.whatsapp_api_version}/"
