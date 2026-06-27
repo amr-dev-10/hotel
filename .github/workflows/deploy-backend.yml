@@ -49,7 +49,10 @@ jobs:
       GCP_DEPLOY_SERVICE_ACCOUNT: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
       CORS_ORIGINS: ${{ vars.CORS_ORIGINS || '*' }}
       DEFAULT_TIMEZONE: ${{ vars.DEFAULT_TIMEZONE || 'UTC' }}
+      WHATSAPP_API_VERSION: ${{ vars.WHATSAPP_API_VERSION || 'v19.0' }}
       WHATSAPP_DRY_RUN: ${{ vars.WHATSAPP_DRY_RUN || 'true' }}
+      WHATSAPP_VERIFY_TOKEN_SECRET: ${{ vars.WHATSAPP_VERIFY_TOKEN_SECRET }}
+      WHATSAPP_APP_SECRET_SECRET: ${{ vars.WHATSAPP_APP_SECRET_SECRET }}
       DATABASE_URL_SECRET: ${{ vars.DATABASE_URL_SECRET }}
       REDIS_URL_SECRET: ${{ vars.REDIS_URL_SECRET }}
       CELERY_BROKER_URL_SECRET: ${{ vars.CELERY_BROKER_URL_SECRET }}
@@ -96,6 +99,18 @@ jobs:
             printf 'Missing required GitHub environment variables or secrets: %s\n' "${missing[*]}"
             exit 1
           fi
+          if [[ "${WHATSAPP_DRY_RUN,,}" != "true" ]]; then
+            whatsapp_missing=()
+            for name in WHATSAPP_VERIFY_TOKEN_SECRET WHATSAPP_APP_SECRET_SECRET; do
+              if [[ -z "${!name:-}" ]]; then
+                whatsapp_missing+=("$name")
+              fi
+            done
+            if (( ${#whatsapp_missing[@]} > 0 )); then
+              printf 'WHATSAPP_DRY_RUN=false requires these Secret Manager reference variables: %s\n' "${whatsapp_missing[*]}"
+              exit 1
+            fi
+          fi
           if [[ -z "${VPC_CONNECTOR:-}" ]]; then
             echo "VPC_CONNECTOR is empty. Memorystore private IPs need a Cloud Run VPC connector or another private egress setup."
           fi
@@ -128,8 +143,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          app_env_vars="^|^ENVIRONMENT=${ENVIRONMENT_NAME}|AUTO_CREATE_TABLES=false|CORS_ORIGINS=${CORS_ORIGINS}|DEFAULT_TIMEZONE=${DEFAULT_TIMEZONE}|WHATSAPP_DRY_RUN=${WHATSAPP_DRY_RUN}"
+          app_env_vars="^|^ENVIRONMENT=${ENVIRONMENT_NAME}|AUTO_CREATE_TABLES=false|CORS_ORIGINS=${CORS_ORIGINS}|DEFAULT_TIMEZONE=${DEFAULT_TIMEZONE}|WHATSAPP_API_VERSION=${WHATSAPP_API_VERSION}|WHATSAPP_DRY_RUN=${WHATSAPP_DRY_RUN}"
           app_secret_refs="DATABASE_URL=${DATABASE_URL_SECRET}:latest,REDIS_URL=${REDIS_URL_SECRET}:latest,CELERY_BROKER_URL=${CELERY_BROKER_URL_SECRET}:latest,CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND_SECRET}:latest,JWT_SECRET=${JWT_SECRET_NAME}:latest,ENCRYPTION_KEY=${ENCRYPTION_KEY_SECRET_NAME}:latest,VAULT_MASTER_KEY=${VAULT_MASTER_KEY_SECRET_NAME}:latest"
+          if [[ -n "${WHATSAPP_VERIFY_TOKEN_SECRET:-}" ]]; then
+            app_secret_refs="${app_secret_refs},WHATSAPP_VERIFY_TOKEN=${WHATSAPP_VERIFY_TOKEN_SECRET}:latest"
+          fi
+          if [[ -n "${WHATSAPP_APP_SECRET_SECRET:-}" ]]; then
+            app_secret_refs="${app_secret_refs},WHATSAPP_APP_SECRET=${WHATSAPP_APP_SECRET_SECRET}:latest"
+          fi
           printf 'APP_ENV_VARS=%s\n' "$app_env_vars" >> "$GITHUB_ENV"
           printf 'APP_SECRET_REFS=%s\n' "$app_secret_refs" >> "$GITHUB_ENV"
 
