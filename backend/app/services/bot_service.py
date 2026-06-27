@@ -42,6 +42,7 @@ class IncomingWhatsAppMessage:
     from_phone: str
     text: str | None = None
     interactive_id: str | None = None
+    meta_message_id: str | None = None
 
 
 class BotService:
@@ -64,7 +65,11 @@ class BotService:
         self.ticket_service = TicketService(db)
         self.reservations = ReservationService(db)
 
-    def handle_message(self, message: IncomingWhatsAppMessage) -> dict[str, Any]:
+    def handle_message(
+        self,
+        message: IncomingWhatsAppMessage,
+        whatsapp_account_id: str | None = None,
+    ) -> dict[str, Any]:
         hotel = self._resolve_hotel(message.phone_number_id)
         if not hotel:
             raise bad_request("No hotel is mapped to this WhatsApp phone_number_id")
@@ -73,6 +78,7 @@ class BotService:
             hotel.id,
             message.from_phone,
             message.phone_number_id,
+            whatsapp_account_id=whatsapp_account_id,
         )
         self._record_message(
             hotel.id,
@@ -80,6 +86,8 @@ class BotService:
             direction="inbound",
             message_type="interactive" if message.interactive_id else "text",
             text=message.text or message.interactive_id,
+            meta_message_id=message.meta_message_id,
+            whatsapp_account_id=whatsapp_account_id,
         )
         config = self.bot_configs.get_for_hotel(hotel.id)
         services = config.services if config and config.services else DEFAULT_SERVICES
@@ -118,21 +126,25 @@ class BotService:
             )
 
         self.db.commit()
+        outbound_message_ids: list[str] = []
         for reply in replies:
-            self._record_message(
+            outbound_message = self._record_message(
                 hotel.id,
                 session,
                 direction="outbound",
                 message_type=reply["kind"],
                 text=reply.get("text"),
                 ticket_id=ticket_id,
+                whatsapp_account_id=whatsapp_account_id,
             )
+            outbound_message_ids.append(outbound_message.id)
         self.db.commit()
         return {
             "hotel_id": hotel.id,
             "phone": message.from_phone,
             "session_state": session.state,
             "replies": replies,
+            "outbound_message_ids": outbound_message_ids,
             "ticket_id": ticket_id,
         }
 
@@ -157,19 +169,18 @@ class BotService:
                                 from_phone=item["from"],
                                 text=text,
                                 interactive_id=interactive_id,
+                                meta_message_id=item.get("id"),
                             )
                         )
         return messages
 
     def _resolve_hotel(self, phone_number_id: str | None):
-        if phone_number_id:
-            account = self.whatsapp_accounts.get_by_phone_number_id(phone_number_id)
-            if account:
-                return self.hotels.get(account.hotel_id)
-            hotel = self.hotels.get_by_phone_number_id(phone_number_id)
-            if hotel:
-                return hotel
-        return self.hotels.first_active()
+        if not phone_number_id:
+            return None
+        account = self.whatsapp_accounts.get_by_phone_number_id(phone_number_id)
+        if not account:
+            return None
+        return self.hotels.get(account.hotel_id)
 
     def _start_onboarding(
         self,
@@ -178,7 +189,7 @@ class BotService:
         session: WhatsAppSession,
         messages: dict[str, str],
         replies: list[dict[str, Any]],
-    ) -> None:
+    ) -> WhatsAppMessage:
         guest = self.guests.find_by_phone(hotel_id, session.phone)
         if guest:
             session.guest_id = guest.id
@@ -502,7 +513,12 @@ class BotService:
         if form_responses:
             details = ", ".join(f"{key}: {value}" for key, value in form_responses.items())
             description = f"{description} ({details})"
-        conversation = self.conversations.get_or_create(hotel_id, session.phone, session.guest_id)
+        conversation = self.conversations.get_or_create(
+            hotel_id,
+            session.phone,
+            session.guest_id,
+            session.whatsapp_account_id,
+        )
         ticket = self.ticket_service.create_ticket(
             hotel_id,
             TicketCreate(
@@ -647,30 +663,41 @@ class BotService:
         text: str | None = None,
         interactive_id: str | None = None,
         ticket_id: str | None = None,
+        meta_message_id: str | None = None,
+        whatsapp_account_id: str | None = None,
     ) -> None:
-        conversation = self.conversations.get_or_create(hotel_id, session.phone, session.guest_id)
+        conversation = self.conversations.get_or_create(
+            hotel_id,
+            session.phone,
+            session.guest_id,
+            whatsapp_account_id,
+        )
         if direction == "inbound" and conversation.status == "resolved":
             conversation.status = "open"
             conversation.resolved_at = None
         
         message = WhatsAppMessage(
             hotel_id=hotel_id,
+            whatsapp_account_id=whatsapp_account_id,
             conversation_id=conversation.id,
             reservation_id=self._active_reservation_id(hotel_id, session.guest_id),
             ticket_id=ticket_id,
             direction=direction,
             message_type=message_type,
             message_text=text,
+            meta_message_id=meta_message_id,
             status="received" if direction == "inbound" else "sent",
             created_at=utcnow(),
         )
         self.db.add(message)
+        self.db.flush()
         ConversationWindowService(self.db).track_message(
             hotel_id,
             session.phone,
             category="service",
             commit=False,
         )
+        return message
 
     def _active_reservation_id(self, hotel_id: str, guest_id: str | None) -> str | None:
         if not guest_id:

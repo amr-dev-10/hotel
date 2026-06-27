@@ -25,3 +25,4 @@ github-variables.txt
 github-secrets.txt
 bootstrap-summary.txt
 secret-manager-summary.txt
+tsconfig.tsbuildinfo

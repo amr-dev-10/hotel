@@ -16,6 +16,7 @@ from app.schemas.whatsapp_account import (
     WhatsAppMessageSendRequest,
 )
 from app.services.audit_service import AuditService
+from app.services.whatsapp_contact_sync import sync_guest_whatsapp_contact
 from app.services.whatsapp_ops_service import ConversationWindowService, WhatsAppHealthService
 from app.services.whatsapp_service import WhatsAppService
 
@@ -34,16 +35,17 @@ class WhatsAppAccountService:
         if self.accounts.get_by_phone_number_id(payload.phone_number_id):
             raise bad_request("WhatsApp phone_number_id is already mapped")
         data = payload.model_dump()
-        if data.get("access_token") and not data.get("access_token_encrypted"):
-            data["access_token_encrypted"] = encrypt_secret(data["access_token"])
+        access_token = data.pop("access_token", None)
+        if access_token:
+            data["access_token_encrypted"] = encrypt_secret(access_token)
         account = WhatsAppAccount(hotel_id=hotel_id, **data)
         self.db.add(account)
         self.db.flush()
-        if payload.access_token:
+        if access_token:
             Vault(self.db).store(
                 hotel_id,
                 f"whatsapp_token:{account.phone_number_id}",
-                payload.access_token,
+                access_token,
                 commit=False,
             )
         AuditService(self.db).log(
@@ -105,7 +107,7 @@ class WhatsAppAccountService:
         account = self.accounts.get_for_hotel(hotel_id, account_id)
         if not account:
             raise not_found("WhatsApp account not found")
-        account.access_token = payload.access_token
+        account.access_token = None
         account.access_token_encrypted = encrypt_secret(payload.access_token)
         account.token_expires_at = payload.token_expires_at
         account.status = "active"
@@ -139,9 +141,7 @@ class WhatsAppAccountService:
         account = self.accounts.get_for_hotel(hotel_id, account_id)
         if not account:
             raise not_found("WhatsApp account not found")
-        access_token = account.access_token or (
-            decrypt_secret(account.access_token_encrypted) if account.access_token_encrypted else None
-        )
+        access_token = self._access_token(account)
         result = WhatsAppService().send_text(
             account.phone_number_id,
             payload.to_phone,
@@ -189,31 +189,39 @@ class WhatsAppAccountService:
                 raise not_found("Ticket not found")
             if ticket.conversation_id and ticket.conversation_id != conversation_id:
                 raise bad_request("Ticket is linked to another WhatsApp conversation")
+        if conversation.guest_id:
+            from app.models.guest import Guest
+
+            guest = self.db.get(Guest, conversation.guest_id)
+            if guest and guest.hotel_id == hotel_id:
+                sync_guest_whatsapp_contact(self.db, guest)
+                self.db.flush()
             
-        accounts = self.accounts.list_for_hotel(hotel_id, limit=1)
-        if not accounts:
+        account = self.accounts.first_active_for_hotel(hotel_id)
+        if not account:
             raise bad_request("WhatsApp account not configured")
-        account = accounts[0]
-        
-        access_token = account.access_token or (
-            decrypt_secret(account.access_token_encrypted) if account.access_token_encrypted else None
-        )
+
+        access_token = self._access_token(account)
         result = WhatsAppService().send_text(
             account.phone_number_id,
             conversation.phone,
             message,
             access_token=access_token,
         )
+        if not conversation.whatsapp_account_id:
+            conversation.whatsapp_account_id = account.id
         
         from app.models.whatsapp import WhatsAppMessage
         msg = WhatsAppMessage(
             hotel_id=hotel_id,
+            whatsapp_account_id=account.id,
             conversation_id=conversation.id,
             reservation_id=reservation_id,
             ticket_id=ticket_id,
             direction="outbound",
             message_type="text",
             message_text=message,
+            meta_message_id=self._meta_message_id_from_send_result(result),
             status="sent",
             created_at=utcnow(),
         )
@@ -242,15 +250,17 @@ class WhatsAppAccountService:
         if not account:
             raise bad_request("WhatsApp account not found")
         data = payload.model_dump()
-        if data.get("access_token") and not data.get("access_token_encrypted"):
-            data["access_token_encrypted"] = encrypt_secret(data["access_token"])
+        access_token = data.pop("access_token", None)
+        if access_token:
+            data["access_token_encrypted"] = encrypt_secret(access_token)
+            account.access_token = None
         for key, value in data.items():
             setattr(account, key, value)
-        if payload.access_token:
+        if access_token:
             Vault(self.db).store(
                 hotel_id,
                 f"whatsapp_token:{account.phone_number_id}",
-                payload.access_token,
+                access_token,
                 commit=False,
             )
         AuditService(self.db).log(
@@ -263,6 +273,21 @@ class WhatsAppAccountService:
         self.db.commit()
         self.db.refresh(account)
         return account
+
+    def _access_token(self, account: WhatsAppAccount) -> str | None:
+        if account.access_token_encrypted:
+            return decrypt_secret(account.access_token_encrypted)
+        return account.access_token
+
+    def _meta_message_id_from_send_result(self, send_result: dict) -> str | None:
+        sent_messages = send_result.get("messages")
+        if not isinstance(sent_messages, list) or not sent_messages:
+            return None
+        first = sent_messages[0]
+        if not isinstance(first, dict):
+            return None
+        message_id = first.get("id")
+        return message_id if isinstance(message_id, str) else None
 
 
 class WhatsAppTemplateService:

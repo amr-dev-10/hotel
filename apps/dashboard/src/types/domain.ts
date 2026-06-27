@@ -567,6 +567,7 @@ export interface WhatsAppTemplate {
 export interface WhatsAppConversation {
   id: string;
   hotel_id: string;
+  whatsapp_account_id: string | null;
   guest_id: string | null;
   phone: string;
   status: string;
@@ -582,6 +583,7 @@ export interface WhatsAppConversation {
 export interface WhatsAppMessage {
   id: string;
   hotel_id: string;
+  whatsapp_account_id: string | null;
   conversation_id: string;
   reservation_id: string | null;
   ticket_id: string | null;

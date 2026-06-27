@@ -58,6 +58,7 @@ class WhatsAppTemplateRead(ORMModel):
 class WhatsAppConversationRead(ORMModel):
     id: str
     hotel_id: str
+    whatsapp_account_id: str | None = None
     guest_id: str | None = None
     phone: str
     status: str
@@ -78,6 +79,7 @@ class WhatsAppConversationUpdateRequest(BaseModel):
 class WhatsAppMessageRead(ORMModel):
     id: str
     hotel_id: str
+    whatsapp_account_id: str | None = None
     conversation_id: str
     reservation_id: str | None = None
     ticket_id: str | None = None

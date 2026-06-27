@@ -39,7 +39,12 @@ export VAULT_MASTER_KEY_SECRET_NAME="${VAULT_MASTER_KEY_SECRET_NAME:-arcadia-sta
 
 export CORS_ORIGINS="${CORS_ORIGINS:-*}"
 export DEFAULT_TIMEZONE="${DEFAULT_TIMEZONE:-Asia/Kolkata}"
+export WHATSAPP_API_VERSION="${WHATSAPP_API_VERSION:-v19.0}"
 export WHATSAPP_DRY_RUN="${WHATSAPP_DRY_RUN:-true}"
+export WHATSAPP_VERIFY_TOKEN_SECRET="${WHATSAPP_VERIFY_TOKEN_SECRET:-arcadia-staging-whatsapp-verify-token}"
+export WHATSAPP_APP_SECRET_SECRET="${WHATSAPP_APP_SECRET_SECRET:-arcadia-staging-whatsapp-app-secret}"
+export WHATSAPP_VERIFY_TOKEN_VALUE="${WHATSAPP_VERIFY_TOKEN_VALUE:-}"
+export WHATSAPP_APP_SECRET_VALUE="${WHATSAPP_APP_SECRET_VALUE:-}"
 
 log() {
   printf "\n==> %s\n" "$*" >&2
@@ -99,6 +104,49 @@ ensure_value_secret() {
   echo "Updated secret version: $secret_name" >&2
 }
 
+ensure_whatsapp_verify_token_secret() {
+  local current
+  local desired
+
+  ensure_secret "$WHATSAPP_VERIFY_TOKEN_SECRET"
+  current="$(secret_value "$WHATSAPP_VERIFY_TOKEN_SECRET")"
+  desired="$WHATSAPP_VERIFY_TOKEN_VALUE"
+  if [[ -z "$desired" && -z "$current" ]]; then
+    desired="$(openssl rand -hex 24)"
+  fi
+
+  if [[ -z "$desired" ]]; then
+    echo "Reusing existing WhatsApp verify token secret: $WHATSAPP_VERIFY_TOKEN_SECRET" >&2
+    return
+  fi
+  if [[ "$current" == "$desired" ]]; then
+    echo "WhatsApp verify token secret unchanged: $WHATSAPP_VERIFY_TOKEN_SECRET" >&2
+    return
+  fi
+
+  printf "%s" "$desired" | gcloud secrets versions add "$WHATSAPP_VERIFY_TOKEN_SECRET" \
+    --project="$PROJECT_ID" \
+    --data-file=- >/dev/null
+  echo "Updated WhatsApp verify token secret: $WHATSAPP_VERIFY_TOKEN_SECRET" >&2
+}
+
+configure_whatsapp_app_secret() {
+  local current
+
+  current="$(secret_value "$WHATSAPP_APP_SECRET_SECRET")"
+  if [[ -n "$WHATSAPP_APP_SECRET_VALUE" ]]; then
+    ensure_value_secret "$WHATSAPP_APP_SECRET_SECRET" "$WHATSAPP_APP_SECRET_VALUE"
+    return
+  fi
+  if [[ -n "$current" ]]; then
+    echo "Reusing existing WhatsApp app secret: $WHATSAPP_APP_SECRET_SECRET" >&2
+    return
+  fi
+
+  echo "WhatsApp app secret is not configured yet." >&2
+  echo "Set WHATSAPP_APP_SECRET_VALUE to the Meta app secret and rerun this script before WHATSAPP_DRY_RUN=false." >&2
+}
+
 gcloud config set project "$PROJECT_ID"
 export PROJECT_NUMBER="$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)")"
 export RUNTIME_SA_EMAIL="${RUNTIME_SA}@${PROJECT_ID}.iam.gserviceaccount.com"
@@ -131,6 +179,10 @@ ensure_random_secret "$JWT_SECRET_NAME" 32
 ensure_random_secret "$ENCRYPTION_KEY_SECRET_NAME" 32
 ensure_random_secret "$VAULT_MASTER_KEY_SECRET_NAME" 32
 
+log "Creating or reusing WhatsApp webhook secrets"
+ensure_whatsapp_verify_token_secret
+configure_whatsapp_app_secret
+
 cat > github-variables.txt <<EOF
 GCP_PROJECT_ID=${PROJECT_ID}
 GCP_REGION=${REGION}
@@ -146,7 +198,10 @@ GCP_WORKLOAD_IDENTITY_PROVIDER=${WIF_PROVIDER_RESOURCE}
 GCP_DEPLOY_SERVICE_ACCOUNT=${DEPLOY_SA_EMAIL}
 CORS_ORIGINS=${CORS_ORIGINS}
 DEFAULT_TIMEZONE=${DEFAULT_TIMEZONE}
+WHATSAPP_API_VERSION=${WHATSAPP_API_VERSION}
 WHATSAPP_DRY_RUN=${WHATSAPP_DRY_RUN}
+WHATSAPP_VERIFY_TOKEN_SECRET=${WHATSAPP_VERIFY_TOKEN_SECRET}
+WHATSAPP_APP_SECRET_SECRET=${WHATSAPP_APP_SECRET_SECRET}
 DATABASE_URL_SECRET=${DATABASE_URL_SECRET}
 REDIS_URL_SECRET=${REDIS_URL_SECRET}
 CELERY_BROKER_URL_SECRET=${CELERY_BROKER_URL_SECRET}
@@ -176,6 +231,8 @@ ${CELERY_RESULT_BACKEND_SECRET}
 ${JWT_SECRET_NAME}
 ${ENCRYPTION_KEY_SECRET_NAME}
 ${VAULT_MASTER_KEY_SECRET_NAME}
+${WHATSAPP_VERIFY_TOKEN_SECRET}
+${WHATSAPP_APP_SECRET_SECRET}
 
 GitHub output files:
 github-variables.txt

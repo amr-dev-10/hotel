@@ -211,7 +211,10 @@ GCP_WORKLOAD_IDENTITY_PROVIDER=projects/PROJECT_NUMBER/locations/global/workload
 GCP_DEPLOY_SERVICE_ACCOUNT=arcadia-github-deploy-staging@arcadia-hotel-staging.iam.gserviceaccount.com
 CORS_ORIGINS=*
 DEFAULT_TIMEZONE=Asia/Kolkata
+WHATSAPP_API_VERSION=v19.0
 WHATSAPP_DRY_RUN=true
+WHATSAPP_VERIFY_TOKEN_SECRET=arcadia-staging-whatsapp-verify-token
+WHATSAPP_APP_SECRET_SECRET=arcadia-staging-whatsapp-app-secret
 DATABASE_URL_SECRET=arcadia-staging-database-url
 REDIS_URL_SECRET=arcadia-staging-redis-url
 CELERY_BROKER_URL_SECRET=arcadia-staging-celery-broker-url
@@ -246,6 +249,20 @@ staging
 Add every line from `github-variables.txt` as a GitHub environment variable.
 
 Do not add application secrets to GitHub. Values like `DATABASE_URL`, `JWT_SECRET`, `ENCRYPTION_KEY`, `VAULT_MASTER_KEY`, and Redis URLs remain in Google Secret Manager.
+
+For real WhatsApp webhook testing, Secret Manager stores the actual Meta values:
+
+- `arcadia-staging-whatsapp-verify-token` stores the webhook verify token value you paste into Meta.
+- `arcadia-staging-whatsapp-app-secret` stores the Meta app secret.
+
+GitHub stores only these Secret Manager names:
+
+```text
+WHATSAPP_VERIFY_TOKEN_SECRET=arcadia-staging-whatsapp-verify-token
+WHATSAPP_APP_SECRET_SECRET=arcadia-staging-whatsapp-app-secret
+```
+
+Set `WHATSAPP_DRY_RUN=false` in the GitHub `staging` environment when you want staging to send real WhatsApp messages.
 
 ## Step 6: Trigger The Staging Deployment
 

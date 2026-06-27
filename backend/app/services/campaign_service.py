@@ -5,9 +5,9 @@ from sqlalchemy.orm import Session
 
 from app.models.campaign import Campaign, CampaignDelivery
 from app.core.encryption import decrypt_secret
+from app.core.exceptions import bad_request
 from app.repositories.campaign_repository import CampaignRepository
 from app.repositories.guest_repository import GuestRepository
-from app.repositories.hotel_repository import HotelRepository
 from app.repositories.whatsapp_repository import WhatsAppAccountRepository
 from app.schemas.campaign import CampaignCreate
 from app.services.consent_service import GuestConsentService
@@ -21,7 +21,6 @@ class CampaignService:
         self.db = db
         self.campaigns = CampaignRepository(db)
         self.guests = GuestRepository(db)
-        self.hotels = HotelRepository(db)
         self.whatsapp_accounts = WhatsAppAccountRepository(db)
         self.whatsapp = WhatsAppService()
 
@@ -54,11 +53,8 @@ class CampaignService:
                 amount=max(1, len(recipients)),
                 commit=False,
             )
+        account = self._active_account(hotel_id) if campaign.status != "scheduled" else None
         sent_count = 0
-        hotel = self.hotels.get(hotel_id)
-        account = None
-        if hotel and hotel.whatsapp_phone_number_id:
-            account = self.whatsapp_accounts.get_by_phone_number_id(hotel.whatsapp_phone_number_id)
         for guest in recipients:
             phone = guest.whatsapp_phone or guest.phone
             if not phone:
@@ -83,16 +79,14 @@ class CampaignService:
                 status="queued" if campaign.status == "scheduled" else "sent",
             )
             if campaign.status != "scheduled":
+                if not account:
+                    raise bad_request("WhatsApp account not configured")
                 self.whatsapp.send_template(
-                    account.phone_number_id if account else (hotel.whatsapp_phone_number_id if hotel else None),
+                    account.phone_number_id,
                     phone,
                     payload.template_name,
                     self._template_params(guest.name, payload.params),
-                    access_token=(
-                        account.access_token or decrypt_secret(account.access_token_encrypted)
-                        if account
-                        else None
-                    ),
+                    access_token=self._account_access_token(account),
                 )
                 WhatsAppUsageService(self.db).increment(hotel_id, "template_sent", commit=False)
                 WhatsAppUsageService(self.db).increment(hotel_id, "messages_sent", commit=False)
@@ -123,10 +117,9 @@ class CampaignService:
         if campaign.status == "sent":
             return campaign
 
-        hotel = self.hotels.get(hotel_id)
-        account = None
-        if hotel and hotel.whatsapp_phone_number_id:
-            account = self.whatsapp_accounts.get_by_phone_number_id(hotel.whatsapp_phone_number_id)
+        account = self._active_account(hotel_id)
+        if not account:
+            raise bad_request("WhatsApp account not configured")
         deliveries = self.campaigns.list_deliveries(campaign.id)
         pending_deliveries = [delivery for delivery in deliveries if delivery.status != "sent"]
         UsageService(self.db).check_and_increment(
@@ -144,15 +137,11 @@ class CampaignService:
                 continue
             try:
                 self.whatsapp.send_template(
-                    account.phone_number_id if account else (hotel.whatsapp_phone_number_id if hotel else None),
+                    account.phone_number_id,
                     delivery.phone,
                     campaign.template_name,
                     [str(value) for _, value in sorted(campaign.params.items())],
-                    access_token=(
-                        account.access_token or decrypt_secret(account.access_token_encrypted)
-                        if account
-                        else None
-                    ),
+                    access_token=self._account_access_token(account),
                 )
                 WhatsAppUsageService(self.db).increment(hotel_id, "template_sent", commit=False)
                 WhatsAppUsageService(self.db).increment(hotel_id, "messages_sent", commit=False)
@@ -203,6 +192,14 @@ class CampaignService:
         for key in sorted(params):
             values.append(str(params[key]))
         return values
+
+    def _active_account(self, hotel_id: str):
+        return self.whatsapp_accounts.first_active_for_hotel(hotel_id)
+
+    def _account_access_token(self, account) -> str | None:
+        if account.access_token_encrypted:
+            return decrypt_secret(account.access_token_encrypted)
+        return account.access_token
 
     def _is_future(self, value: datetime | None) -> bool:
         if value is None:

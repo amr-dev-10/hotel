@@ -40,6 +40,17 @@ class WhatsAppAccountRepository(BaseRepository[WhatsAppAccount]):
             select(WhatsAppAccount).where(WhatsAppAccount.status == "active")
         ).scalars().all()
 
+    def first_active_for_hotel(self, hotel_id: str) -> WhatsAppAccount | None:
+        return self.db.execute(
+            select(WhatsAppAccount)
+            .where(
+                WhatsAppAccount.hotel_id == hotel_id,
+                WhatsAppAccount.status == "active",
+            )
+            .order_by(WhatsAppAccount.created_at)
+            .limit(1)
+        ).scalars().first()
+
 
 class WhatsAppTemplateRepository(BaseRepository[WhatsAppTemplate]):
     def __init__(self, db: Session) -> None:
@@ -85,19 +96,27 @@ class WhatsAppConversationRepository(BaseRepository[WhatsAppConversation]):
         hotel_id: str,
         phone: str,
         guest_id: str | None,
+        whatsapp_account_id: str | None = None,
     ) -> WhatsAppConversation:
         statement = select(WhatsAppConversation).where(
             WhatsAppConversation.hotel_id == hotel_id,
             WhatsAppConversation.phone == phone,
         )
+        if whatsapp_account_id:
+            statement = statement.where(
+                WhatsAppConversation.whatsapp_account_id == whatsapp_account_id,
+            )
         conversation = self.db.execute(statement).scalar_one_or_none()
         if conversation:
             if guest_id and not conversation.guest_id:
                 conversation.guest_id = guest_id
+            if whatsapp_account_id and not conversation.whatsapp_account_id:
+                conversation.whatsapp_account_id = whatsapp_account_id
             conversation.last_message_at = utcnow()
             return conversation
         conversation = WhatsAppConversation(
             hotel_id=hotel_id,
+            whatsapp_account_id=whatsapp_account_id,
             phone=phone,
             guest_id=guest_id,
             status="open",
@@ -131,6 +150,35 @@ class WhatsAppConversationRepository(BaseRepository[WhatsAppConversation]):
             )
             .order_by(WhatsAppMessage.created_at)
         ).scalars().all()
+
+
+class WhatsAppMessageRepository(BaseRepository[WhatsAppMessage]):
+    def __init__(self, db: Session) -> None:
+        super().__init__(db, WhatsAppMessage)
+
+    def get_by_meta_message_id(
+        self,
+        hotel_id: str,
+        meta_message_id: str,
+    ) -> WhatsAppMessage | None:
+        return self.db.execute(
+            select(WhatsAppMessage).where(
+                WhatsAppMessage.hotel_id == hotel_id,
+                WhatsAppMessage.meta_message_id == meta_message_id,
+            )
+        ).scalar_one_or_none()
+
+    def update_status_by_meta_message_id(
+        self,
+        hotel_id: str,
+        meta_message_id: str,
+        status: str,
+    ) -> WhatsAppMessage | None:
+        message = self.get_by_meta_message_id(hotel_id, meta_message_id)
+        if not message:
+            return None
+        message.status = status
+        return message
 
 
 class LiveChatSessionRepository(BaseRepository[LiveChatSession]):

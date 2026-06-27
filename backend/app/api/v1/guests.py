@@ -12,6 +12,7 @@ from app.repositories.guest_repository import GuestRepository
 from app.schemas.consent import GuestConsentRead, GuestConsentUpsert
 from app.schemas.guest import GuestCreate, GuestDetail, GuestListItem, GuestRead, GuestUpdate, TimelineEvent
 from app.services.consent_service import GuestConsentService
+from app.services.whatsapp_contact_sync import sync_guest_whatsapp_contact
 from app.models.reservation import Reservation, ReservationGuest
 from app.models.whatsapp import WhatsAppConversation, WhatsAppMessage
 from app.models.ticket import Ticket
@@ -105,6 +106,8 @@ def update_guest(
     update_data = payload.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(guest, key, value)
+    if {"phone", "whatsapp_phone"} & update_data.keys():
+        sync_guest_whatsapp_contact(db, guest)
         
     db.commit()
     db.refresh(guest)
@@ -220,6 +223,10 @@ def get_guest_conversation(
             )
             db.add(conversation)
         
+        db.commit()
+        db.refresh(conversation)
+    else:
+        sync_guest_whatsapp_contact(db, guest)
         db.commit()
         db.refresh(conversation)
 
