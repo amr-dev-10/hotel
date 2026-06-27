@@ -1,0 +1,39 @@
+FROM node:20-alpine AS base
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
+
+FROM base AS deps
+WORKDIR /app
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/dashboard/package.json apps/dashboard/package.json
+RUN pnpm install --frozen-lockfile
+
+FROM deps AS builder
+WORKDIR /app
+ARG API_PROXY_TARGET="http://localhost:8000"
+ARG NEXT_PUBLIC_API_BASE_URL="/api/v1"
+ARG NEXT_PUBLIC_WS_BASE_URL="ws://localhost:8000"
+ENV API_PROXY_TARGET="${API_PROXY_TARGET}"
+ENV NEXT_PUBLIC_API_BASE_URL="${NEXT_PUBLIC_API_BASE_URL}"
+ENV NEXT_PUBLIC_WS_BASE_URL="${NEXT_PUBLIC_WS_BASE_URL}"
+COPY . .
+RUN mkdir -p apps/dashboard/public
+RUN pnpm --filter @arcadia/dashboard build
+
+FROM node:20-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+ENV HOSTNAME=0.0.0.0
+ENV PORT=8080
+
+RUN addgroup -S nodejs && adduser -S nextjs -G nodejs
+
+COPY --from=builder --chown=nextjs:nodejs /app/apps/dashboard/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/apps/dashboard/.next/static ./apps/dashboard/.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/apps/dashboard/public ./apps/dashboard/public
+
+USER nextjs
+EXPOSE 8080
+
+CMD ["node", "apps/dashboard/server.js"]

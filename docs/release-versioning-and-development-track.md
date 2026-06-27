@@ -67,6 +67,7 @@ This is the current tracked deployment hardening sequence for staging.
 | `DEPLOY-STG-006` | `platform-v1.0.0-rc.1` | 2026-06-27 | Release Track | Promoted the current development line to the first major release candidate because staging is the first server deployment milestone. | Applied |
 | `DEPLOY-STG-007` | `infra-staging-v2026.06.27.4` | 2026-06-27 | Admin Bootstrap | Added production-style one-time Cloud Run Job script for creating the first platform admin without permanent plaintext secrets. | Applied |
 | `DEPLOY-STG-008` | `infra-staging-v2026.06.27.5` | 2026-06-27 | Admin Recovery | Added one-time Cloud Run Job script and backend seed module for platform admin password recovery without rotating long-lived secrets. | Applied |
+| `DEPLOY-STG-009` | `dashboard-v1.0.0-rc.1` | 2026-06-27 | Frontend CI/CD | Added Next.js standalone Docker image, frontend Cloud Run workflow, staging GitHub variable generator, and deployment documentation. | Applied |
 
 ## Branch And Environment Track
 

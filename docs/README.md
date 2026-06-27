@@ -7,6 +7,7 @@ Architecture documents are versioned by folder so new designs can be added witho
 - `../SETUP.md` - canonical single-file setup guide for database setup, backend/frontend environment setup, test commands, demo data seeding, and production notes.
 - `development-setup-testing-and-seeding.md` - pointer to the canonical setup guide.
 - `GCP_BACKEND_DEPLOYMENT.md` - Google Cloud Run, Cloud SQL, Redis, Secret Manager, and GitHub Actions deployment guide.
+- `frontend-cloud-run-deployment.md` - Next.js dashboard deployment to Google Cloud Run with GitHub Actions.
 - `release-versioning-and-development-track.md` - SemVer, release candidate, migration, infrastructure, documentation, and current staging deployment fix tracking.
 - `staging-serverless-deployment-runbook.md` - staging deployment runbook for `amr-dev-10/hotel`, including Cloud Shell setup, GitHub environment variables, CI/CD trigger steps, verification, and troubleshooting.
 - `current-development-operations-guide.md` - current escalation, notification, Food and Beverage, kitchen, and guest portal flows, including staff manual order creation and order editing.

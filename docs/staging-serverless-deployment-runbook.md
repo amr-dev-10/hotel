@@ -56,7 +56,9 @@ The staging deployment is driven by these files:
 | `infra/staging/full-setup.sh` | Runs bootstrap and secret configuration together. |
 | `infra/staging/bootstrap-platform-admin.sh` | Creates the first platform admin with a one-time Cloud Run Job and temporary Secret Manager password. |
 | `infra/staging/reset-platform-admin-password.sh` | Resets an existing platform admin password with a one-time Cloud Run Job and temporary Secret Manager password. |
+| `infra/staging/configure-frontend.sh` | Creates frontend Cloud Run runtime identity and writes frontend GitHub variables. |
 | `docs/GCP_BACKEND_DEPLOYMENT.md` | Main deployment guide. |
+| `docs/frontend-cloud-run-deployment.md` | Frontend Cloud Run deployment guide. |
 | `docs/staging-serverless-deployment-runbook.md` | This operational runbook. |
 | `backend/Dockerfile` | Cloud Run container image definition. |
 | `backend/alembic.ini` | Alembic config with portable migration path. |
@@ -635,6 +637,8 @@ The workflow deploys the service only after migration succeeds.
 - Rolling back Cloud Run does not roll back database migrations.
 
 ## Production Notes
+
+Frontend production deployment should follow `docs/frontend-cloud-run-deployment.md` with production project, service name, backend URL, and GitHub environment values.
 
 Production should use the same pattern with different names:
 

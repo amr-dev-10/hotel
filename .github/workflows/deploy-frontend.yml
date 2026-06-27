@@ -1,0 +1,152 @@
+name: Frontend CI/CD
+
+on:
+  push:
+    branches:
+      - staging
+      - main
+    paths:
+      - "apps/dashboard/**"
+      - ".github/workflows/deploy-frontend.yml"
+      - ".dockerignore"
+      - "Dockerfile.frontend"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Environment to deploy"
+        required: true
+        default: "staging"
+        type: choice
+        options:
+          - staging
+          - production
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: frontend-deploy-${{ github.event_name == 'workflow_dispatch' && inputs.target || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build and deploy frontend
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event_name == 'workflow_dispatch' && inputs.target || (github.ref_name == 'main' && 'production' || 'staging') }}
+    env:
+      ENVIRONMENT_NAME: ${{ github.event_name == 'workflow_dispatch' && inputs.target || (github.ref_name == 'main' && 'production' || 'staging') }}
+      GCP_REGION: ${{ vars.GCP_REGION || 'us-central1' }}
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      ARTIFACT_REPOSITORY: ${{ vars.ARTIFACT_REPOSITORY || 'arcadia-repo' }}
+      FRONTEND_IMAGE_NAME: ${{ vars.FRONTEND_IMAGE_NAME || 'dashboard-web' }}
+      FRONTEND_CLOUD_RUN_SERVICE: ${{ vars.FRONTEND_CLOUD_RUN_SERVICE || vars.CLOUD_RUN_FRONTEND_SERVICE }}
+      FRONTEND_CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT: ${{ vars.FRONTEND_CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT }}
+      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      GCP_DEPLOY_SERVICE_ACCOUNT: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      API_PROXY_TARGET: ${{ vars.API_PROXY_TARGET }}
+      NEXT_PUBLIC_API_BASE_URL: ${{ vars.NEXT_PUBLIC_API_BASE_URL || '/api/v1' }}
+      NEXT_PUBLIC_WS_BASE_URL: ${{ vars.NEXT_PUBLIC_WS_BASE_URL }}
+      FRONTEND_MEMORY: ${{ vars.FRONTEND_MEMORY || '1Gi' }}
+      FRONTEND_CPU: ${{ vars.FRONTEND_CPU || '1' }}
+      FRONTEND_MIN_INSTANCES: ${{ vars.FRONTEND_MIN_INSTANCES || '0' }}
+      FRONTEND_MAX_INSTANCES: ${{ vars.FRONTEND_MAX_INSTANCES || '10' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate deployment configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$ENVIRONMENT_NAME" == "production" && "$GITHUB_REF_NAME" != "main" ]]; then
+            echo "Production deploys must run from the main branch."
+            exit 1
+          fi
+          required=(
+            GCP_PROJECT_ID
+            GCP_WORKLOAD_IDENTITY_PROVIDER
+            GCP_DEPLOY_SERVICE_ACCOUNT
+            FRONTEND_CLOUD_RUN_SERVICE
+            FRONTEND_CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT
+            API_PROXY_TARGET
+            NEXT_PUBLIC_API_BASE_URL
+            NEXT_PUBLIC_WS_BASE_URL
+          )
+          missing=()
+          for name in "${required[@]}"; do
+            if [[ -z "${!name:-}" ]]; then
+              missing+=("$name")
+            fi
+          done
+          if (( ${#missing[@]} > 0 )); then
+            printf 'Missing required GitHub environment variables: %s\n' "${missing[*]}"
+            exit 1
+          fi
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
+
+      - name: Build and push frontend image
+        shell: bash
+        run: |
+          set -euo pipefail
+          image_uri="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REPOSITORY}/${FRONTEND_IMAGE_NAME}:${GITHUB_SHA}"
+          latest_uri="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REPOSITORY}/${FRONTEND_IMAGE_NAME}:${ENVIRONMENT_NAME}-latest"
+
+          docker build --file Dockerfile.frontend \
+            --build-arg API_PROXY_TARGET="${API_PROXY_TARGET}" \
+            --build-arg NEXT_PUBLIC_API_BASE_URL="${NEXT_PUBLIC_API_BASE_URL}" \
+            --build-arg NEXT_PUBLIC_WS_BASE_URL="${NEXT_PUBLIC_WS_BASE_URL}" \
+            --tag "$image_uri" \
+            --tag "$latest_uri" .
+
+          docker push "$image_uri"
+          docker push "$latest_uri"
+          printf 'IMAGE_URI=%s\n' "$image_uri" >> "$GITHUB_ENV"
+
+      - name: Deploy frontend service
+        shell: bash
+        run: |
+          set -euo pipefail
+          frontend_env_vars="^|^API_PROXY_TARGET=${API_PROXY_TARGET}|NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}|NEXT_PUBLIC_WS_BASE_URL=${NEXT_PUBLIC_WS_BASE_URL}|NODE_ENV=production"
+
+          gcloud run deploy "$FRONTEND_CLOUD_RUN_SERVICE" \
+            --project="$GCP_PROJECT_ID" \
+            --region="$GCP_REGION" \
+            --image="$IMAGE_URI" \
+            --service-account="$FRONTEND_CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT" \
+            --port=8080 \
+            --memory="$FRONTEND_MEMORY" \
+            --cpu="$FRONTEND_CPU" \
+            --min-instances="$FRONTEND_MIN_INSTANCES" \
+            --max-instances="$FRONTEND_MAX_INSTANCES" \
+            --set-env-vars="$frontend_env_vars" \
+            --allow-unauthenticated \
+            --quiet
+
+      - name: Smoke test frontend
+        shell: bash
+        run: |
+          set -euo pipefail
+          service_url="$(gcloud run services describe "$FRONTEND_CLOUD_RUN_SERVICE" \
+            --project="$GCP_PROJECT_ID" \
+            --region="$GCP_REGION" \
+            --format='value(status.url)')"
+          echo "Frontend URL: ${service_url}"
+          curl -fsS "${service_url}/platform/login" >/dev/null

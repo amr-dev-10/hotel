@@ -5,6 +5,7 @@ const apiProxyTarget = process.env.API_PROXY_TARGET ?? process.env.API_INTERNAL_
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  output: "standalone",
   outputFileTracingRoot: path.join(process.cwd(), "../.."),
   async rewrites() {
     return [
