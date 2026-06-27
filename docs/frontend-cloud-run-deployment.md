@@ -73,7 +73,7 @@ bash infra/staging/configure-frontend.sh
 The script creates:
 
 ```text
-arcadia-dashboard-runner-staging@arcadia-hotel-staging.iam.gserviceaccount.com
+arcadia-dash-run-stg@arcadia-hotel-staging.iam.gserviceaccount.com
 ```
 
 It also writes:
@@ -100,7 +100,7 @@ GCP_WORKLOAD_IDENTITY_PROVIDER=...
 GCP_DEPLOY_SERVICE_ACCOUNT=arcadia-github-deploy-staging@arcadia-hotel-staging.iam.gserviceaccount.com
 FRONTEND_CLOUD_RUN_SERVICE=arcadia-dashboard-staging
 FRONTEND_IMAGE_NAME=dashboard-web
-FRONTEND_CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT=arcadia-dashboard-runner-staging@arcadia-hotel-staging.iam.gserviceaccount.com
+FRONTEND_CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT=arcadia-dash-run-stg@arcadia-hotel-staging.iam.gserviceaccount.com
 API_PROXY_TARGET=https://arcadia-backend-staging-....a.run.app
 NEXT_PUBLIC_API_BASE_URL=/api/v1
 NEXT_PUBLIC_WS_BASE_URL=wss://arcadia-backend-staging-....a.run.app
