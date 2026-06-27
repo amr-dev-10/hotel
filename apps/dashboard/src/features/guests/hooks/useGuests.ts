@@ -81,6 +81,9 @@ export function useUpdateGuest(hotelId: string, guestId: string) {
       apiPatch<Guest>(`/hotels/${hotelId}/guests/${guestId}`, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.guests(hotelId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.guestDetail(hotelId, guestId) });
+      queryClient.invalidateQueries({ queryKey: ["guestConversation", hotelId, guestId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.whatsapp.conversations(hotelId) });
     },
   });
 }

@@ -64,7 +64,8 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
 
   const conversations = useWhatsappConversations(hotelId);
   const allGuests = useGuests(hotelId);
-  const selectedConversation = conversations.data?.find((c) => c.id === activeConversationId);
+  const conversationRows = useMemo(() => conversations.data ?? [], [conversations.data]);
+  const selectedConversation = conversationRows.find((c) => c.id === activeConversationId);
   const contextGuestId =
     guestQueryParam && !activeConversationId
       ? guestQueryParam
@@ -88,8 +89,7 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
   }, [autoConversation.data, activeConversationId, router, hotelId, activeReservationId]);
 
   const filteredConversations = useMemo(() => {
-    if (!conversations.data) return [];
-    let filtered = conversations.data;
+    let filtered = conversationRows;
 
     // Apply Search
     if (searchQuery) {
@@ -111,10 +111,10 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
     }
 
     return filtered;
-  }, [activeFilter, conversations.data, currentUser?.id, searchQuery]);
+  }, [activeFilter, conversationRows, currentUser?.id, searchQuery]);
 
   // If a conversation is selected, fetch messages and guest info
-  const messagesQuery = useWhatsappMessages(hotelId, activeConversationId || "");
+  const messagesQuery = useWhatsappMessages(hotelId, selectedConversation ? activeConversationId || "" : "");
   const guestQuery = useGuest(hotelId, selectedConversation?.guest_id || "");
   const reservationTickets = (reservationTicketsQuery.data ?? []).filter((ticket) => ticket.reservation_id === activeReservationId);
   const guestTickets = (guestTicketsQuery.data ?? []).filter((ticket) => !activeReservationId || ticket.reservation_id !== activeReservationId);
@@ -197,14 +197,11 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
     }
   }
 
-  if (conversations.isLoading) return <DataState isLoading />;
-  if (conversations.error) return <DataState error={conversations.error} />;
-
   // Conversation counters
-  const unreadCount = conversations.data?.filter(c => c.unread_count > 0).length || 0;
-  const openCount = conversations.data?.filter(c => c.status === "open").length || 0;
-  const vipCount = conversations.data?.filter(c => ["high", "urgent"].includes(c.priority)).length || 0;
-  const mineCount = conversations.data?.filter(c => Boolean(currentUser?.id) && c.assigned_staff_id === currentUser?.id).length || 0;
+  const unreadCount = conversationRows.filter(c => c.unread_count > 0).length;
+  const openCount = conversationRows.filter(c => c.status === "open").length;
+  const vipCount = conversationRows.filter(c => ["high", "urgent"].includes(c.priority)).length;
+  const mineCount = conversationRows.filter(c => Boolean(currentUser?.id) && c.assigned_staff_id === currentUser?.id).length;
 
   return (
     <>
@@ -259,10 +256,10 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
         </DialogContent>
       </Dialog>
 
-      <div className="flex h-[85vh] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="flex min-h-[85vh] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm lg:h-[85vh] lg:flex-row">
       
       {/* LEFT PANE: CONVERSATION LIST */}
-      <div className="flex w-1/4 min-w-[300px] flex-col border-r border-slate-200 bg-slate-50/50">
+      <div className="flex w-full flex-col border-b border-slate-200 bg-slate-50/50 lg:w-1/4 lg:min-w-[300px] lg:border-b-0 lg:border-r">
         <div className="border-b border-slate-200 p-4">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-slate-800">Inbox</h2>
@@ -275,6 +272,11 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
               </Button>
             </div>
           </div>
+          {conversations.error ? (
+            <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+              Conversations are unavailable. Settings is still available.
+            </div>
+          ) : null}
           
           <div className="relative mb-3">
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
@@ -288,7 +290,7 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
 
           <div className="flex flex-wrap gap-1">
             <FilterButton active={activeFilter === "all"} onClick={() => setActiveFilter("all")}>
-              All <span className="text-xs text-slate-400">({conversations.data?.length})</span>
+              All <span className="text-xs text-slate-400">({conversationRows.length})</span>
             </FilterButton>
             <FilterButton active={activeFilter === "unread"} onClick={() => setActiveFilter("unread")}>
               Unread <span className="text-xs text-slate-400">({unreadCount})</span>
@@ -306,7 +308,28 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
         </div>
 
         <div className="flex-1 overflow-y-auto p-2">
-          {!filteredConversations?.length ? (
+          {conversations.isLoading ? (
+            <div className="flex items-center justify-center gap-2 p-4 text-sm text-slate-500">
+              <Loader2 className="size-4 animate-spin" />
+              Loading conversations
+            </div>
+          ) : conversations.error ? (
+            <div className="grid gap-3 rounded-md border border-rose-100 bg-white p-4 text-sm text-slate-600">
+              <div className="flex items-start gap-2 text-rose-700">
+                <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                <div>
+                  <p className="font-semibold">Conversation API failed</p>
+                  <p className="mt-1 text-xs text-slate-500">{apiErrorMessage(conversations.error)}</p>
+                </div>
+              </div>
+              <Button asChild type="button" variant="secondary">
+                <Link href={`/${hotelId}/whatsapp/settings`}>
+                  <Settings className="size-4" />
+                  Open settings
+                </Link>
+              </Button>
+            </div>
+          ) : !filteredConversations?.length ? (
             <div className="p-4 text-center text-sm text-slate-500">No conversations found.</div>
           ) : (
             filteredConversations.map((conversation) => {
@@ -351,8 +374,24 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
       </div>
 
       {/* MIDDLE PANE: CHAT HISTORY */}
-      <div className="flex flex-1 flex-col bg-[#E5E5E5]/20 relative">
-        {!activeConversationId || !selectedConversation ? (
+      <div className="relative flex min-h-[420px] flex-1 flex-col bg-[#E5E5E5]/20">
+        {conversations.error ? (
+          <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-slate-500">
+            <AlertCircle className="size-12 text-amber-500" />
+            <div>
+              <p className="font-semibold text-slate-700">Inbox cannot load conversations right now</p>
+              <p className="mt-1 max-w-md text-sm">
+                You can still open WhatsApp settings and configure the hotel account.
+              </p>
+            </div>
+            <Button asChild type="button">
+              <Link href={`/${hotelId}/whatsapp/settings`}>
+                <Settings className="size-4" />
+                Open WhatsApp settings
+              </Link>
+            </Button>
+          </div>
+        ) : !activeConversationId || !selectedConversation ? (
           <div className="flex h-full flex-col items-center justify-center text-slate-400">
             <MessageCircle className="mb-4 size-12 opacity-20" />
             <p>Select a conversation to start chatting</p>
@@ -474,7 +513,7 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
       </div>
 
       {/* RIGHT PANE: CONTEXT */}
-      <div className="flex w-[320px] flex-col border-l border-slate-200 bg-white">
+      <div className="flex w-full flex-col border-t border-slate-200 bg-white lg:w-[320px] lg:border-l lg:border-t-0">
         {!activeConversationId || !selectedConversation ? (
           <div className="flex h-full items-center justify-center p-4 text-center text-sm text-slate-400">
             Select a conversation to view context

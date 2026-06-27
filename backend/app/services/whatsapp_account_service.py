@@ -16,6 +16,7 @@ from app.schemas.whatsapp_account import (
     WhatsAppMessageSendRequest,
 )
 from app.services.audit_service import AuditService
+from app.services.whatsapp_contact_sync import sync_guest_whatsapp_contact
 from app.services.whatsapp_ops_service import ConversationWindowService, WhatsAppHealthService
 from app.services.whatsapp_service import WhatsAppService
 
@@ -188,6 +189,13 @@ class WhatsAppAccountService:
                 raise not_found("Ticket not found")
             if ticket.conversation_id and ticket.conversation_id != conversation_id:
                 raise bad_request("Ticket is linked to another WhatsApp conversation")
+        if conversation.guest_id:
+            from app.models.guest import Guest
+
+            guest = self.db.get(Guest, conversation.guest_id)
+            if guest and guest.hotel_id == hotel_id:
+                sync_guest_whatsapp_contact(self.db, guest)
+                self.db.flush()
             
         account = self.accounts.first_active_for_hotel(hotel_id)
         if not account:

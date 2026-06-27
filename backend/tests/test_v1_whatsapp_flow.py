@@ -1,8 +1,11 @@
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
+import pytest
 
 from app.main import app
+from app.services import whatsapp_service
+from app.services.whatsapp_service import WhatsAppService
 
 
 def _meta_payload(
@@ -317,3 +320,103 @@ def test_whatsapp_status_webhook_updates_existing_message_status() -> None:
             item for item in messages.json()["data"] if item["meta_message_id"] == meta_message_id
         )
         assert updated["status"] == "read"
+
+
+def test_guest_whatsapp_phone_update_syncs_conversation_send_target() -> None:
+    suffix = uuid4().hex[:8]
+    phone_number_id = f"sync_{suffix}"
+    old_guest_phone = f"300{suffix[:7]}"
+    corrected_guest_phone = f"92300{suffix[:7]}"
+
+    with TestClient(app) as client:
+        hotel_id, headers = _bootstrap_hotel(client, f"sync-{suffix}", phone_number_id, "601")
+
+        guest = client.post(
+            f"/api/v1/hotels/{hotel_id}/guests",
+            headers=headers,
+            json={
+                "name": "Phone Fix Guest",
+                "phone": old_guest_phone,
+                "whatsapp_phone": old_guest_phone,
+                "status": "checked_in",
+            },
+        )
+        assert guest.status_code == 200
+        guest_id = guest.json()["data"]["id"]
+
+        conversation = client.get(
+            f"/api/v1/hotels/{hotel_id}/guests/{guest_id}/conversation",
+            headers=headers,
+        )
+        assert conversation.status_code == 200
+        conversation_id = conversation.json()["data"]["conversation_id"]
+
+        before = client.get(
+            f"/api/v1/hotels/{hotel_id}/whatsapp/conversations",
+            headers=headers,
+        )
+        assert before.status_code == 200
+        assert before.json()["data"][0]["phone"] == old_guest_phone
+
+        update = client.patch(
+            f"/api/v1/hotels/{hotel_id}/guests/{guest_id}",
+            headers=headers,
+            json={"whatsapp_phone": corrected_guest_phone},
+        )
+        assert update.status_code == 200
+        assert update.json()["data"]["whatsapp_phone"] == corrected_guest_phone
+
+        after = client.get(
+            f"/api/v1/hotels/{hotel_id}/whatsapp/conversations",
+            headers=headers,
+        )
+        assert after.status_code == 200
+        assert after.json()["data"][0]["phone"] == corrected_guest_phone
+
+        send = client.post(
+            f"/api/v1/hotels/{hotel_id}/whatsapp/conversations/{conversation_id}/messages",
+            headers=headers,
+            json={"message": "Hello again"},
+        )
+        assert send.status_code == 200
+        assert send.json()["data"]["result"]["payload"]["to"] == corrected_guest_phone
+
+
+def test_whatsapp_service_uses_account_access_token_when_not_dry_run(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict = {}
+
+    class FakeResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {"messages": [{"id": "wamid.outbound"}]}
+
+    def fake_post(url: str, json: dict, headers: dict, timeout: int) -> FakeResponse:
+        captured.update(
+            {
+                "url": url,
+                "json": json,
+                "headers": headers,
+                "timeout": timeout,
+            }
+        )
+        return FakeResponse()
+
+    monkeypatch.setattr(whatsapp_service.settings, "whatsapp_dry_run", False)
+    monkeypatch.setattr(whatsapp_service.httpx, "post", fake_post)
+
+    result = WhatsAppService().send_text(
+        "phone_account_a",
+        "919999999999",
+        "Hello from hotel A",
+        access_token="hotel-a-token",
+    )
+
+    assert result == {"messages": [{"id": "wamid.outbound"}]}
+    assert captured["url"].endswith("/phone_account_a/messages")
+    assert captured["headers"] == {"Authorization": "Bearer hotel-a-token"}
+    assert captured["json"]["to"] == "919999999999"
+    assert captured["json"]["text"]["body"] == "Hello from hotel A"

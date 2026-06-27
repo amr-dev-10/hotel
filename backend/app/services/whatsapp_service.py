@@ -107,7 +107,7 @@ class WhatsAppService:
         response = httpx.post(
             url,
             json=payload,
-            headers={"Authorization": f"Bearer {token}"},
+            headers={"Authorization": f"Bearer {access_token}"},
             timeout=10,
         )
         response.raise_for_status()
