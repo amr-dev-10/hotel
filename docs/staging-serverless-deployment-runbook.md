@@ -54,6 +54,8 @@ The staging deployment is driven by these files:
 | `infra/staging/bootstrap.sh` | Creates or reuses Google Cloud infrastructure for staging. |
 | `infra/staging/configure-secrets.sh` | Creates or reuses Secret Manager values and writes GitHub setup files. |
 | `infra/staging/full-setup.sh` | Runs bootstrap and secret configuration together. |
+| `infra/staging/bootstrap-platform-admin.sh` | Creates the first platform admin with a one-time Cloud Run Job and temporary Secret Manager password. |
+| `infra/staging/reset-platform-admin-password.sh` | Resets an existing platform admin password with a one-time Cloud Run Job and temporary Secret Manager password. |
 | `docs/GCP_BACKEND_DEPLOYMENT.md` | Main deployment guide. |
 | `docs/staging-serverless-deployment-runbook.md` | This operational runbook. |
 | `backend/Dockerfile` | Cloud Run container image definition. |
@@ -76,7 +78,7 @@ The Cloud Shell scripts create or reuse:
 - Memorystore Redis instance: `arcadia-redis-staging`
 - Serverless VPC Access connector: `arcadia-vpc-staging`
 - Runtime service account: `arcadia-backend-runner-staging`
-- GitHub deploy service account: `arcadia-github-deployer-staging`
+- GitHub deploy service account: `arcadia-github-deploy-staging`
 - Workload Identity Federation pool: `github-actions-pool`
 - Workload Identity Federation provider: `github-actions-provider`
 
@@ -204,7 +206,7 @@ CLOUD_SQL_CONNECTION_NAME=arcadia-hotel-staging:asia-south2:arcadia-db-staging
 VPC_CONNECTOR=arcadia-vpc-staging
 VPC_EGRESS=private-ranges-only
 GCP_WORKLOAD_IDENTITY_PROVIDER=projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider
-GCP_DEPLOY_SERVICE_ACCOUNT=arcadia-github-deployer-staging@arcadia-hotel-staging.iam.gserviceaccount.com
+GCP_DEPLOY_SERVICE_ACCOUNT=arcadia-github-deploy-staging@arcadia-hotel-staging.iam.gserviceaccount.com
 CORS_ORIGINS=*
 DEFAULT_TIMEZONE=Asia/Kolkata
 WHATSAPP_DRY_RUN=true
@@ -302,6 +304,163 @@ Expected response:
 ```json
 {"ok":true}
 ```
+
+## Step 9: Create First Platform Admin
+
+Staging should use the same production-safe bootstrap process:
+
+```text
+Temporary generated password
+-> temporary Secret Manager secret
+-> one-time Cloud Run Job
+-> platform admin row in Cloud SQL
+-> delete job and temporary secret
+-> store printed password in password manager
+```
+
+Run this only after the backend service has deployed successfully:
+
+```bash
+cd ~/hotel
+git fetch origin
+git checkout staging
+git pull origin staging
+bash infra/staging/bootstrap-platform-admin.sh
+```
+
+Default platform admin email:
+
+```text
+admin@arcadia.io
+```
+
+The script prints a generated password once. Save it in a password manager immediately.
+
+If the job logs say:
+
+```text
+Platform admin already exists
+```
+
+then the printed password was not applied because the seed script does not overwrite existing admins. For another staging admin, rerun with a different email:
+
+```bash
+PLATFORM_ADMIN_EMAIL="admin+staging-$(date +%Y%m%d%H%M)@arcadia.io" \
+bash infra/staging/bootstrap-platform-admin.sh
+```
+
+## Step 10: Test Platform Login And Hotel Creation
+
+In Cloud Shell:
+
+```bash
+SERVICE_URL="$(gcloud run services describe arcadia-backend-staging \
+  --project=arcadia-hotel-staging \
+  --region=asia-south2 \
+  --format='value(status.url)')"
+
+ADMIN_EMAIL="admin@arcadia.io"
+ADMIN_PASSWORD="PASTE_PASSWORD_FROM_PASSWORD_MANAGER"
+
+LOGIN_JSON="$(curl -sS -X POST "$SERVICE_URL/api/v1/platform/auth/login" \
+  -H "Content-Type: application/json" \
+  -d "{\"email\":\"$ADMIN_EMAIL\",\"password\":\"$ADMIN_PASSWORD\"}")"
+
+echo "$LOGIN_JSON"
+
+TOKEN="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["access_token"])' <<< "$LOGIN_JSON")"
+
+curl -sS "$SERVICE_URL/api/v1/platform/dashboard" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Create a test hotel:
+
+```bash
+OWNER_PASSWORD="HotelOwner-$(openssl rand -hex 8)"
+
+cat > /tmp/create-hotel.json <<EOF
+{
+  "slug": "arcadia-demo",
+  "name": "Arcadia Demo Hotel",
+  "owner_name": "Demo Hotel Owner",
+  "owner_email": "owner@arcadia.demo",
+  "owner_password": "$OWNER_PASSWORD",
+  "address": "Delhi",
+  "timezone": "Asia/Kolkata",
+  "subscription_tier": "starter",
+  "seed_rooms": ["101", "102", "201"]
+}
+EOF
+
+curl -sS -X POST "$SERVICE_URL/api/v1/platform/hotels" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  --data @/tmp/create-hotel.json
+
+echo "Hotel owner email: owner@arcadia.demo"
+echo "Hotel owner password: $OWNER_PASSWORD"
+```
+
+Test hotel owner login:
+
+```bash
+curl -sS -X POST "$SERVICE_URL/api/v1/auth/login" \
+  -H "Content-Type: application/json" \
+  -d "{\"email\":\"owner@arcadia.demo\",\"password\":\"$OWNER_PASSWORD\"}"
+```
+
+## Step 11: Recover Lost Platform Admin Password
+
+Use this only when a platform admin password is lost. The first-admin bootstrap script does not overwrite an existing admin password.
+
+This recovery flow uses the same production-safe pattern:
+
+```text
+Temporary generated password
+-> temporary Secret Manager secret
+-> one-time Cloud Run Job
+-> update platform_admins.password_hash
+-> delete job and temporary secret
+-> store printed password in password manager
+```
+
+Run after this recovery code has been deployed to staging:
+
+```bash
+cd ~/hotel
+git fetch origin
+git checkout staging
+git pull origin staging
+bash infra/staging/reset-platform-admin-password.sh
+```
+
+The script asks you to type the target email before it resets anything.
+
+Default platform admin email:
+
+```text
+admin@arcadia.io
+```
+
+To reset another platform admin:
+
+```bash
+PLATFORM_ADMIN_EMAIL="admin-recovery@arcadia.io" \
+bash infra/staging/reset-platform-admin-password.sh
+```
+
+The script prints the new password once. Save it in a password manager immediately.
+
+This recovery does not rotate or change:
+
+- `JWT_SECRET`
+- `DATABASE_URL`
+- DB password
+- Redis secrets
+- encryption keys
+- vault keys
+- hotel owner or staff passwords
 
 ## Useful Cloud Shell Checks
 
@@ -497,6 +656,9 @@ Before production use:
 - Use a stronger Cloud SQL tier and backup policy.
 - Confirm monitoring and alerting.
 - Take database backups before risky migrations.
+- Create the first production platform admin with the same one-time Cloud Run Job and temporary Secret Manager password pattern.
+- Recover lost production platform admin passwords with the same one-time Cloud Run Job pattern used by `reset-platform-admin-password.sh`.
+- Store the production admin password only in a password manager.
 
 ## Official References
 

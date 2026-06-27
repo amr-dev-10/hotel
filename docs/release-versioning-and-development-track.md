@@ -65,6 +65,8 @@ This is the current tracked deployment hardening sequence for staging.
 | `DEPLOY-STG-004` | `infra-staging-v2026.06.27.3` | 2026-06-27 | Cloud SQL | Fixed Cloud SQL tier mismatch by explicitly using `DB_EDITION=enterprise` with `DB_TIER=db-g1-small`. | Applied |
 | `DEPLOY-STG-005` | `docs-v2026.06.27.1` | 2026-06-27 | Documentation | Added staging deployment runbook, troubleshooting notes, and versioning track. | Applied |
 | `DEPLOY-STG-006` | `platform-v1.0.0-rc.1` | 2026-06-27 | Release Track | Promoted the current development line to the first major release candidate because staging is the first server deployment milestone. | Applied |
+| `DEPLOY-STG-007` | `infra-staging-v2026.06.27.4` | 2026-06-27 | Admin Bootstrap | Added production-style one-time Cloud Run Job script for creating the first platform admin without permanent plaintext secrets. | Applied |
+| `DEPLOY-STG-008` | `infra-staging-v2026.06.27.5` | 2026-06-27 | Admin Recovery | Added one-time Cloud Run Job script and backend seed module for platform admin password recovery without rotating long-lived secrets. | Applied |
 
 ## Branch And Environment Track
 

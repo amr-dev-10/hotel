@@ -65,7 +65,7 @@ The scripts use these defaults:
 | Redis instance | `arcadia-redis-staging` |
 | VPC connector | `arcadia-vpc-staging` |
 | Runtime service account | `arcadia-backend-runner-staging` |
-| Deploy service account | `arcadia-github-deployer-staging` |
+| Deploy service account | `arcadia-github-deploy-staging` |
 
 To override a value, export it before running:
 
@@ -106,6 +106,10 @@ bash infra/staging/full-setup.sh
 - `github-secrets.txt`.
 
 `infra/staging/full-setup.sh` runs both scripts.
+
+`infra/staging/bootstrap-platform-admin.sh` creates the first platform admin after the backend service deploys, using a temporary Secret Manager password and a one-time Cloud Run Job. This is the same pattern production should use.
+
+`infra/staging/reset-platform-admin-password.sh` resets an existing platform admin password with a separate one-time Cloud Run Job. It changes only the selected `platform_admins.password_hash` row and deletes its temporary Secret Manager password after the job completes.
 
 ## No-Regeneration Behavior
 
@@ -177,7 +181,7 @@ Recommended production values:
 | Redis instance | `arcadia-redis-production` |
 | VPC connector | `arcadia-vpc-production` |
 | Runtime service account | `arcadia-backend-runner-production` |
-| Deploy service account | `arcadia-github-deployer-production` |
+| Deploy service account | `arcadia-github-deploy-production` |
 
 Create production scripts by copying `infra/staging`, changing defaults to production names, and creating a GitHub environment named `production`.
 
@@ -187,14 +191,63 @@ Pushes to `main` deploy production. Manual production deployments must also run 
 
 Do not store `PLATFORM_ADMIN_PASSWORD` as a long-lived GitHub or Cloud Run environment variable.
 
-For the first platform admin, use a one-time bootstrap process:
+For the first platform admin, use the same one-time bootstrap process in staging that production will use:
 
-1. Generate a temporary password.
-2. Run the admin seed once through a controlled one-off job or local authenticated database connection.
-3. Store the password in a password manager for the real admin user.
-4. Remove the plain-text password from shell history and any files.
+```bash
+cd ~/hotel
+git checkout staging
+git pull origin staging
+bash infra/staging/bootstrap-platform-admin.sh
+```
 
-Do not leave a plain-text admin password in Cloud Run env vars or GitHub secrets.
+The script:
+
+1. Generates a temporary password.
+2. Stores it briefly in Secret Manager.
+3. Runs `python -m app.seeds.seed_platform_admin` through a one-time Cloud Run Job.
+4. Deletes the one-time Cloud Run Job.
+5. Deletes the temporary Secret Manager password.
+6. Prints the admin email and password once.
+
+Save the printed password in a password manager. Do not leave a plain-text admin password in Cloud Run env vars, GitHub secrets, docs, or source control.
+
+## Platform Admin Password Recovery
+
+If the platform admin password is lost, do not rerun the first-admin bootstrap for the same email. The bootstrap script intentionally refuses to overwrite an existing admin.
+
+Use the recovery script instead:
+
+```bash
+cd ~/hotel
+git checkout staging
+git pull origin staging
+bash infra/staging/reset-platform-admin-password.sh
+```
+
+The script asks you to type the target email before it resets anything. Default email:
+
+```text
+admin@arcadia.io
+```
+
+To recover a different platform admin:
+
+```bash
+PLATFORM_ADMIN_EMAIL="admin-recovery@arcadia.io" \
+bash infra/staging/reset-platform-admin-password.sh
+```
+
+The recovery job:
+
+1. Generates a temporary new password.
+2. Stores it briefly in Secret Manager.
+3. Runs `python -m app.seeds.reset_platform_admin_password` through a one-time Cloud Run Job.
+4. Updates only `platform_admins.password_hash` for the selected email.
+5. Deletes the one-time Cloud Run Job.
+6. Deletes the temporary Secret Manager password.
+7. Prints the new password once.
+
+This does not rotate `JWT_SECRET`, `DATABASE_URL`, the database password, Redis values, encryption keys, vault keys, or hotel-user passwords.
 
 ## Useful Commands
 
