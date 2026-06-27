@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     rate_limit_enabled: bool = True
     permission_cache_ttl_seconds: int = 60
 
-    cors_origins: list[str] = ["*"]
+    cors_origins: str | list[str] = ["*"]
 
     jwt_secret: str = "change-this-secret-before-production"
     jwt_algorithm: str = "HS256"
