@@ -252,12 +252,19 @@ class LiveChatService:
         if chat.status == "waiting":
             chat.status = "active"
             chat.assigned_staff_id = staff_id
-        conversation = self.conversations.get_or_create(hotel_id, chat.guest_phone, chat.guest_id)
+        account = WhatsAppAccountRepository(self.db).first_active_for_hotel(hotel_id)
+        conversation = self.conversations.get_or_create(
+            hotel_id,
+            chat.guest_phone,
+            chat.guest_id,
+            account.id if account else None,
+        )
         from app.models.whatsapp import WhatsAppMessage
 
         self.db.add(
             WhatsAppMessage(
                 hotel_id=hotel_id,
+                whatsapp_account_id=account.id if account else None,
                 conversation_id=conversation.id,
                 ticket_id=None,
                 direction="outbound",

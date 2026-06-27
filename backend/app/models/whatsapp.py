@@ -80,11 +80,13 @@ class WhatsAppConversation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __table_args__ = (
         UniqueConstraint("hotel_id", "guest_id", name="uq_whatsapp_conversation_guest"),
         Index("ix_wa_conv_hotel_phone", "hotel_id", "phone"),
+        Index("ix_wa_conv_account_phone", "whatsapp_account_id", "phone"),
         Index("ix_wa_conv_hotel_last_msg", "hotel_id", "last_message_at", "id"),
         Index("ix_wa_conv_hotel_status", "hotel_id", "status"),
     )
 
     hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
+    whatsapp_account_id: Mapped[str | None] = mapped_column(ForeignKey("whatsapp_accounts.id"), index=True)
     guest_id: Mapped[str | None] = mapped_column(ForeignKey("guests.id"))
     phone: Mapped[str] = mapped_column(String(40), index=True)
     status: Mapped[str] = mapped_column(String(40), default="open")
@@ -100,8 +102,14 @@ class WhatsAppConversation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
 class WhatsAppMessage(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "whatsapp_messages"
+    __table_args__ = (
+        UniqueConstraint("meta_message_id", name="uq_whatsapp_messages_meta_message_id"),
+        Index("ix_wa_msg_hotel_meta_id", "hotel_id", "meta_message_id"),
+        Index("ix_wa_msg_hotel_created", "hotel_id", "created_at", "id"),
+    )
 
     hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
+    whatsapp_account_id: Mapped[str | None] = mapped_column(ForeignKey("whatsapp_accounts.id"), index=True)
     conversation_id: Mapped[str] = mapped_column(
         ForeignKey("whatsapp_conversations.id"),
         index=True,

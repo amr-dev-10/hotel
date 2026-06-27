@@ -200,16 +200,20 @@ class WhatsAppAccountService:
             message,
             access_token=access_token,
         )
+        if not conversation.whatsapp_account_id:
+            conversation.whatsapp_account_id = account.id
         
         from app.models.whatsapp import WhatsAppMessage
         msg = WhatsAppMessage(
             hotel_id=hotel_id,
+            whatsapp_account_id=account.id,
             conversation_id=conversation.id,
             reservation_id=reservation_id,
             ticket_id=ticket_id,
             direction="outbound",
             message_type="text",
             message_text=message,
+            meta_message_id=self._meta_message_id_from_send_result(result),
             status="sent",
             created_at=utcnow(),
         )
@@ -266,6 +270,16 @@ class WhatsAppAccountService:
         if account.access_token_encrypted:
             return decrypt_secret(account.access_token_encrypted)
         return account.access_token
+
+    def _meta_message_id_from_send_result(self, send_result: dict) -> str | None:
+        sent_messages = send_result.get("messages")
+        if not isinstance(sent_messages, list) or not sent_messages:
+            return None
+        first = sent_messages[0]
+        if not isinstance(first, dict):
+            return None
+        message_id = first.get("id")
+        return message_id if isinstance(message_id, str) else None
 
 
 class WhatsAppTemplateService:

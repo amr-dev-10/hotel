@@ -10,8 +10,11 @@ def _meta_payload(
     from_phone: str,
     text: str | None = None,
     interactive_id: str | None = None,
+    message_id: str | None = None,
 ) -> dict:
     message: dict = {"from": from_phone}
+    if message_id:
+        message["id"] = message_id
     if interactive_id:
         message.update(
             {
@@ -35,6 +38,30 @@ def _meta_payload(
                         "value": {
                             "metadata": {"phone_number_id": phone_number_id},
                             "messages": [message],
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+
+
+def _status_payload(phone_number_id: str, message_id: str, message_status: str) -> dict:
+    return {
+        "entry": [
+            {
+                "changes": [
+                    {
+                        "value": {
+                            "metadata": {"phone_number_id": phone_number_id},
+                            "statuses": [
+                                {
+                                    "id": message_id,
+                                    "status": message_status,
+                                    "timestamp": "1710000000",
+                                    "recipient_id": "919999999999",
+                                }
+                            ],
                         }
                     }
                 ]
@@ -213,3 +240,80 @@ def test_whatsapp_webhook_routes_same_guest_phone_to_correct_hotel_account() -> 
         assert hotel_b_conversations.status_code == 200
         assert len(hotel_b_conversations.json()["data"]) == 1
         assert hotel_b_conversations.json()["data"][0]["phone"] == guest_phone
+
+
+def test_whatsapp_webhook_deduplicates_retried_meta_message_id() -> None:
+    suffix = uuid4().hex[:8]
+    phone_number_id = f"dedupe_{suffix}"
+    guest_phone = f"9193333{suffix[:5]}"
+    meta_message_id = f"wamid.{suffix}"
+
+    with TestClient(app) as client:
+        hotel_id, headers = _bootstrap_hotel(client, f"dedupe-{suffix}", phone_number_id, "401")
+
+        first = client.post(
+            "/webhook/whatsapp",
+            json=_meta_payload(phone_number_id, guest_phone, text="Hi", message_id=meta_message_id),
+        )
+        assert first.status_code == 200
+        assert first.json()["data"]["processed"] == 1
+        assert first.json()["data"]["duplicates"] == 0
+
+        retry = client.post(
+            "/webhook/whatsapp",
+            json=_meta_payload(phone_number_id, guest_phone, text="Hi", message_id=meta_message_id),
+        )
+        assert retry.status_code == 200
+        assert retry.json()["data"]["processed"] == 0
+        assert retry.json()["data"]["duplicates"] == 1
+        assert retry.json()["data"]["outbound"] == []
+
+        conversations = client.get(
+            f"/api/v1/hotels/{hotel_id}/whatsapp/conversations",
+            headers=headers,
+        )
+        conversation_id = conversations.json()["data"][0]["id"]
+        messages = client.get(
+            f"/api/v1/hotels/{hotel_id}/whatsapp/conversations/{conversation_id}/messages",
+            headers=headers,
+        )
+        assert messages.status_code == 200
+        assert len(messages.json()["data"]) == 2
+        assert messages.json()["data"][0]["meta_message_id"] == meta_message_id
+
+
+def test_whatsapp_status_webhook_updates_existing_message_status() -> None:
+    suffix = uuid4().hex[:8]
+    phone_number_id = f"status_{suffix}"
+    guest_phone = f"9194444{suffix[:5]}"
+    meta_message_id = f"wamid.status.{suffix}"
+
+    with TestClient(app) as client:
+        hotel_id, headers = _bootstrap_hotel(client, f"status-{suffix}", phone_number_id, "501")
+
+        inbound = client.post(
+            "/webhook/whatsapp",
+            json=_meta_payload(phone_number_id, guest_phone, text="Hi", message_id=meta_message_id),
+        )
+        assert inbound.status_code == 200
+
+        status_update = client.post(
+            "/webhook/whatsapp",
+            json=_status_payload(phone_number_id, meta_message_id, "read"),
+        )
+        assert status_update.status_code == 200
+        assert status_update.json()["data"]["status_updates"] == 1
+
+        conversations = client.get(
+            f"/api/v1/hotels/{hotel_id}/whatsapp/conversations",
+            headers=headers,
+        )
+        conversation_id = conversations.json()["data"][0]["id"]
+        messages = client.get(
+            f"/api/v1/hotels/{hotel_id}/whatsapp/conversations/{conversation_id}/messages",
+            headers=headers,
+        )
+        updated = next(
+            item for item in messages.json()["data"] if item["meta_message_id"] == meta_message_id
+        )
+        assert updated["status"] == "read"

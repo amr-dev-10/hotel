@@ -14,6 +14,7 @@ class WhatsAppSession(UUIDPrimaryKeyMixin, Base):
     )
 
     hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
+    whatsapp_account_id: Mapped[str | None] = mapped_column(ForeignKey("whatsapp_accounts.id"), index=True)
     phone: Mapped[str] = mapped_column(String(40), index=True)
     guest_id: Mapped[str | None] = mapped_column(ForeignKey("guests.id"))
     room_id: Mapped[str | None] = mapped_column(ForeignKey("rooms.id"))

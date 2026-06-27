@@ -10,27 +10,39 @@ class WhatsAppSessionRepository(BaseRepository[WhatsAppSession]):
     def __init__(self, db: Session) -> None:
         super().__init__(db, WhatsAppSession)
 
-    def get_by_phone(self, hotel_id: str, phone: str) -> WhatsAppSession | None:
-        return self.db.execute(
-            select(WhatsAppSession).where(
-                WhatsAppSession.hotel_id == hotel_id,
-                WhatsAppSession.phone == phone,
+    def get_by_phone(
+        self,
+        hotel_id: str,
+        phone: str,
+        whatsapp_account_id: str | None = None,
+    ) -> WhatsAppSession | None:
+        statement = select(WhatsAppSession).where(
+            WhatsAppSession.hotel_id == hotel_id,
+            WhatsAppSession.phone == phone,
+        )
+        if whatsapp_account_id:
+            statement = statement.where(
+                WhatsAppSession.whatsapp_account_id == whatsapp_account_id,
             )
-        ).scalar_one_or_none()
+        return self.db.execute(statement).scalar_one_or_none()
 
     def get_or_create(
         self,
         hotel_id: str,
         phone: str,
         phone_number_id: str | None,
+        whatsapp_account_id: str | None = None,
     ) -> WhatsAppSession:
-        session = self.get_by_phone(hotel_id, phone)
+        session = self.get_by_phone(hotel_id, phone, whatsapp_account_id)
         if session:
             session.last_active_at = utcnow()
+            if whatsapp_account_id and not session.whatsapp_account_id:
+                session.whatsapp_account_id = whatsapp_account_id
             return session
 
         session = WhatsAppSession(
             hotel_id=hotel_id,
+            whatsapp_account_id=whatsapp_account_id,
             phone=phone,
             state="new",
             cart=[],
