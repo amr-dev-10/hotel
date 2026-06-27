@@ -25,7 +25,7 @@ export CLOUD_RUN_SERVICE="${CLOUD_RUN_SERVICE:-arcadia-backend-staging}"
 export CLOUD_RUN_MIGRATION_JOB="${CLOUD_RUN_MIGRATION_JOB:-arcadia-backend-migrate-staging}"
 
 export RUNTIME_SA="${RUNTIME_SA:-arcadia-backend-runner-staging}"
-export DEPLOY_SA="${DEPLOY_SA:-arcadia-github-deployer-staging}"
+export DEPLOY_SA="${DEPLOY_SA:-arcadia-github-deploy-staging}"
 export WIF_POOL="${WIF_POOL:-github-actions-pool}"
 export WIF_PROVIDER="${WIF_PROVIDER:-github-actions-provider}"
 
