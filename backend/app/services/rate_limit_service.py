@@ -52,14 +52,14 @@ class RateLimitService:
         self.db.refresh(limit)
         return limit
 
-    def check(self, hotel_id: str, endpoint_group: str) -> None:
-        limit = self.limits.get_for_group(hotel_id, endpoint_group)
+    def check(self, identifier: str, endpoint_group: str) -> None:
+        limit = self.limits.get_for_group(identifier, endpoint_group)
         max_requests, window_seconds = DEFAULT_RATE_LIMITS.get(endpoint_group, DEFAULT_RATE_LIMITS["general"])
         if limit:
             max_requests = limit.max_requests
             window_seconds = limit.window_seconds
         now = time()
-        key = (hotel_id, endpoint_group)
+        key = (identifier, endpoint_group)
         bucket = _WINDOWS[key]
         while bucket and bucket[0] <= now - window_seconds:
             bucket.popleft()

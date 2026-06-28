@@ -7,8 +7,8 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Textarea } from "@/components/ui/textarea";
 import { PlatformShell } from "@/features/platform/components/platform-shell";
 import {
@@ -136,10 +136,9 @@ function PlatformSettingsContent() {
         <form className="grid gap-4 md:grid-cols-3" onSubmit={handlePasswordChange}>
           <div className="grid gap-2">
             <Label htmlFor="platform-current-password">Current password</Label>
-            <Input
+            <PasswordInput
               autoComplete="current-password"
               id="platform-current-password"
-              type="password"
               value={passwordForm.current_password}
               onChange={(event) =>
                 setPasswordForm((current) => ({ ...current, current_password: event.target.value }))
@@ -148,11 +147,10 @@ function PlatformSettingsContent() {
           </div>
           <div className="grid gap-2">
             <Label htmlFor="platform-new-password">New password</Label>
-            <Input
+            <PasswordInput
               autoComplete="new-password"
               id="platform-new-password"
               minLength={8}
-              type="password"
               value={passwordForm.new_password}
               onChange={(event) =>
                 setPasswordForm((current) => ({ ...current, new_password: event.target.value }))
@@ -161,11 +159,10 @@ function PlatformSettingsContent() {
           </div>
           <div className="grid gap-2">
             <Label htmlFor="platform-confirm-password">Confirm password</Label>
-            <Input
+            <PasswordInput
               autoComplete="new-password"
               id="platform-confirm-password"
               minLength={8}
-              type="password"
               value={passwordForm.confirm_password}
               onChange={(event) =>
                 setPasswordForm((current) => ({ ...current, confirm_password: event.target.value }))

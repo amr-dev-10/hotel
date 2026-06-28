@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Select } from "@/components/ui/select";
 import { apiErrorMessage } from "@/lib/api/client";
 import { useDepartments } from "@/features/departments/hooks/useDepartments";
@@ -77,7 +78,7 @@ export function StaffCreatePage({ hotelId }: { hotelId: string }) {
             <Input id="staff-email" type="email" {...form.register("email")} />
           </Field>
           <Field label="Temporary password" id="staff-password">
-            <Input id="staff-password" type="password" {...form.register("password")} />
+            <PasswordInput id="staff-password" {...form.register("password")} />
           </Field>
           <Field label="Job role" id="staff-job-role">
             <Input id="staff-job-role" {...form.register("job_role")} />

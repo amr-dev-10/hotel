@@ -10,6 +10,7 @@ import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import { loginSchema, type LoginValues } from "@/features/auth/schemas/login.schema";
 import { api, apiErrorMessage } from "@/lib/api/client";
 import { useAuthStore } from "@/stores/auth.store";
@@ -76,7 +77,7 @@ export function LoginForm() {
 
         <div className="grid gap-2">
           <Label htmlFor="password">Password</Label>
-          <Input id="password" type="password" autoComplete="current-password" {...form.register("password")} />
+          <PasswordInput id="password" autoComplete="current-password" {...form.register("password")} />
           {form.formState.errors.password ? (
             <p className="text-xs text-rose-700">{form.formState.errors.password.message}</p>
           ) : null}

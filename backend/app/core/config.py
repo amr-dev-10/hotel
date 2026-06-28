@@ -34,7 +34,7 @@ class Settings(BaseSettings):
 
     whatsapp_verify_token: str = ""
     whatsapp_app_secret: str = ""
-    whatsapp_api_version: str = "v19.0"
+    whatsapp_api_version: str = "v25.0"
     whatsapp_dry_run: bool = True
 
     gemini_api_key: str = ""

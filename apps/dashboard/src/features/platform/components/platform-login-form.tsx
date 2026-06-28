@@ -10,6 +10,7 @@ import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import { loginSchema, type LoginValues } from "@/features/auth/schemas/login.schema";
 import { platformPost } from "@/lib/api/platform-client";
 import { apiErrorMessage } from "@/lib/api/client";
@@ -72,12 +73,7 @@ export function PlatformLoginForm() {
 
         <div className="grid gap-2">
           <Label htmlFor="platform-password">Password</Label>
-          <Input
-            id="platform-password"
-            type="password"
-            autoComplete="current-password"
-            {...form.register("password")}
-          />
+          <PasswordInput id="platform-password" autoComplete="current-password" {...form.register("password")} />
           {form.formState.errors.password ? (
             <p className="text-xs text-rose-700">{form.formState.errors.password.message}</p>
           ) : null}

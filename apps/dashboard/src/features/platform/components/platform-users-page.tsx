@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import { Select } from "@/components/ui/select";
 import { PlatformShell } from "@/features/platform/components/platform-shell";
@@ -395,10 +396,9 @@ function PlatformUsersContent() {
           </DialogHeader>
           <form className="grid gap-4" onSubmit={handlePasswordSave}>
             <Field label="New password" id="platform-user-new-password">
-              <Input
+              <PasswordInput
                 id="platform-user-new-password"
                 minLength={8}
-                type="password"
                 value={passwordForm.new_password}
                 onChange={(event) =>
                   setPasswordForm((current) => ({ ...current, new_password: event.target.value }))
@@ -406,10 +406,9 @@ function PlatformUsersContent() {
               />
             </Field>
             <Field label="Confirm password" id="platform-user-confirm-password">
-              <Input
+              <PasswordInput
                 id="platform-user-confirm-password"
                 minLength={8}
-                type="password"
                 value={passwordForm.confirm_password}
                 onChange={(event) =>
                   setPasswordForm((current) => ({ ...current, confirm_password: event.target.value }))

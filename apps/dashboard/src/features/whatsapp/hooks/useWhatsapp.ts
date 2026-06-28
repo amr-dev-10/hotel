@@ -10,6 +10,8 @@ import type {
   WhatsAppTemplate,
 } from "@/types/domain";
 
+const WHATSAPP_INBOX_REFETCH_INTERVAL_MS = 15_000;
+
 export interface WhatsAppAccountPayload {
   business_name: string;
   phone_number?: string | null;
@@ -74,7 +76,7 @@ export function useWhatsappConversations(hotelId: string) {
     queryKey: queryKeys.whatsapp.conversations(hotelId),
     queryFn: () => apiGet<WhatsAppConversation[]>(`/hotels/${hotelId}/whatsapp/conversations`),
     enabled: Boolean(hotelId),
-    refetchInterval: 5000,
+    refetchInterval: WHATSAPP_INBOX_REFETCH_INTERVAL_MS,
   });
 }
 
@@ -84,7 +86,7 @@ export function useWhatsappMessages(hotelId: string, conversationId: string) {
     queryFn: () =>
       apiGet<WhatsAppMessage[]>(`/hotels/${hotelId}/whatsapp/conversations/${conversationId}/messages`),
     enabled: Boolean(hotelId && conversationId),
-    refetchInterval: 5000,
+    refetchInterval: WHATSAPP_INBOX_REFETCH_INTERVAL_MS,
   });
 }
 

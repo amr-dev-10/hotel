@@ -14,10 +14,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if request.url.path in {"/health", "/docs", "/openapi.json"}:
             return await call_next(request)
         group = self._group(request.url.path)
-        hotel_id = request.path_params.get("hotel_id") or self._hotel_id_from_path(request.url.path) or "global"
+        identifier = self._limit_identifier(request)
         db = SessionLocal()
         try:
-            RateLimitService(db).check(hotel_id, group)
+            RateLimitService(db).check(identifier, group)
         except HTTPException as exc:
             status_code = exc.status_code
             return JSONResponse(
@@ -53,3 +53,26 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if index + 1 < len(parts):
             return parts[index + 1]
         return None
+
+    def _limit_identifier(self, request: Request) -> str:
+        hotel_id = request.path_params.get("hotel_id") or self._hotel_id_from_path(request.url.path)
+        if hotel_id:
+            return hotel_id
+        return f"ip:{self._client_ip(request)}"
+
+    def _client_ip(self, request: Request) -> str:
+        forwarded_for = request.headers.get("x-forwarded-for")
+        if forwarded_for:
+            for value in forwarded_for.split(","):
+                ip_address = value.strip()
+                if ip_address:
+                    return ip_address
+
+        real_ip = request.headers.get("x-real-ip")
+        if real_ip and real_ip.strip():
+            return real_ip.strip()
+
+        if request.client and request.client.host:
+            return request.client.host
+
+        return "unknown"
