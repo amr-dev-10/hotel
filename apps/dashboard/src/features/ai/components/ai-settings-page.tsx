@@ -120,6 +120,16 @@ export function AiSettingsPage({ hotelId }: { hotelId: string }) {
   }
 
   const busy = saveSettings.isPending || testConnection.isPending || resetSettings.isPending;
+  const modelPlaceholder =
+    provider === "groq"
+      ? "llama-3.3-70b-versatile"
+      : provider === "anthropic"
+        ? "claude-3-5-sonnet-latest"
+        : provider === "gemini"
+          ? "gemini-2.0-flash"
+          : provider === "local"
+            ? "local-keyword"
+            : "gpt-4o-mini";
 
   return (
     <div className="grid gap-5">
@@ -158,10 +168,11 @@ export function AiSettingsPage({ hotelId }: { hotelId: string }) {
               <option value="gemini">Google Gemini</option>
               <option value="openai">OpenAI</option>
               <option value="anthropic">Anthropic Claude</option>
+              <option value="groq">Groq</option>
             </Select>
           </Field>
           <Field label="Model" id="ai-model">
-            <Input id="ai-model" placeholder="gpt-4o-mini" value={model} onChange={(event) => setModel(event.target.value)} />
+            <Input id="ai-model" placeholder={modelPlaceholder} value={model} onChange={(event) => setModel(event.target.value)} />
           </Field>
           <Field label="API key" id="ai-key">
             <PasswordInput

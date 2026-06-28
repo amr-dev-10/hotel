@@ -13,6 +13,12 @@ class AIAnalyticsService:
         "openai": {"gpt-4o-mini": {"prompt": 0.15, "completion": 0.60}},
         "gemini": {"gemini-2.0-flash": {"prompt": 0.10, "completion": 0.40}},
         "anthropic": {"claude-3-5-sonnet-latest": {"prompt": 3.00, "completion": 15.00}},
+        "groq": {
+            "llama-3.1-8b-instant": {"prompt": 0.05, "completion": 0.08},
+            "llama-3.3-70b-versatile": {"prompt": 0.59, "completion": 0.79},
+            "openai/gpt-oss-20b": {"prompt": 0.075, "completion": 0.30},
+            "openai/gpt-oss-120b": {"prompt": 0.15, "completion": 0.60},
+        },
         "local": {"local-keyword": {"prompt": 0.0, "completion": 0.0}},
     }
 

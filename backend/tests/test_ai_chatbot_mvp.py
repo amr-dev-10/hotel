@@ -1,14 +1,23 @@
+from types import SimpleNamespace
 from uuid import uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.core.database import SessionLocal
+from app.core.vault import Vault
+from app.integrations.ai.anthropic_provider import AnthropicProvider
+from app.integrations.ai.factory import get_ai_provider
+from app.integrations.ai.gemini_provider import GeminiProvider
+from app.integrations.ai.groq_provider import GroqProvider
 from app.integrations.ai.local_provider import LocalProvider
+from app.integrations.ai.openai_provider import OpenAIProvider
 from app.main import app
 from app.models.base import utcnow
 from app.models.ticket import Ticket
 from app.models.whatsapp import WhatsAppConversation, WhatsAppMessage
 from app.schemas.ai import AIDecision
+from app.services.ai_analytics_service import AIAnalyticsService
 from app.services.ai_decision_engine import AIDecisionEngine
 from app.services.ai_response_parser import AIResponseParser
 
@@ -84,6 +93,157 @@ def test_local_provider_returns_structured_housekeeping_decision() -> None:
     assert decision.ticket_required is True
     assert decision.ticket is not None
     assert decision.ticket.department_key == "housekeeping"
+
+
+def test_groq_provider_is_registered_with_default_model() -> None:
+    provider = get_ai_provider("groq", api_key="test-groq-key")
+
+    assert isinstance(provider, GroqProvider)
+    assert provider.provider_name == "groq"
+    assert provider.api_key == "test-groq-key"
+    assert provider.model == "llama-3.3-70b-versatile"
+
+
+def test_groq_provider_requires_hotel_api_key() -> None:
+    with pytest.raises(RuntimeError, match="Groq API key is not configured"):
+        GroqProvider().chat([{"role": "user", "content": "Hello"}])
+
+
+@pytest.mark.parametrize(
+    ("provider_cls", "error"),
+    [
+        (OpenAIProvider, "OpenAI API key is not configured"),
+        (GeminiProvider, "Gemini API key is not configured"),
+        (AnthropicProvider, "Anthropic API key is not configured"),
+    ],
+)
+def test_real_providers_require_hotel_api_key(provider_cls, error: str) -> None:
+    with pytest.raises(RuntimeError, match=error):
+        provider_cls().chat([{"role": "user", "content": "Hello"}])
+
+
+def test_unknown_provider_fails_instead_of_falling_back_to_local() -> None:
+    with pytest.raises(RuntimeError, match="Unsupported AI provider 'typo-provider'"):
+        get_ai_provider("typo-provider")
+
+
+def test_groq_provider_uses_openai_compatible_client(monkeypatch: pytest.MonkeyPatch) -> None:
+    openai = pytest.importorskip("openai")
+    calls: dict[str, dict] = {}
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            calls["completion_kwargs"] = kwargs
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(content='{"intent":"information","confidence":0.9}'),
+                        finish_reason="stop",
+                    )
+                ],
+                model=kwargs["model"],
+                usage=SimpleNamespace(prompt_tokens=12, completion_tokens=8, total_tokens=20),
+            )
+
+    class FakeOpenAI:
+        def __init__(self, **kwargs):
+            calls["client_kwargs"] = kwargs
+            self.chat = SimpleNamespace(completions=FakeCompletions())
+
+    monkeypatch.setattr(openai, "OpenAI", FakeOpenAI)
+
+    response = GroqProvider(api_key="test-groq-key").chat(
+        [{"role": "user", "content": "What time is checkout?"}],
+        temperature=0.2,
+        max_tokens=128,
+        response_format="json_object",
+    )
+
+    assert calls["client_kwargs"] == {
+        "api_key": "test-groq-key",
+        "base_url": "https://api.groq.com/openai/v1",
+    }
+    assert calls["completion_kwargs"]["model"] == "llama-3.3-70b-versatile"
+    assert calls["completion_kwargs"]["messages"][0]["content"] == "What time is checkout?"
+    assert calls["completion_kwargs"]["temperature"] == 0.2
+    assert calls["completion_kwargs"]["max_tokens"] == 128
+    assert calls["completion_kwargs"]["response_format"] == {"type": "json_object"}
+    assert response["provider"] == "groq"
+    assert response["model"] == "llama-3.3-70b-versatile"
+    assert response["total_tokens"] == 20
+
+
+def test_groq_cost_estimate_uses_configured_model_pricing() -> None:
+    cost = AIAnalyticsService.get_cost_estimate(
+        "groq",
+        "llama-3.3-70b-versatile",
+        prompt_tokens=1_000_000,
+        completion_tokens=1_000_000,
+    )
+
+    assert cost == 1.38
+
+
+def test_ai_settings_reuses_existing_hotel_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen_keys: list[str | None] = []
+
+    def fake_generate(self, *args, **kwargs):
+        seen_keys.append(self.api_key)
+        return "ok"
+
+    monkeypatch.setattr(GroqProvider, "generate", fake_generate)
+
+    with TestClient(app) as client:
+        hotel_id, headers = _bootstrap(client)
+        first = client.put(
+            f"/api/v1/hotels/{hotel_id}/settings/ai",
+            headers=headers,
+            json={
+                "provider": "groq",
+                "api_key": "hotel-groq-key",
+                "model": "llama-3.3-70b-versatile",
+            },
+        )
+        assert first.status_code == 200
+
+        second = client.put(
+            f"/api/v1/hotels/{hotel_id}/settings/ai",
+            headers=headers,
+            json={
+                "provider": "groq",
+                "model": "llama-3.1-8b-instant",
+                "temperature": 0.2,
+            },
+        )
+        assert second.status_code == 200
+
+    assert seen_keys == ["hotel-groq-key", "hotel-groq-key"]
+
+
+def test_ai_settings_reset_deletes_hotel_provider_keys(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(GroqProvider, "generate", lambda self, *args, **kwargs: "ok")
+
+    with TestClient(app) as client:
+        hotel_id, headers = _bootstrap(client)
+        response = client.put(
+            f"/api/v1/hotels/{hotel_id}/settings/ai",
+            headers=headers,
+            json={
+                "provider": "groq",
+                "api_key": "hotel-groq-key",
+                "model": "llama-3.3-70b-versatile",
+            },
+        )
+        assert response.status_code == 200
+
+        reset = client.delete(f"/api/v1/hotels/{hotel_id}/settings/ai", headers=headers)
+        assert reset.status_code == 200
+
+        db = SessionLocal()
+        try:
+            assert Vault(db).retrieve(hotel_id, "ai:groq:api_key") is None
+        finally:
+            db.close()
 
 
 def test_ai_response_parser_fails_closed_on_bad_json() -> None:

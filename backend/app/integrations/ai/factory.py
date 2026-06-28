@@ -2,6 +2,7 @@ from app.core.config import settings
 from app.integrations.ai.anthropic_provider import AnthropicProvider
 from app.integrations.ai.base import AIProvider
 from app.integrations.ai.gemini_provider import GeminiProvider
+from app.integrations.ai.groq_provider import GroqProvider
 from app.integrations.ai.local_provider import LocalProvider
 from app.integrations.ai.openai_provider import OpenAIProvider
 
@@ -10,6 +11,7 @@ PROVIDERS: dict[str, type[AIProvider]] = {
     "gemini": GeminiProvider,
     "openai": OpenAIProvider,
     "anthropic": AnthropicProvider,
+    "groq": GroqProvider,
 }
 
 
@@ -19,7 +21,10 @@ def get_ai_provider(
     model: str | None = None,
 ) -> AIProvider:
     name = provider_name or settings.default_ai_provider
-    provider_cls = PROVIDERS.get(name, LocalProvider)
+    provider_cls = PROVIDERS.get(name)
+    if provider_cls is None:
+        supported = ", ".join(sorted(PROVIDERS))
+        raise RuntimeError(f"Unsupported AI provider '{name}'. Supported providers: {supported}")
     return provider_cls(api_key=api_key, model=model)
 
 

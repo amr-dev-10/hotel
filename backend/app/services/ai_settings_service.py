@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.vault import Vault
-from app.integrations.ai.factory import get_ai_provider
+from app.integrations.ai.factory import PROVIDERS, get_ai_provider
 
 
 AI_SETTINGS_SECRET = "ai_settings"
@@ -43,7 +43,8 @@ class AISettingsService:
     def update(self, hotel_id: str, payload) -> dict:
         started = time.perf_counter()
         existing = self.get(hotel_id)
-        provider = get_ai_provider(payload.provider, api_key=payload.api_key, model=payload.model)
+        api_key = payload.api_key or self.vault.retrieve(hotel_id, f"ai:{payload.provider}:api_key")
+        provider = get_ai_provider(payload.provider, api_key=api_key, model=payload.model)
         preview = provider.generate("Hello! I am working correctly.", max_tokens=80)
         elapsed_ms = int((time.perf_counter() - started) * 1000)
         data = {
@@ -99,7 +100,10 @@ class AISettingsService:
 
     def delete(self, hotel_id: str) -> dict:
         data = dict(DEFAULT_AI_SETTINGS)
-        self.vault.store(hotel_id, AI_SETTINGS_SECRET, json.dumps(data), commit=True)
+        self.vault.store(hotel_id, AI_SETTINGS_SECRET, json.dumps(data), commit=False)
+        for provider_name in PROVIDERS:
+            self.vault.delete(hotel_id, f"ai:{provider_name}:api_key", commit=False)
+        self.db.commit()
         return data
 
     def is_runtime_enabled(self, hotel_id: str) -> bool:

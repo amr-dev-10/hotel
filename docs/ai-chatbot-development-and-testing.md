@@ -10,7 +10,7 @@ Current MVP capabilities:
 
 - Structured AI chat decision pipeline.
 - Local deterministic provider for development and tests.
-- OpenAI, Gemini, and Anthropic provider adapters with lazy SDK imports.
+- OpenAI, Gemini, Anthropic, and Groq provider adapters with lazy SDK imports.
 - AI context builder for hotel, conversation, guest, reservation, room, open tickets, summaries, and knowledge snippets.
 - AI response parser that fails closed to staff escalation when provider output is invalid.
 - Decision engine using high and low confidence thresholds.
@@ -92,7 +92,7 @@ Backend dependencies added:
 - `openai`
 - `anthropic`
 
-`google-generativeai` already existed.
+`google-generativeai` already existed. The Groq adapter reuses the `openai` package through Groq's OpenAI-compatible API.
 
 Install/update dependencies for Windows development if needed:
 
@@ -110,16 +110,13 @@ API_PROXY_TARGET=http://localhost:8000
 NEXT_PUBLIC_WS_BASE_URL=ws://localhost:8000
 ```
 
-Backend provider environment variables are optional for local-provider testing:
+Backend local-provider testing does not require real AI provider environment variables:
 
 ```env
-GEMINI_API_KEY=
-OPENAI_API_KEY=
-ANTHROPIC_API_KEY=
 DEFAULT_AI_PROVIDER=local
 ```
 
-Provider API keys can also be saved per hotel from the dashboard AI settings page. Those keys are stored in the hotel vault secret records.
+Real provider API keys must be saved per hotel from the dashboard AI settings page when each hotel manages its own AI account. OpenAI, Gemini, Anthropic, and Groq do not use platform environment key fallbacks in this implementation. Hotel keys are stored in the hotel vault secret records.
 
 ## Hotel AI Settings
 
@@ -145,13 +142,15 @@ Useful MVP configuration for local development:
 
 Recommended real-provider setup:
 
-- Provider: `gemini`, `openai`, or `anthropic`
+- Provider: `gemini`, `openai`, `anthropic`, or `groq`
 - API key: provider key for this hotel
 - Model examples:
   - Gemini: `gemini-2.0-flash`
   - OpenAI: `gpt-4o-mini`
   - Anthropic: `claude-3-5-sonnet-latest`
+  - Groq: `llama-3.3-70b-versatile`
 - Keep Auto-send replies off until staff validates outputs in real guest conversations.
+- Do not add platform `OPENAI_API_KEY`, `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`, or `GROQ_API_KEY` values to Cloud Run or GitHub for this BYOK setup.
 
 ## API Endpoints
 
@@ -244,12 +243,18 @@ Run the focused AI chatbot tests:
 Expected:
 
 ```text
-4 passed
+14 passed
 ```
 
 These tests cover:
 
 - local provider structured housekeeping intent,
+- strict hotel-key-only behavior for OpenAI, Gemini, Anthropic, and Groq,
+- unsupported provider rejection,
+- reuse of stored hotel provider keys during settings edits,
+- provider key removal during AI settings reset,
+- Groq OpenAI-compatible request shape,
+- Groq usage cost estimate,
 - parser safe fallback for invalid JSON,
 - decision engine high-confidence action mapping,
 - live `/ai/chat` endpoint using local provider,
@@ -265,7 +270,7 @@ Run full backend tests:
 Expected after this development:
 
 ```text
-48 passed
+58 passed
 ```
 
 Run frontend TypeScript check:
@@ -529,8 +534,8 @@ Unexpected WhatsApp behavior:
 
 Last verified on Windows development environment:
 
-- AI chatbot targeted tests: `4 passed`
-- Full backend suite: `48 passed`
+- AI chatbot targeted tests: `14 passed`
+- Full backend suite: `58 passed`
 - Frontend typecheck: passed
 - Backend dev server: `http://127.0.0.1:8000`
 - Frontend dev server: `http://127.0.0.1:3000`

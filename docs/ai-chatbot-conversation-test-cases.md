@@ -10,6 +10,7 @@ Current code-level AI providers:
 - `gemini` - Google Gemini adapter.
 - `openai` - OpenAI adapter.
 - `anthropic` - Anthropic Claude adapter.
+- `groq` - Groq Cloud adapter using the OpenAI-compatible chat completions API.
 
 Current tested development model:
 
@@ -21,8 +22,11 @@ Recommended real-provider examples:
 - Gemini: `gemini-2.0-flash`
 - OpenAI: `gpt-4o-mini`
 - Anthropic: `claude-3-5-sonnet-latest`
+- Groq: `llama-3.3-70b-versatile`
 
-The local provider is the only provider used in automated tests. Real providers require API keys and should be tested carefully with auto-reply disabled first.
+The local provider is used for deterministic conversation behavior tests. Real providers are covered by BYOK safety tests and should be tested carefully with auto-reply disabled first.
+
+All real provider API keys are hotel-specific. The backend does not use platform environment key fallbacks for OpenAI, Gemini, Anthropic, or Groq.
 
 ## Required Test Setup
 
@@ -525,104 +529,103 @@ pnpm --filter @arcadia/dashboard typecheck
 
 Expected current result:
 
-- AI chatbot tests: `4 passed`
-- Full backend suite: `48 passed`
+- AI chatbot tests: `14 passed`
+- Full backend suite: `58 passed`
 - Frontend typecheck: exit code `0`
 
-## Adding Grok/xAI
+## Hotel-Owned AI Provider Accounts
 
 Current status:
 
-- Grok/xAI is not currently integrated in this codebase.
-- The current provider list is `local`, `gemini`, `openai`, and `anthropic`.
+- OpenAI, Gemini, Anthropic, and Groq are BYOK providers.
+- Each hotel must save its own provider API key from the dashboard AI settings page.
+- If a hotel key is missing, the provider fails with a configuration error instead of using a platform key.
+- Resetting AI settings removes stored provider keys for that hotel.
+- Unknown provider ids fail clearly instead of silently falling back to local.
 
-Official xAI docs currently show OpenAI-compatible access with:
+Do not configure these as platform environment variables in staging or production:
 
-- base URL: `https://api.x.ai/v1`
-- model example: `grok-4.3`
-- chat endpoint: `/v1/chat/completions`
+```text
+OPENAI_API_KEY
+GEMINI_API_KEY
+ANTHROPIC_API_KEY
+GROQ_API_KEY
+```
+
+## Groq Provider
+
+Groq-specific status:
+
+- Groq Cloud is integrated as provider id `groq`.
+- Default Groq model: `llama-3.3-70b-versatile`.
+- Groq uses the existing `openai` Python package with `base_url="https://api.groq.com/openai/v1"`.
+
+Official Groq docs show OpenAI-compatible access with:
+
+- base URL: `https://api.groq.com/openai/v1`
+- chat endpoint: `https://api.groq.com/openai/v1/chat/completions`
+- production model examples: `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `openai/gpt-oss-120b`
 
 Sources:
 
-- xAI overview and examples: https://docs.x.ai/overview
-- xAI chat API reference: https://docs.x.ai/developers/rest-api-reference/inference/chat
+- Groq OpenAI compatibility: https://console.groq.com/docs/openai
+- Groq API reference: https://console.groq.com/docs/api-reference
+- Groq supported models: https://console.groq.com/docs/models
 
-Because your app already has an OpenAI-style provider abstraction, adding Grok is a small-to-medium backend change.
+### Configure Groq
 
-### Minimal Grok Integration Plan
+Dashboard AI settings:
 
-Add config:
+- Provider: `groq`
+- Model: `llama-3.3-70b-versatile`
+- API key: that hotel's Groq API key
+- Enable AI runtime: on after Test succeeds
+- Auto-send replies: off until manual cases pass
 
-```python
-xai_api_key: str = ""
+### Groq Conversation Test
+
+Use the same conversation cases in this document, but configure provider `groq` instead of `local`.
+
+Expected differences:
+
+- The wording of `suggested_reply` can vary.
+- Intent and ticket behavior should still match the expected case.
+- Provider metadata should report `provider="groq"`.
+- Token counts should come from the Groq/OpenAI-compatible response when available.
+
+### Groq Regression Checklist
+
+Run:
+
+```powershell
+.\.venv-win\Scripts\python.exe -m pytest backend\tests\test_ai_chatbot_mvp.py -v
 ```
 
-Add provider:
+Verify:
 
-```text
-backend/app/integrations/ai/xai_provider.py
-```
+- `get_ai_provider("groq")` returns `GroqProvider`.
+- OpenAI, Gemini, Anthropic, and Groq fail closed without a hotel API key.
+- AI settings edits reuse the stored hotel key when the write-only API key field is blank.
+- AI settings reset deletes stored provider keys for that hotel.
+- Unknown provider ids fail clearly.
+- Groq provider sends `base_url="https://api.groq.com/openai/v1"`.
+- Groq provider preserves the standard response fields used by the parser and analytics.
 
-Register provider:
+## Grok/xAI Note
 
-```python
-PROVIDERS = {
-    "local": LocalProvider,
-    "gemini": GeminiProvider,
-    "openai": OpenAIProvider,
-    "anthropic": AnthropicProvider,
-    "xai": XAIProvider,
-}
-```
+Groq Cloud and xAI Grok are different providers.
 
-Provider implementation can reuse the installed `openai` package with:
+Current xAI Grok status:
 
-```python
-OpenAI(api_key=<xai key>, base_url="https://api.x.ai/v1")
-```
+- xAI Grok is not currently integrated in this codebase.
+- If added later, use a separate provider id such as `xai`.
+- xAI docs currently show OpenAI-compatible access with `base_url="https://api.x.ai/v1"` and model example `grok-4.3`.
 
-Then call chat completions or responses with a Grok model such as `grok-4.3`.
+Minimal xAI Grok changes later:
 
-Frontend changes:
-
-- Add `xai` option to AI Provider select.
-- Suggested model placeholder: `grok-4.3`.
-- Domain label: `xAI Grok`.
-
-Schema/settings changes:
-
-- No major schema change is required because settings already store `provider`, `model`, and write-only `api_key`.
-- Optional: add `XAI_API_KEY` environment support for platform-level default.
-
-Tests to add:
-
-- Unit test that `get_ai_provider("xai")` returns `XAIProvider`.
-- Mocked provider chat test verifying it returns the standard `AIChatResponse` shape.
-- Optional live provider test behind an environment variable, skipped when `XAI_API_KEY` is absent.
-
-### Estimated Change Size
-
-Approximate files to modify:
-
-- `backend/app/core/config.py`
-- `backend/app/integrations/ai/factory.py`
-- `backend/app/integrations/ai/xai_provider.py`
-- `apps/dashboard/src/features/ai/components/ai-settings-page.tsx`
-- optional tests in `backend/tests`
-- optional docs update
-
-Approximate code size:
-
-- 80-150 backend lines for provider/config/tests.
-- 2-10 frontend lines for provider select/model hint.
-
-Risk:
-
-- Low if xAI OpenAI-compatible API is used.
-- Medium if you want xAI-specific Responses API, structured outputs, tool calling, or pricing/usage accounting.
-
-Recommendation:
-
-- Add Grok first as `provider="xai"` using OpenAI-compatible chat completions.
+- Add `xai_api_key` config.
+- Add `backend/app/integrations/ai/xai_provider.py`.
+- Register provider `xai`.
+- Add dashboard provider option and docs.
 - Keep response parsing through existing `AIResponseParser`.
 - Keep auto-reply disabled until manual conversation cases pass.

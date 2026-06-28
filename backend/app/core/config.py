@@ -37,11 +37,8 @@ class Settings(BaseSettings):
     whatsapp_api_version: str = "v25.0"
     whatsapp_dry_run: bool = True
 
-    gemini_api_key: str = ""
-    openai_api_key: str = ""
-    anthropic_api_key: str = ""
     default_ai_provider: str = "local"
-    ai_fallback_providers: str = "local,gemini,openai,anthropic"
+    ai_fallback_providers: str = "local"
     fcm_enabled: bool = False
     default_timezone: str = "UTC"
 

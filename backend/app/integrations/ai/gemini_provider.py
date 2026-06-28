@@ -1,6 +1,5 @@
 from typing import Any
 
-from app.core.config import settings
 from app.integrations.ai.local_provider import LocalProvider
 
 
@@ -8,7 +7,7 @@ class GeminiProvider(LocalProvider):
     provider_name = "gemini"
 
     def __init__(self, api_key: str | None = None, model: str | None = None) -> None:
-        super().__init__(api_key=api_key or settings.gemini_api_key, model=model or "gemini-2.0-flash")
+        super().__init__(api_key=api_key, model=model or "gemini-2.0-flash")
 
     def generate(
         self,

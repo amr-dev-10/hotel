@@ -1,6 +1,5 @@
 from typing import Any
 
-from app.core.config import settings
 from app.integrations.ai.local_provider import LocalProvider
 
 
@@ -9,7 +8,7 @@ class AnthropicProvider(LocalProvider):
 
     def __init__(self, api_key: str | None = None, model: str | None = None) -> None:
         super().__init__(
-            api_key=api_key or settings.anthropic_api_key,
+            api_key=api_key,
             model=model or "claude-3-5-sonnet-latest",
         )
 

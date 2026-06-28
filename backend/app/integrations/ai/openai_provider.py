@@ -1,14 +1,15 @@
 from typing import Any
 
-from app.core.config import settings
 from app.integrations.ai.local_provider import LocalProvider
 
 
 class OpenAIProvider(LocalProvider):
     provider_name = "openai"
+    provider_label = "OpenAI"
+    base_url: str | None = None
 
     def __init__(self, api_key: str | None = None, model: str | None = None) -> None:
-        super().__init__(api_key=api_key or settings.openai_api_key, model=model or "gpt-4o-mini")
+        super().__init__(api_key=api_key, model=model or "gpt-4o-mini")
 
     def generate(
         self,
@@ -32,13 +33,16 @@ class OpenAIProvider(LocalProvider):
         model: str | None = None,
     ) -> dict[str, Any]:
         if not self.api_key:
-            raise RuntimeError("OpenAI API key is not configured")
+            raise RuntimeError(f"{self.provider_label} API key is not configured")
         try:
             from openai import OpenAI
         except ImportError as exc:
             raise RuntimeError("openai package is not installed") from exc
 
-        client = OpenAI(api_key=self.api_key)
+        client_kwargs: dict[str, Any] = {"api_key": self.api_key}
+        if self.base_url:
+            client_kwargs["base_url"] = self.base_url
+        client = OpenAI(**client_kwargs)
         kwargs: dict[str, Any] = {
             "model": model or self.model,
             "messages": messages,
