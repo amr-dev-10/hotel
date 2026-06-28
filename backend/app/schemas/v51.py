@@ -176,6 +176,17 @@ class AISettingsRead(BaseModel):
     last_tested_at: datetime | None = None
     embedding_provider: str | None = None
     embedding_model: str | None = None
+    is_active: bool = False
+    temperature: float = 0.3
+    high_confidence_threshold: float = 0.95
+    low_confidence_threshold: float = 0.8
+    max_context_messages: int = 20
+    language: str = "en"
+    enable_ticket_creation: bool = True
+    enable_auto_reply: bool = False
+    enable_sentiment_analysis: bool = True
+    escalation_department_key: str = "front_office"
+    system_prompt: str | None = None
 
 
 class AISettingsUpdate(BaseModel):
@@ -184,6 +195,17 @@ class AISettingsUpdate(BaseModel):
     model: str | None = None
     embedding_provider: str | None = None
     embedding_model: str | None = None
+    is_active: bool | None = None
+    temperature: float = Field(default=0.3, ge=0.0, le=2.0)
+    high_confidence_threshold: float = Field(default=0.95, ge=0.0, le=1.0)
+    low_confidence_threshold: float = Field(default=0.8, ge=0.0, le=1.0)
+    max_context_messages: int = Field(default=20, ge=1, le=100)
+    language: str = Field(default="en", min_length=2, max_length=10)
+    enable_ticket_creation: bool = True
+    enable_auto_reply: bool = False
+    enable_sentiment_analysis: bool = True
+    escalation_department_key: str = Field(default="front_office", min_length=2, max_length=50)
+    system_prompt: str | None = None
 
 
 class AISettingsTestRead(BaseModel):

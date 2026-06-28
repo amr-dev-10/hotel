@@ -3,6 +3,8 @@ from typing import Any
 
 
 class AIProvider(ABC):
+    provider_name = "unknown"
+
     @abstractmethod
     def generate(
         self,
@@ -11,6 +13,17 @@ class AIProvider(ABC):
         temperature: float = 0.3,
         max_tokens: int = 1024,
     ) -> str:
+        raise NotImplementedError
+
+    @abstractmethod
+    def chat(
+        self,
+        messages: list[dict[str, str]],
+        temperature: float = 0.3,
+        max_tokens: int = 1024,
+        response_format: str | None = None,
+        model: str | None = None,
+    ) -> dict[str, Any]:
         raise NotImplementedError
 
     @abstractmethod

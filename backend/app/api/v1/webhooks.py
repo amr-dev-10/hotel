@@ -7,6 +7,8 @@ from app.core.database import get_db, set_tenant_context
 from app.core.encryption import decrypt_secret
 from app.core.responses import ok
 from app.repositories.whatsapp_repository import WhatsAppAccountRepository, WhatsAppMessageRepository
+from app.services.ai_orchestrator import AIOrchestratorService
+from app.services.ai_settings_service import AISettingsService
 from app.services.bot_service import BotService
 from app.services.whatsapp_ops_service import WhatsAppHealthService, WhatsAppUsageService
 from app.services.whatsapp_service import WhatsAppService
@@ -87,10 +89,70 @@ async def receive_whatsapp_webhook(
             duplicates += 1
             continue
         WhatsAppUsageService(db).increment(account.hotel_id, "messages_received", commit=False)
-        result = bot.handle_message(incoming, whatsapp_account_id=account.id)
+        session = bot.sessions.get_by_phone(
+            account.hotel_id,
+            incoming.from_phone,
+            whatsapp_account_id=account.id,
+        )
+        use_ai = (
+            bool(incoming.text)
+            and not incoming.interactive_id
+            and session is not None
+            and session.state in {"active", "live_chat"}
+            and AISettingsService(db).is_runtime_enabled(account.hotel_id)
+        )
+        if use_ai:
+            inbound_message = bot._record_message(
+                account.hotel_id,
+                session,
+                direction="inbound",
+                message_type="text",
+                text=incoming.text,
+                meta_message_id=incoming.meta_message_id,
+                whatsapp_account_id=account.id,
+            )
+            ai_result = await AIOrchestratorService.process_message(
+                db,
+                account.hotel_id,
+                inbound_message.conversation_id,
+                incoming.text or "",
+                inbound_message.id,
+                source="whatsapp",
+            )
+            result = {
+                "hotel_id": account.hotel_id,
+                "phone": incoming.from_phone,
+                "session_state": session.state,
+                "replies": [],
+                "outbound_message_ids": [],
+                "ticket_id": ai_result.ticket_id or ai_result.escalation_ticket_id,
+                "conversation_id": inbound_message.conversation_id,
+                "inbound_message_id": inbound_message.id,
+                "ai_result": ai_result.model_dump(),
+            }
+        else:
+            result = bot.handle_message(incoming, whatsapp_account_id=account.id)
         processed += 1
         access_token = _account_access_token(account)
         outbound_message_ids = result.get("outbound_message_ids") or []
+        if result.get("ai_result", {}).get("reply_sent") and result.get("ai_result", {}).get("reply_text"):
+            send_result = _send_reply(
+                whatsapp,
+                incoming,
+                {"kind": "text", "text": result["ai_result"]["reply_text"]},
+                access_token=access_token,
+            )
+            WhatsAppHealthService(db).record_sent(account.hotel_id, account.id, commit=False)
+            WhatsAppUsageService(db).increment(account.hotel_id, "messages_sent", commit=False)
+            WhatsAppUsageService(db).increment(account.hotel_id, "api_calls", commit=False)
+            outbound.append(
+                {
+                    "incoming": incoming.__dict__,
+                    "reply": {"kind": "text", "text": result["ai_result"]["reply_text"]},
+                    "send_result": send_result,
+                    "ai_result": result["ai_result"],
+                }
+            )
         for index, reply in enumerate(result["replies"]):
             send_result = _send_reply(
                 whatsapp,

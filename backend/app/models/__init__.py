@@ -1,3 +1,4 @@
+from app.models.ai_models import AIConversationSummary, AIPrompt, AIToolExecutionLog, AIUsageLog
 from app.models.availability import RoomBlock
 from app.models.bot_config import BotConfig
 from app.models.campaign import Campaign, CampaignDelivery
@@ -74,6 +75,10 @@ from app.models.workflow import WorkflowDefinition, WorkflowState, WorkflowTrans
 __all__ = [
     "AuditLog",
     "AnalyticsSnapshot",
+    "AIConversationSummary",
+    "AIPrompt",
+    "AIToolExecutionLog",
+    "AIUsageLog",
     "ApiRateLimit",
     "BotConfig",
     "BotVersion",

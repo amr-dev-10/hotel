@@ -58,6 +58,7 @@ export const queryKeys = {
   hierarchy: (hotelId: string, departmentId: string) =>
     ["hierarchy", hotelId, departmentId] as const,
   ai: (hotelId: string) => ["ai-settings", hotelId] as const,
+  aiAnalytics: (hotelId: string) => ["ai-analytics", hotelId] as const,
   whatsapp: {
     account: (hotelId: string) => ["whatsapp", hotelId, "account"] as const,
     conversations: (hotelId: string) => ["whatsapp", hotelId, "conversations"] as const,

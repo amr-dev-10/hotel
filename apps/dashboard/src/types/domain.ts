@@ -528,6 +528,17 @@ export interface AISettings {
   last_tested_at: string | null;
   embedding_provider: string | null;
   embedding_model: string | null;
+  is_active: boolean;
+  temperature: number;
+  high_confidence_threshold: number;
+  low_confidence_threshold: number;
+  max_context_messages: number;
+  language: string;
+  enable_ticket_creation: boolean;
+  enable_auto_reply: boolean;
+  enable_sentiment_analysis: boolean;
+  escalation_department_key: string;
+  system_prompt: string | null;
 }
 
 export interface AISettingsTest {
@@ -535,6 +546,16 @@ export interface AISettingsTest {
   provider: string;
   response_time_ms: number;
   response_preview: string;
+}
+
+export interface AIAnalyticsSummary {
+  total_requests: number;
+  total_tokens: number;
+  total_cost: number;
+  avg_latency_ms: number;
+  escalation_rate: number;
+  auto_reply_rate: number;
+  intent_distribution: Record<string, number>;
 }
 
 export interface WhatsAppAccount {

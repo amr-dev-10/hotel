@@ -80,7 +80,7 @@ class BotService:
             message.phone_number_id,
             whatsapp_account_id=whatsapp_account_id,
         )
-        self._record_message(
+        inbound_message = self._record_message(
             hotel.id,
             session,
             direction="inbound",
@@ -146,6 +146,8 @@ class BotService:
             "replies": replies,
             "outbound_message_ids": outbound_message_ids,
             "ticket_id": ticket_id,
+            "conversation_id": inbound_message.conversation_id,
+            "inbound_message_id": inbound_message.id,
         }
 
     def parse_webhook_payload(self, payload: dict[str, Any]) -> list[IncomingWhatsAppMessage]:
@@ -220,7 +222,7 @@ class BotService:
         name: str,
         messages: dict[str, str],
         replies: list[dict[str, Any]],
-    ) -> None:
+    ) -> WhatsAppMessage:
         clean_name = name.strip()
         if len(clean_name) < 2:
             replies.append(self._text("Please share your full name."))
