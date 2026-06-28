@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { apiErrorMessage } from "@/lib/api/client";
 import { titleCase } from "@/lib/utils";
 import {
@@ -31,6 +32,17 @@ export function AiSettingsPage({ hotelId }: { hotelId: string }) {
   const [apiKey, setApiKey] = useState("");
   const [embeddingProvider, setEmbeddingProvider] = useState("");
   const [embeddingModel, setEmbeddingModel] = useState("");
+  const [isActive, setIsActive] = useState(false);
+  const [temperature, setTemperature] = useState(0.3);
+  const [highConfidenceThreshold, setHighConfidenceThreshold] = useState(0.95);
+  const [lowConfidenceThreshold, setLowConfidenceThreshold] = useState(0.8);
+  const [maxContextMessages, setMaxContextMessages] = useState(20);
+  const [language, setLanguage] = useState("en");
+  const [enableTicketCreation, setEnableTicketCreation] = useState(true);
+  const [enableAutoReply, setEnableAutoReply] = useState(false);
+  const [enableSentimentAnalysis, setEnableSentimentAnalysis] = useState(true);
+  const [escalationDepartmentKey, setEscalationDepartmentKey] = useState("front_office");
+  const [systemPrompt, setSystemPrompt] = useState("");
 
   useEffect(() => {
     if (!settings.data) {
@@ -41,6 +53,17 @@ export function AiSettingsPage({ hotelId }: { hotelId: string }) {
     setModel(settings.data.model ?? "");
     setEmbeddingProvider(settings.data.embedding_provider ?? "");
     setEmbeddingModel(settings.data.embedding_model ?? "");
+    setIsActive(settings.data.is_active);
+    setTemperature(settings.data.temperature);
+    setHighConfidenceThreshold(settings.data.high_confidence_threshold);
+    setLowConfidenceThreshold(settings.data.low_confidence_threshold);
+    setMaxContextMessages(settings.data.max_context_messages);
+    setLanguage(settings.data.language);
+    setEnableTicketCreation(settings.data.enable_ticket_creation);
+    setEnableAutoReply(settings.data.enable_auto_reply);
+    setEnableSentimentAnalysis(settings.data.enable_sentiment_analysis);
+    setEscalationDepartmentKey(settings.data.escalation_department_key);
+    setSystemPrompt(settings.data.system_prompt ?? "");
   }, [settings.data]);
 
   async function handleSave() {
@@ -51,6 +74,17 @@ export function AiSettingsPage({ hotelId }: { hotelId: string }) {
         model: model || null,
         embedding_provider: embeddingProvider || null,
         embedding_model: embeddingModel || null,
+        is_active: isActive,
+        temperature,
+        high_confidence_threshold: highConfidenceThreshold,
+        low_confidence_threshold: lowConfidenceThreshold,
+        max_context_messages: maxContextMessages,
+        language,
+        enable_ticket_creation: enableTicketCreation,
+        enable_auto_reply: enableAutoReply,
+        enable_sentiment_analysis: enableSentimentAnalysis,
+        escalation_department_key: escalationDepartmentKey,
+        system_prompt: systemPrompt || null,
       });
       setApiKey("");
       toast.success("AI settings saved");
@@ -86,6 +120,16 @@ export function AiSettingsPage({ hotelId }: { hotelId: string }) {
   }
 
   const busy = saveSettings.isPending || testConnection.isPending || resetSettings.isPending;
+  const modelPlaceholder =
+    provider === "groq"
+      ? "llama-3.3-70b-versatile"
+      : provider === "anthropic"
+        ? "claude-3-5-sonnet-latest"
+        : provider === "gemini"
+          ? "gemini-2.0-flash"
+          : provider === "local"
+            ? "local-keyword"
+            : "gpt-4o-mini";
 
   return (
     <div className="grid gap-5">
@@ -120,13 +164,15 @@ export function AiSettingsPage({ hotelId }: { hotelId: string }) {
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Provider" id="ai-provider">
             <Select id="ai-provider" value={provider} onChange={(event) => setProvider(event.target.value)}>
+              <option value="local">Local fallback</option>
               <option value="gemini">Google Gemini</option>
               <option value="openai">OpenAI</option>
               <option value="anthropic">Anthropic Claude</option>
+              <option value="groq">Groq</option>
             </Select>
           </Field>
           <Field label="Model" id="ai-model">
-            <Input id="ai-model" placeholder="gpt-4o-mini" value={model} onChange={(event) => setModel(event.target.value)} />
+            <Input id="ai-model" placeholder={modelPlaceholder} value={model} onChange={(event) => setModel(event.target.value)} />
           </Field>
           <Field label="API key" id="ai-key">
             <PasswordInput
@@ -150,7 +196,95 @@ export function AiSettingsPage({ hotelId }: { hotelId: string }) {
               onChange={(event) => setEmbeddingModel(event.target.value)}
             />
           </Field>
+          <Field label="Language" id="ai-language">
+            <Input id="ai-language" value={language} onChange={(event) => setLanguage(event.target.value)} />
+          </Field>
+          <Field label="Escalation department" id="ai-escalation-department">
+            <Input
+              id="ai-escalation-department"
+              value={escalationDepartmentKey}
+              onChange={(event) => setEscalationDepartmentKey(event.target.value)}
+            />
+          </Field>
+          <Field label="Context messages" id="ai-context-messages">
+            <Input
+              id="ai-context-messages"
+              min={1}
+              max={100}
+              type="number"
+              value={maxContextMessages}
+              onChange={(event) => setMaxContextMessages(Number(event.target.value))}
+            />
+          </Field>
+          <Field label="Temperature" id="ai-temperature">
+            <Input
+              id="ai-temperature"
+              max={2}
+              min={0}
+              step={0.1}
+              type="number"
+              value={temperature}
+              onChange={(event) => setTemperature(Number(event.target.value))}
+            />
+          </Field>
+          <Field label="High confidence" id="ai-high-confidence">
+            <Input
+              id="ai-high-confidence"
+              max={1}
+              min={0}
+              step={0.01}
+              type="number"
+              value={highConfidenceThreshold}
+              onChange={(event) => setHighConfidenceThreshold(Number(event.target.value))}
+            />
+          </Field>
+          <Field label="Low confidence" id="ai-low-confidence">
+            <Input
+              id="ai-low-confidence"
+              max={1}
+              min={0}
+              step={0.01}
+              type="number"
+              value={lowConfidenceThreshold}
+              onChange={(event) => setLowConfidenceThreshold(Number(event.target.value))}
+            />
+          </Field>
         </div>
+
+        <div className="grid gap-3 md:grid-cols-2">
+          <ToggleField
+            checked={isActive}
+            id="ai-is-active"
+            label="Enable AI runtime"
+            onChange={setIsActive}
+          />
+          <ToggleField
+            checked={enableTicketCreation}
+            id="ai-ticket-creation"
+            label="Create tickets"
+            onChange={setEnableTicketCreation}
+          />
+          <ToggleField
+            checked={enableAutoReply}
+            id="ai-auto-reply"
+            label="Auto-send replies"
+            onChange={setEnableAutoReply}
+          />
+          <ToggleField
+            checked={enableSentimentAnalysis}
+            id="ai-sentiment"
+            label="Sentiment analysis"
+            onChange={setEnableSentimentAnalysis}
+          />
+        </div>
+
+        <Field label="System prompt" id="ai-system-prompt">
+          <Textarea
+            id="ai-system-prompt"
+            value={systemPrompt}
+            onChange={(event) => setSystemPrompt(event.target.value)}
+          />
+        </Field>
 
         {testConnection.data ? (
           <div className="rounded-md bg-slate-50 p-3 text-sm">
@@ -192,5 +326,33 @@ function Field({
       <Label htmlFor={id}>{label}</Label>
       {children}
     </div>
+  );
+}
+
+function ToggleField({
+  checked,
+  id,
+  label,
+  onChange,
+}: {
+  checked: boolean;
+  id: string;
+  label: string;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <label
+      className="flex min-h-12 items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+      htmlFor={id}
+    >
+      <span className="font-medium text-slate-700">{label}</span>
+      <input
+        checked={checked}
+        className="size-4 accent-[#0F3D91]"
+        id={id}
+        type="checkbox"
+        onChange={(event) => onChange(event.target.checked)}
+      />
+    </label>
   );
 }

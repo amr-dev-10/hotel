@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.v1 import (
     analytics,
+    ai_chat,
     ai_settings,
     auth,
     availability,
@@ -184,6 +185,11 @@ api_router.include_router(
     ai_settings.router,
     prefix="/hotels/{hotel_id}/settings/ai",
     tags=["ai-settings"],
+)
+api_router.include_router(
+    ai_chat.router,
+    prefix="/hotels/{hotel_id}/ai",
+    tags=["ai-operations"],
 )
 api_router.include_router(
     knowledge.router,

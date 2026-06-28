@@ -40,3 +40,12 @@ class Vault:
         if not secret:
             return None
         return decrypt_secret(secret.encrypted_value)
+
+    def delete(self, hotel_id: str, secret_type: str, commit: bool = False) -> bool:
+        secret = self.secrets.get_by_type(hotel_id, secret_type)
+        if not secret:
+            return False
+        self.db.delete(secret)
+        if commit:
+            self.db.commit()
+        return True

@@ -11,6 +11,8 @@ Architecture documents are versioned by folder so new designs can be added witho
 - `release-versioning-and-development-track.md` - SemVer, release candidate, migration, infrastructure, documentation, and current staging deployment fix tracking.
 - `staging-serverless-deployment-runbook.md` - staging deployment runbook for `amr-dev-10/hotel`, including Cloud Shell setup, GitHub environment variables, CI/CD trigger steps, verification, and troubleshooting.
 - `current-development-operations-guide.md` - current escalation, notification, Food and Beverage, kitchen, and guest portal flows, including staff manual order creation and order editing.
+- `ai-chatbot-development-and-testing.md` - AI chatbot MVP implementation map, configuration, Windows dev run commands, automated tests, live smoke test, and troubleshooting.
+- `ai-chatbot-conversation-test-cases.md` - manual conversational QA cases for hotel guest messages, expected AI routing/ticket/reply behavior, hotel-owned AI provider setup, and xAI Grok distinction notes.
 - `order-computation-functional-flow.md` - Food and Beverage POS order total calculation flow, current backend behavior, and recommended charge/discount extension model.
 
 ## Versions

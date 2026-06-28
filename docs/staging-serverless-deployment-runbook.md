@@ -264,6 +264,21 @@ WHATSAPP_APP_SECRET_SECRET=arcadia-staging-whatsapp-app-secret
 
 Set `WHATSAPP_DRY_RUN=false` in the GitHub `staging` environment when you want staging to send real WhatsApp messages.
 
+## Configure Hotel-Owned AI For Staging
+
+Real AI providers are configured per hotel in staging because each hotel manages its own AI account.
+
+No staging Secret Manager value or GitHub environment variable is required for OpenAI, Gemini, Anthropic, or Groq provider keys.
+
+Dashboard AI settings:
+
+- Provider: `gemini`, `openai`, `anthropic`, or `groq`
+- Model: the model selected by that hotel
+- API key: that hotel's provider API key
+- Auto-send replies: off until manual conversation cases pass
+
+Do not add platform `OPENAI_API_KEY`, `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`, or `GROQ_API_KEY` values to GitHub environment variables, Cloud Run environment variables, or Secret Manager for this BYOK setup.
+
 ## Step 6: Trigger The Staging Deployment
 
 Option A, from GitHub UI:
