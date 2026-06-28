@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Select } from "@/components/ui/select";
 import { apiErrorMessage } from "@/lib/api/client";
 import { titleCase } from "@/lib/utils";
@@ -122,10 +123,9 @@ export function WhatsAppSettingsPage({ hotelId }: { hotelId: string }) {
             <Input id="wa-waba" value={wabaId} onChange={(event) => setWabaId(event.target.value)} />
           </Field>
           <Field label="Access token" id="wa-token">
-            <Input
+            <PasswordInput
               id="wa-token"
               placeholder="Write-only token"
-              type="password"
               value={accessToken}
               onChange={(event) => setAccessToken(event.target.value)}
             />

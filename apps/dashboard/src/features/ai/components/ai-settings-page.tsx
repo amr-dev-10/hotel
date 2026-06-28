@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Select } from "@/components/ui/select";
 import { apiErrorMessage } from "@/lib/api/client";
 import { titleCase } from "@/lib/utils";
@@ -128,10 +129,9 @@ export function AiSettingsPage({ hotelId }: { hotelId: string }) {
             <Input id="ai-model" placeholder="gpt-4o-mini" value={model} onChange={(event) => setModel(event.target.value)} />
           </Field>
           <Field label="API key" id="ai-key">
-            <Input
+            <PasswordInput
               id="ai-key"
               placeholder="Write-only key"
-              type="password"
               value={apiKey}
               onChange={(event) => setApiKey(event.target.value)}
             />

@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Select } from "@/components/ui/select";
 import { apiErrorMessage } from "@/lib/api/client";
 import { useDepartments } from "@/features/departments/hooks/useDepartments";
@@ -87,7 +88,7 @@ export function CreateStaffDialog({ hotelId }: { hotelId: string }) {
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="grid gap-2">
               <Label htmlFor="password">Temporary password</Label>
-              <Input id="password" type="password" {...form.register("password")} />
+              <PasswordInput id="password" {...form.register("password")} />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="staff_level">Level</Label>

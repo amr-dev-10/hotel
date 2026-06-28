@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Select } from "@/components/ui/select";
 import { apiErrorMessage, apiPost } from "@/lib/api/client";
 import { titleCase } from "@/lib/utils";
@@ -104,10 +105,9 @@ export function ProfileSettingsPage() {
         </div>
         <form className="grid gap-4 md:grid-cols-3" onSubmit={handlePasswordChange}>
           <Field label="Current password" id="profile-current-password">
-            <Input
+            <PasswordInput
               autoComplete="current-password"
               id="profile-current-password"
-              type="password"
               value={passwordForm.current_password}
               onChange={(event) =>
                 setPasswordForm((current) => ({ ...current, current_password: event.target.value }))
@@ -115,11 +115,10 @@ export function ProfileSettingsPage() {
             />
           </Field>
           <Field label="New password" id="profile-new-password">
-            <Input
+            <PasswordInput
               autoComplete="new-password"
               id="profile-new-password"
               minLength={8}
-              type="password"
               value={passwordForm.new_password}
               onChange={(event) =>
                 setPasswordForm((current) => ({ ...current, new_password: event.target.value }))
@@ -127,11 +126,10 @@ export function ProfileSettingsPage() {
             />
           </Field>
           <Field label="Confirm password" id="profile-confirm-password">
-            <Input
+            <PasswordInput
               autoComplete="new-password"
               id="profile-confirm-password"
               minLength={8}
-              type="password"
               value={passwordForm.confirm_password}
               onChange={(event) =>
                 setPasswordForm((current) => ({ ...current, confirm_password: event.target.value }))
