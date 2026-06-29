@@ -30,6 +30,7 @@ const PAGE_SIZE = 50;
 
 export function ReservationsTable({ hotelId }: { hotelId: string }) {
   const [reservationToCancel, setReservationToCancel] = useState<Reservation | null>(null);
+  const [searchDraft, setSearchDraft] = useState("");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [fromDate, setFromDate] = useState("");
@@ -67,6 +68,11 @@ export function ReservationsTable({ hotelId }: { hotelId: string }) {
       await reservations.fetchNextPage();
       setPage((current) => current + 1);
     }
+  }
+
+  function handleSearch(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSearch(searchDraft.trim());
   }
 
   const columns = [
@@ -213,16 +219,19 @@ export function ReservationsTable({ hotelId }: { hotelId: string }) {
     <div className="grid gap-4">
       <section className="grid gap-3 rounded-md border border-slate-200 bg-white p-4">
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_12rem_10rem_10rem]">
-          <label className="relative block">
+          <form className="relative block" onSubmit={handleSearch}>
             <span className="sr-only">Search reservations</span>
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <Input
-              className="pl-9"
+              className="pl-9 pr-10"
               placeholder="Search by reservation, guest, room, or source"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              value={searchDraft}
+              onChange={(event) => setSearchDraft(event.target.value)}
             />
-          </label>
+            <Button className="absolute right-1 top-1 size-8" size="icon" type="submit" variant="ghost">
+              <Search className="size-4" />
+            </Button>
+          </form>
           <label>
             <span className="sr-only">Reservation status</span>
             <Select value={status} onChange={(event) => setStatus(event.target.value)}>

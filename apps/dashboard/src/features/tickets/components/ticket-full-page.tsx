@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { format, formatDistanceToNowStrict } from "date-fns";
 import {
   ArrowLeft,
@@ -20,6 +21,7 @@ import {
   ShieldCheck,
   ThumbsDown,
   ThumbsUp,
+  Trash2,
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -52,6 +54,7 @@ import {
   useAcceptTicket,
   useApproveTicket,
   useCreateTicketMessage,
+  useDeleteTicket,
   useCompleteTicket,
   useRejectTicket,
   useReopenTicket,
@@ -74,6 +77,7 @@ export function TicketFullPage({
   hotelId: string;
   ticketId: string;
 }) {
+  const router = useRouter();
   const ticketQuery = useTicket(hotelId, ticketId);
   const acceptances = useTicketAcceptances(hotelId, ticketId);
   const escalations = useTicketEscalations(hotelId, ticketId);
@@ -92,6 +96,7 @@ export function TicketFullPage({
   const approveTicket = useApproveTicket(hotelId);
   const reopenTicket = useReopenTicket(hotelId);
   const updateTicket = useUpdateTicket(hotelId);
+  const deleteTicket = useDeleteTicket(hotelId);
   const createTicketMessage = useCreateTicketMessage(hotelId, ticketId);
   const ticket = ticketQuery.data;
   const whatsappHistory = useWhatsappMessages(hotelId, ticket?.conversation_id ?? "");
@@ -101,6 +106,7 @@ export function TicketFullPage({
   const [discussionMessage, setDiscussionMessage] = useState("");
   const [guestReply, setGuestReply] = useState("");
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const departmentMap = useMemo(() => new Map((departments.data ?? []).map((department) => [department.id, department.name])), [departments.data]);
   const guestMap = useMemo(() => new Map((guests.data ?? []).map((guest) => [guest.id, guest.name])), [guests.data]);
   const reservationMap = useMemo(() => new Map((reservations.data ?? []).map((reservation) => [reservation.id, reservation.reservation_no])), [reservations.data]);
@@ -146,6 +152,17 @@ export function TicketFullPage({
       });
       setGuestReply("");
       toast.success("Guest message sent");
+    } catch (error) {
+      showApiErrorToast(error);
+    }
+  }
+
+  async function handleDeleteTicket() {
+    try {
+      await deleteTicket.mutateAsync(ticketId);
+      toast.success("Ticket deleted");
+      setDeleteDialogOpen(false);
+      router.push(`/${hotelId}/tickets`);
     } catch (error) {
       showApiErrorToast(error);
     }
@@ -211,6 +228,12 @@ export function TicketFullPage({
             <Button disabled={updateTicket.isPending} type="button" variant="secondary" onClick={() => setEditDialogOpen(true)}>
               <Pencil />
               Edit
+            </Button>
+          </Can>
+          <Can I="delete" a="Ticket">
+            <Button disabled={deleteTicket.isPending} type="button" variant="danger" onClick={() => setDeleteDialogOpen(true)}>
+              {deleteTicket.isPending ? <Loader2 className="animate-spin" /> : <Trash2 />}
+              Delete
             </Button>
           </Can>
           <Can I="approve" a="Ticket">
@@ -390,7 +413,50 @@ export function TicketFullPage({
           }
         }}
       />
+      <DeleteTicketDialog
+        isPending={deleteTicket.isPending}
+        open={deleteDialogOpen}
+        ticketCode={ticket.ticket_code}
+        onConfirm={handleDeleteTicket}
+        onOpenChange={setDeleteDialogOpen}
+      />
     </div>
+  );
+}
+
+function DeleteTicketDialog({
+  isPending,
+  open,
+  ticketCode,
+  onConfirm,
+  onOpenChange,
+}: {
+  isPending: boolean;
+  open: boolean;
+  ticketCode: string;
+  onConfirm: () => Promise<void>;
+  onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Delete ticket</DialogTitle>
+          <DialogDescription>
+            This removes {ticketCode} from active ticket queues and reports.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button disabled={isPending} type="button" variant="danger" onClick={onConfirm}>
+            {isPending ? <Loader2 className="animate-spin" /> : <Trash2 />}
+            Delete
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

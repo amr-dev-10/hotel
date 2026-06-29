@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { format, formatDistanceToNow } from "date-fns";
 import {
   ArrowLeft,
@@ -15,6 +16,7 @@ import {
   LogOut,
   MessageCircle,
   Pencil,
+  Trash2,
   UserRound,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -44,6 +46,7 @@ import {
   useCancelReservation,
   useCheckInReservation,
   useCheckOutReservation,
+  useDeleteReservation,
   useReservation,
   useReservationFolios,
   useReservationGuests,
@@ -60,8 +63,10 @@ export function ReservationDetailPage({
   hotelId: string;
   reservationId: string;
 }) {
+  const router = useRouter();
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const reservation = useReservation(hotelId, reservationId);
   const guestQuery = useGuest(hotelId, reservation.data?.guest_id ?? "");
   const roomQuery = useRoom(hotelId, reservation.data?.room_id);
@@ -72,6 +77,7 @@ export function ReservationDetailPage({
   const checkIn = useCheckInReservation(hotelId);
   const checkOut = useCheckOutReservation(hotelId);
   const cancelReservation = useCancelReservation(hotelId);
+  const deleteReservation = useDeleteReservation(hotelId);
   const updateReservation = useUpdateReservation(hotelId);
 
   const guest = guestQuery.data ?? null;
@@ -100,6 +106,17 @@ export function ReservationDetailPage({
       await cancelReservation.mutateAsync({ reservationId, reason });
       toast.success("Reservation cancelled");
       setCancelDialogOpen(false);
+    } catch (error) {
+      showApiErrorToast(error);
+    }
+  }
+
+  async function handleDeleteReservation() {
+    try {
+      await deleteReservation.mutateAsync(reservationId);
+      toast.success("Reservation deleted");
+      setDeleteDialogOpen(false);
+      router.push(`/${hotelId}/reservations`);
     } catch (error) {
       showApiErrorToast(error);
     }
@@ -149,12 +166,6 @@ export function ReservationDetailPage({
                 Check out
               </Button>
             ) : null}
-            {canCancel ? (
-              <Button size="sm" type="button" variant="danger" onClick={() => setCancelDialogOpen(true)}>
-                <Ban />
-                Cancel
-              </Button>
-            ) : null}
             <Button size="sm" type="button" variant="secondary" onClick={() => setEditDialogOpen(true)}>
               <Pencil />
               Edit
@@ -164,6 +175,18 @@ export function ReservationDetailPage({
                 <MessageCircle className="mr-2 size-3" />
                 Open Communication
               </Link>
+            </Button>
+          </Can>
+          <Can I="delete" a="Reservation">
+            {canCancel ? (
+              <Button size="sm" type="button" variant="danger" onClick={() => setCancelDialogOpen(true)}>
+                <Ban />
+                Cancel
+              </Button>
+            ) : null}
+            <Button size="sm" type="button" variant="danger" onClick={() => setDeleteDialogOpen(true)}>
+              <Trash2 />
+              Delete
             </Button>
           </Can>
         </div>
@@ -267,7 +290,50 @@ export function ReservationDetailPage({
           }
         }}
       />
+      <DeleteReservationDialog
+        isPending={deleteReservation.isPending}
+        open={deleteDialogOpen}
+        reservationNo={reservation.data.reservation_no}
+        onConfirm={handleDeleteReservation}
+        onOpenChange={setDeleteDialogOpen}
+      />
     </div>
+  );
+}
+
+function DeleteReservationDialog({
+  isPending,
+  open,
+  reservationNo,
+  onConfirm,
+  onOpenChange,
+}: {
+  isPending: boolean;
+  open: boolean;
+  reservationNo: string;
+  onConfirm: () => Promise<void>;
+  onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Delete reservation</DialogTitle>
+          <DialogDescription>
+            This removes reservation {reservationNo} from active hotel records.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button disabled={isPending} type="button" variant="danger" onClick={onConfirm}>
+            {isPending ? <Loader2 className="animate-spin" /> : <Trash2 />}
+            Delete
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

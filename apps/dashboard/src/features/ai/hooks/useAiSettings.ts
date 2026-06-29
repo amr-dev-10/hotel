@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api/client";
 import { queryKeys } from "@/lib/api/query-keys";
-import type { AIAnalyticsSummary, AISettings, AISettingsTest } from "@/types/domain";
+import type { AIDebugLog, AIAnalyticsSummary, AISettings, AISettingsTest } from "@/types/domain";
 
 export interface AISettingsPayload {
   provider: string;
@@ -36,7 +36,10 @@ export function useSaveAiSettings(hotelId: string) {
 
   return useMutation({
     mutationFn: (payload: AISettingsPayload) => apiPut<AISettings>(`/hotels/${hotelId}/settings/ai`, payload),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.ai(hotelId) }),
+    onSuccess: (data) => {
+      queryClient.setQueryData(queryKeys.ai(hotelId), data);
+      queryClient.invalidateQueries({ queryKey: queryKeys.ai(hotelId) });
+    },
   });
 }
 
@@ -54,7 +57,10 @@ export function useResetAiSettings(hotelId: string) {
 
   return useMutation({
     mutationFn: () => apiDelete<AISettings>(`/hotels/${hotelId}/settings/ai`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.ai(hotelId) }),
+    onSuccess: (data) => {
+      queryClient.setQueryData(queryKeys.ai(hotelId), data);
+      queryClient.invalidateQueries({ queryKey: queryKeys.ai(hotelId) });
+    },
   });
 }
 
@@ -63,5 +69,14 @@ export function useAiAnalytics(hotelId: string) {
     queryKey: queryKeys.aiAnalytics(hotelId),
     queryFn: () => apiGet<AIAnalyticsSummary>(`/hotels/${hotelId}/ai/analytics`),
     enabled: Boolean(hotelId),
+  });
+}
+
+export function useAiDebugLogs(hotelId: string) {
+  return useQuery({
+    queryKey: queryKeys.aiDebugLogs(hotelId),
+    queryFn: () => apiGet<AIDebugLog[]>(`/hotels/${hotelId}/ai/analytics/debug`, { params: { limit: 10 } }),
+    enabled: Boolean(hotelId),
+    refetchInterval: 15_000,
   });
 }

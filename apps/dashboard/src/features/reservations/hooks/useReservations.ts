@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { apiGet, apiGetEnvelope, apiPost, apiPut } from "@/lib/api/client";
+import { apiDelete, apiGet, apiGetEnvelope, apiPost, apiPut } from "@/lib/api/client";
 import { queryKeys } from "@/lib/api/query-keys";
 import type { ApiEnvelope, CursorPageMeta, Folio, Reservation, ReservationGuest, StayRecord, WhatsAppMessage } from "@/types/domain";
 import type { CreateReservationValues } from "@/features/reservations/schemas/create-reservation.schema";
@@ -158,6 +158,20 @@ export function useCancelReservation(hotelId: string) {
       queryClient.invalidateQueries({ queryKey: queryKeys.reservations(hotelId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.reservationDetail(hotelId, variables.reservationId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.reservationStays(hotelId, variables.reservationId) });
+    },
+  });
+}
+
+export function useDeleteReservation(hotelId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (reservationId: string) =>
+      apiDelete<{ deleted: boolean; reservation_id: string }>(`/hotels/${hotelId}/reservations/${reservationId}`),
+    onSuccess: (_reservation, reservationId) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.reservations(hotelId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.reservationDetail(hotelId, reservationId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.reservationStays(hotelId, reservationId) });
     },
   });
 }

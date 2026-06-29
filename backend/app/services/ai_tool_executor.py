@@ -51,6 +51,7 @@ class AIToolExecutor:
             outbound = AIToolExecutor._record_guest_reply(db, hotel_id, context, decision.reply)
             result.reply_sent = True
             result.reply_text = decision.reply
+            result.outbound_message_id = outbound.id if outbound else None
             AIToolExecutor._log_execution(
                 db,
                 hotel_id,

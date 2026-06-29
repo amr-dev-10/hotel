@@ -32,6 +32,7 @@ from app.schemas.whatsapp_account import (
     WhatsAppUsageRead,
 )
 from app.services.whatsapp_account_service import WhatsAppAccountService, WhatsAppTemplateService
+from app.services.audit_service import AuditService
 from app.services.whatsapp_ops_service import (
     ConversationWindowService,
     WhatsAppHealthService,
@@ -270,6 +271,53 @@ def delete_conversation_profile(
     db.commit()
     db.refresh(conversation)
     return ok(WhatsAppConversationRead.model_validate(conversation).model_dump())
+
+
+@router.delete("/conversations/{conversation_id}")
+def delete_conversation(
+    hotel_id: str,
+    conversation_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("ticket.assign")),
+) -> dict:
+    repo = WhatsAppConversationRepository(db)
+    conversation = repo.get_for_hotel(hotel_id, conversation_id)
+    if not conversation or conversation.status == "deleted":
+        raise not_found("Conversation not found")
+
+    previous_guest_id = conversation.guest_id
+    conversation.status = "deleted"
+    conversation.guest_id = None
+    conversation.assigned_staff_id = None
+    conversation.assigned_at = None
+    conversation.resolved_at = utcnow()
+    conversation.resolved_by = current_user.id
+    conversation.unread_count = 0
+
+    sessions = db.execute(
+        select(WhatsAppSession).where(
+            WhatsAppSession.hotel_id == hotel_id,
+            WhatsAppSession.phone == conversation.phone,
+        )
+    ).scalars().all()
+    for session in sessions:
+        if not previous_guest_id or session.guest_id == previous_guest_id:
+            session.guest_id = None
+            session.room_id = None
+            session.state = "new"
+            session.pending_action = None
+            session.form_responses = {}
+
+    AuditService(db).log(
+        hotel_id,
+        "whatsapp.conversation.deleted",
+        "whatsapp_conversation",
+        conversation.id,
+        current_user.id,
+        payload={"phone": conversation.phone, "previous_guest_id": previous_guest_id},
+    )
+    db.commit()
+    return ok({"deleted": True, "conversation_id": conversation_id})
 
 
 

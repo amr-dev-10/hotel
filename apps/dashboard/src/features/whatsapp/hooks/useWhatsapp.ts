@@ -84,6 +84,19 @@ export function useDeleteWhatsappConversationProfile(hotelId: string, conversati
   });
 }
 
+export function useDeleteWhatsappConversation(hotelId: string, conversationId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => apiDelete<{ deleted: boolean; conversation_id: string }>(`/hotels/${hotelId}/whatsapp/conversations/${conversationId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.whatsapp.conversations(hotelId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.whatsapp.messages(hotelId, conversationId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.guests(hotelId) });
+    },
+  });
+}
+
 export function useWhatsappConversations(hotelId: string) {
   return useQuery({
     queryKey: queryKeys.whatsapp.conversations(hotelId),

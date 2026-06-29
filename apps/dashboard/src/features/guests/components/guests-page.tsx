@@ -22,12 +22,12 @@ const PAGE_SIZE = 50;
 
 export function GuestsPage({ hotelId: hotelIdProp }: { hotelId?: string }) {
   const hotelId = useRouteHotelId(hotelIdProp);
+  const [searchDraft, setSearchDraft] = useState("");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [page, setPage] = useState(1);
-  const debouncedSearch = useDebouncedValue(search.trim(), 300);
   const guests = useGuests(hotelId, {
-    q: debouncedSearch || undefined,
+    q: search || undefined,
     status: status === "all" ? undefined : status,
     limit: PAGE_SIZE,
   });
@@ -36,7 +36,7 @@ export function GuestsPage({ hotelId: hotelIdProp }: { hotelId?: string }) {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, status]);
+  }, [search, status]);
 
   useEffect(() => {
     if (page > loadedPageCount) {
@@ -53,6 +53,11 @@ export function GuestsPage({ hotelId: hotelIdProp }: { hotelId?: string }) {
       await guests.fetchNextPage();
       setPage((current) => current + 1);
     }
+  }
+
+  function handleSearch(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSearch(searchDraft.trim());
   }
 
   if (guests.isLoading) {
@@ -77,16 +82,19 @@ export function GuestsPage({ hotelId: hotelIdProp }: { hotelId?: string }) {
 
       <section className="grid gap-3 rounded-md border border-slate-200 bg-white p-4">
         <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_12rem]">
-          <label className="relative block">
+          <form className="relative block" onSubmit={handleSearch}>
             <span className="sr-only">Search guests</span>
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <Input
-              className="pl-9"
+              className="pl-9 pr-10"
               placeholder="Search by name, phone, or email"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              value={searchDraft}
+              onChange={(event) => setSearchDraft(event.target.value)}
             />
-          </label>
+            <Button className="absolute right-1 top-1 size-8" size="icon" type="submit" variant="ghost">
+              <Search className="size-4" />
+            </Button>
+          </form>
           <label>
             <span className="sr-only">Guest status</span>
             <Select value={status} onChange={(event) => setStatus(event.target.value)}>
@@ -227,16 +235,4 @@ function formatDate(value: string | null) {
   }
 
   return format(new Date(value), "dd MMM yyyy");
-}
-
-function useDebouncedValue<T>(value: T, delayMs: number) {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-
-  useEffect(() => {
-    const timeoutId = window.setTimeout(() => setDebouncedValue(value), delayMs);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [delayMs, value]);
-
-  return debouncedValue;
 }

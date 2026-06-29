@@ -62,11 +62,19 @@ class AIAction(BaseModel):
 class AIExecutionResult(BaseModel):
     reply_sent: bool = False
     reply_text: str | None = None
+    outbound_message_id: str | None = None
     suggested_reply: str | None = None
     ticket_created: bool = False
     ticket_id: str | None = None
     escalated: bool = False
     escalation_ticket_id: str | None = None
+
+
+class AIDebugStep(BaseModel):
+    step: str
+    status: str = "success"
+    details: dict[str, Any] = Field(default_factory=dict)
+    error: str | None = None
 
 
 class AIProcessingResult(BaseModel):
@@ -75,6 +83,7 @@ class AIProcessingResult(BaseModel):
     action: AIAction | None = None
     reply_sent: bool = False
     reply_text: str | None = None
+    outbound_message_id: str | None = None
     suggested_reply: str | None = None
     ticket_created: bool = False
     ticket_id: str | None = None
@@ -83,6 +92,7 @@ class AIProcessingResult(BaseModel):
     latency_ms: int = 0
     usage_log_id: str | None = None
     error: str | None = None
+    debug_steps: list[AIDebugStep] = Field(default_factory=list)
 
 
 class AIChatRequest(BaseModel):
@@ -142,6 +152,23 @@ class AIUsageLogRead(ORMModel):
     reply_sent: bool
     error: str | None = None
     created_at: datetime
+
+
+class AIToolExecutionLogRead(ORMModel):
+    id: str
+    hotel_id: str
+    usage_log_id: str | None = None
+    tool_name: str
+    tool_input: dict[str, Any] | None = None
+    tool_output: dict[str, Any] | None = None
+    status: str
+    executed_by: str
+    error: str | None = None
+    created_at: datetime
+
+
+class AIDebugLogRead(AIUsageLogRead):
+    steps: list[AIToolExecutionLogRead] = Field(default_factory=list)
 
 
 class AIPromptCreate(BaseModel):

@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { apiGet, apiGetEnvelope, apiPatch, apiPost } from "@/lib/api/client";
+import { apiDelete, apiGet, apiGetEnvelope, apiPatch, apiPost } from "@/lib/api/client";
 import { queryKeys } from "@/lib/api/query-keys";
 import type { ApiEnvelope, CursorPageMeta, Guest, GuestConsent, GuestTimelineEvent } from "@/types/domain";
 import type { CreateGuestValues } from "@/features/guests/schemas/create-guest.schema";
@@ -83,6 +83,19 @@ export function useUpdateGuest(hotelId: string, guestId: string) {
       queryClient.invalidateQueries({ queryKey: queryKeys.guests(hotelId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.guestDetail(hotelId, guestId) });
       queryClient.invalidateQueries({ queryKey: ["guestConversation", hotelId, guestId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.whatsapp.conversations(hotelId) });
+    },
+  });
+}
+
+export function useDeleteGuest(hotelId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (guestId: string) => apiDelete<{ deleted: boolean; guest_id: string }>(`/hotels/${hotelId}/guests/${guestId}`),
+    onSuccess: (_data, guestId) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.guests(hotelId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.guestDetail(hotelId, guestId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.whatsapp.conversations(hotelId) });
     },
   });

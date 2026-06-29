@@ -136,11 +136,67 @@ async def receive_whatsapp_webhook(
         access_token = _account_access_token(account)
         outbound_message_ids = result.get("outbound_message_ids") or []
         if result.get("ai_result", {}).get("reply_sent") and result.get("ai_result", {}).get("reply_text"):
-            send_result = _send_reply(
-                whatsapp,
-                incoming,
-                {"kind": "text", "text": result["ai_result"]["reply_text"]},
-                access_token=access_token,
+            ai_result = result["ai_result"]
+            usage_log_id = ai_result.get("usage_log_id")
+            outbound_message_id = ai_result.get("outbound_message_id")
+            AIOrchestratorService.log_debug_event(
+                db,
+                account.hotel_id,
+                usage_log_id,
+                "whatsapp_send_attempt",
+                {
+                    "phone_number_id": incoming.phone_number_id,
+                    "to_phone": incoming.from_phone,
+                    "outbound_message_id": outbound_message_id,
+                    "has_access_token": bool(access_token),
+                },
+            )
+            try:
+                send_result = _send_reply(
+                    whatsapp,
+                    incoming,
+                    {"kind": "text", "text": ai_result["reply_text"]},
+                    access_token=access_token,
+                )
+            except Exception as exc:
+                if outbound_message_id:
+                    outbound_message = db.get(messages.model, outbound_message_id)
+                    if outbound_message:
+                        outbound_message.status = "failed"
+                AIOrchestratorService.log_debug_event(
+                    db,
+                    account.hotel_id,
+                    usage_log_id,
+                    "whatsapp_send_failed",
+                    {
+                        "phone_number_id": incoming.phone_number_id,
+                        "to_phone": incoming.from_phone,
+                        "outbound_message_id": outbound_message_id,
+                    },
+                    status="error",
+                    error=str(exc),
+                )
+                db.commit()
+                raise
+            meta_reply_id = _meta_message_id_from_send_result(send_result)
+            if outbound_message_id:
+                outbound_message = db.get(messages.model, outbound_message_id)
+                if outbound_message:
+                    outbound_message.meta_message_id = meta_reply_id
+                    outbound_message.status = "dry_run" if send_result.get("dry_run") else "sent"
+            AIOrchestratorService.log_debug_event(
+                db,
+                account.hotel_id,
+                usage_log_id,
+                "whatsapp_send_completed",
+                {
+                    "phone_number_id": incoming.phone_number_id,
+                    "to_phone": incoming.from_phone,
+                    "outbound_message_id": outbound_message_id,
+                    "meta_message_id": meta_reply_id,
+                    "dry_run": bool(send_result.get("dry_run")),
+                },
+                result=send_result,
             )
             WhatsAppHealthService(db).record_sent(account.hotel_id, account.id, commit=False)
             WhatsAppUsageService(db).increment(account.hotel_id, "messages_sent", commit=False)
@@ -148,9 +204,9 @@ async def receive_whatsapp_webhook(
             outbound.append(
                 {
                     "incoming": incoming.__dict__,
-                    "reply": {"kind": "text", "text": result["ai_result"]["reply_text"]},
+                    "reply": {"kind": "text", "text": ai_result["reply_text"]},
                     "send_result": send_result,
-                    "ai_result": result["ai_result"],
+                    "ai_result": ai_result,
                 }
             )
         for index, reply in enumerate(result["replies"]):

@@ -42,7 +42,7 @@ export function NotificationBell({ hotelId }: { hotelId: string }) {
       return;
     }
     if (conversationId) {
-      router.push(`/${hotelId}/whatsapp?conversationId=${conversationId}`);
+      router.push(`/${hotelId}/whatsapp?c=${conversationId}`);
     }
   }
 

@@ -6,6 +6,7 @@ from app.api.dependencies import require_permission
 from app.core.database import get_db
 from app.core.exceptions import bad_request, not_found
 from app.core.responses import ok
+from app.models.base import utcnow
 from app.models.guest import Guest
 from app.models.user import User
 from app.repositories.guest_repository import GuestRepository
@@ -16,6 +17,7 @@ from app.services.whatsapp_contact_sync import sync_guest_whatsapp_contact
 from app.models.reservation import Reservation, ReservationGuest
 from app.models.whatsapp import WhatsAppConversation, WhatsAppMessage
 from app.models.ticket import Ticket
+from app.services.audit_service import AuditService
 
 router = APIRouter()
 
@@ -112,6 +114,40 @@ def update_guest(
     db.commit()
     db.refresh(guest)
     return ok(GuestRead.model_validate(guest).model_dump())
+
+
+@router.delete("/{guest_id}")
+def delete_guest(
+    hotel_id: str,
+    guest_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("guest.edit")),
+) -> dict:
+    repo = GuestRepository(db)
+    guest = repo.get_for_hotel(hotel_id, guest_id)
+    if not guest:
+        raise not_found("Guest not found")
+
+    linked_conversations = db.execute(
+        select(WhatsAppConversation).where(
+            WhatsAppConversation.hotel_id == hotel_id,
+            WhatsAppConversation.guest_id == guest_id,
+        )
+    ).scalars().all()
+    for conversation in linked_conversations:
+        conversation.guest_id = None
+
+    AuditService(db).log(
+        hotel_id,
+        "guest.deleted",
+        "guest",
+        guest.id,
+        current_user.id,
+        payload={"name": guest.name, "linked_conversations": len(linked_conversations)},
+    )
+    repo.soft_delete(guest, utcnow(), current_user.id)
+    return ok({"deleted": True, "guest_id": guest_id})
+
 
 @router.put("/{guest_id}/consent")
 def upsert_guest_consent(

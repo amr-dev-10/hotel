@@ -175,6 +175,25 @@ class WhatsAppConversationRepository(BaseRepository[WhatsAppConversation]):
             statement = statement.where(WhatsAppMessage.ticket_id == ticket_id)
         return self.db.execute(statement.order_by(WhatsAppMessage.created_at)).scalars().all()
 
+    def list_for_hotel(
+        self,
+        hotel_id: str,
+        limit: int = 50,
+        cursor: str | None = None,
+    ) -> Sequence[WhatsAppConversation]:
+        statement = select(WhatsAppConversation).where(
+            WhatsAppConversation.hotel_id == hotel_id,
+            WhatsAppConversation.status != "deleted",
+        )
+        if cursor:
+            statement = statement.where(WhatsAppConversation.id > cursor)
+        return self.db.execute(
+            statement.order_by(
+                WhatsAppConversation.last_message_at.desc().nullslast(),
+                WhatsAppConversation.started_at.desc(),
+            ).limit(limit)
+        ).scalars().all()
+
     def list_ticket_messages(self, hotel_id: str, ticket_id: str) -> Sequence[WhatsAppMessage]:
         return self.db.execute(
             select(WhatsAppMessage)

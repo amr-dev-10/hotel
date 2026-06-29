@@ -6,10 +6,11 @@ from app.api.dependencies import require_permission
 from app.core.database import get_db
 from app.core.exceptions import not_found
 from app.core.responses import ok
-from app.models.ai_models import AIPrompt
+from app.models.ai_models import AIPrompt, AIToolExecutionLog
 from app.models.user import User
 from app.schemas.ai import (
     AIChatRequest,
+    AIDebugLogRead,
     AIGenerateTicketRequest,
     AIProcessingResult,
     AIPromptCreate,
@@ -17,6 +18,7 @@ from app.schemas.ai import (
     AIPromptUpdate,
     AISuggestReplyRequest,
     AISummarizeRequest,
+    AIToolExecutionLogRead,
     AIUsageLogRead,
 )
 from app.services.ai_analytics_service import AIAnalyticsService
@@ -105,6 +107,38 @@ def ai_analytics_logs(
 ) -> dict:
     rows = AIAnalyticsService.list_logs(db, hotel_id, limit=limit)
     return ok([AIUsageLogRead.model_validate(row).model_dump() for row in rows])
+
+
+@router.get("/analytics/debug")
+def ai_debug_logs(
+    hotel_id: str,
+    limit: int = Query(default=25, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("analytics.view")),
+) -> dict:
+    usage_logs = AIAnalyticsService.list_logs(db, hotel_id, limit=limit)
+    usage_ids = [item.id for item in usage_logs]
+    steps_by_usage_id: dict[str | None, list[AIToolExecutionLog]] = {usage_id: [] for usage_id in usage_ids}
+    if usage_ids:
+        steps = db.execute(
+            select(AIToolExecutionLog)
+            .where(
+                AIToolExecutionLog.hotel_id == hotel_id,
+                AIToolExecutionLog.usage_log_id.in_(usage_ids),
+            )
+            .order_by(AIToolExecutionLog.created_at)
+        ).scalars().all()
+        for step in steps:
+            steps_by_usage_id.setdefault(step.usage_log_id, []).append(step)
+    items = []
+    for usage_log in usage_logs:
+        data = AIUsageLogRead.model_validate(usage_log).model_dump()
+        data["steps"] = [
+            AIToolExecutionLogRead.model_validate(step).model_dump()
+            for step in steps_by_usage_id.get(usage_log.id, [])
+        ]
+        items.append(AIDebugLogRead.model_validate(data).model_dump())
+    return ok(items)
 
 
 @router.post("/test-provider")

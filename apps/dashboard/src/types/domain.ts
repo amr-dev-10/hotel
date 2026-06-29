@@ -558,6 +558,43 @@ export interface AIAnalyticsSummary {
   intent_distribution: Record<string, number>;
 }
 
+export interface AIToolExecutionLog {
+  id: string;
+  hotel_id: string;
+  usage_log_id: string | null;
+  tool_name: string;
+  tool_input: Record<string, unknown> | null;
+  tool_output: Record<string, unknown> | null;
+  status: string;
+  executed_by: string;
+  error: string | null;
+  created_at: string;
+}
+
+export interface AIDebugLog {
+  id: string;
+  hotel_id: string;
+  conversation_id: string | null;
+  provider: string;
+  model: string;
+  request_type: string;
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+  latency_ms: number;
+  estimated_cost_usd: number;
+  intent_detected: string | null;
+  confidence: number | null;
+  sentiment: string | null;
+  ticket_created: boolean;
+  ticket_id: string | null;
+  escalated: boolean;
+  reply_sent: boolean;
+  error: string | null;
+  created_at: string;
+  steps: AIToolExecutionLog[];
+}
+
 export interface WhatsAppAccount {
   id: string;
   hotel_id: string;
