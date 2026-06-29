@@ -2,6 +2,7 @@
 
 import { Columns3, Filter, List, Search, Star } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +16,11 @@ export function TicketFilters() {
   const searchParams = useSearchParams();
   const currentUser = useAuthStore((state) => state.currentUser);
   const activeView = searchParams.get("view") ?? "list";
+  const [queryDraft, setQueryDraft] = useState(searchParams.get("q") ?? "");
+
+  useEffect(() => {
+    setQueryDraft(searchParams.get("q") ?? "");
+  }, [searchParams]);
 
   function updateParam(key: string, value: string) {
     const next = new URLSearchParams(searchParams.toString());
@@ -36,6 +42,11 @@ export function TicketFilters() {
       }
     });
     router.replace(`${pathname}?${next.toString()}`, { scroll: false });
+  }
+
+  function applySearch(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    updateParam("q", queryDraft.trim());
   }
 
   return (
@@ -94,15 +105,18 @@ export function TicketFilters() {
       </div>
 
       <div className="grid gap-3 xl:grid-cols-[1fr_180px_180px_190px_170px_auto]">
-        <label className="relative">
+        <form className="relative" onSubmit={applySearch}>
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
           <Input
-            className="pl-9"
-            defaultValue={searchParams.get("q") ?? ""}
+            className="pl-9 pr-10"
+            value={queryDraft}
             placeholder="Search ticket code, item, room or assignee"
-            onChange={(event) => updateParam("q", event.target.value)}
+            onChange={(event) => setQueryDraft(event.target.value)}
           />
-        </label>
+          <Button className="absolute right-1 top-1 size-8" size="icon" type="submit" variant="ghost">
+            <Search className="size-4" />
+          </Button>
+        </form>
         <Select value={searchParams.get("stage") ?? ""} onChange={(event) => updateParam("stage", event.target.value)}>
           <option value="">All stages</option>
           <option value="created">Created</option>

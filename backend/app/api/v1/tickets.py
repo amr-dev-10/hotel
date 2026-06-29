@@ -7,6 +7,7 @@ from app.core.permissions import Permissions
 from app.core.database import get_db
 from app.core.exceptions import bad_request, forbidden, not_found
 from app.core.responses import ok
+from app.models.base import utcnow
 from app.models.guest import Guest
 from app.models.reservation import Reservation
 from app.models.room import Room
@@ -30,6 +31,7 @@ from app.schemas.ticket import (
 )
 from app.schemas.v51 import EscalationLogRead
 from app.schemas.whatsapp_account import WhatsAppMessageRead
+from app.services.audit_service import AuditService
 from app.services.rbac_service import RBACService
 from app.services.ticket_service import TicketService
 
@@ -289,6 +291,26 @@ def update_ticket(
 ) -> dict:
     ticket = TicketService(db).update_ticket(hotel_id, ticket_id, payload, actor_id=current_user.id)
     return ok(_ticket_read(ticket, _ticket_context(db, hotel_id, [ticket])).model_dump())
+
+
+@router.delete("/{ticket_id}")
+def delete_ticket(
+    hotel_id: str,
+    ticket_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("ticket.delete")),
+) -> dict:
+    ticket = _get_visible_ticket(db, hotel_id, ticket_id, current_user)
+    AuditService(db).log(
+        hotel_id,
+        "ticket.deleted",
+        "ticket",
+        ticket.id,
+        current_user.id,
+        payload={"ticket_code": ticket.ticket_code, "stage": ticket.stage},
+    )
+    TicketRepository(db).soft_delete(ticket, utcnow(), current_user.id)
+    return ok({"deleted": True, "ticket_id": ticket_id})
 
 
 @router.post("/{ticket_id}/accept")

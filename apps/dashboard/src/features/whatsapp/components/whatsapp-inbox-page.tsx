@@ -34,6 +34,7 @@ import {
   useWhatsappMessages, 
   useSendWhatsappMessage,
   useUpdateWhatsappConversation,
+  useDeleteWhatsappConversation,
   useDeleteWhatsappConversationProfile
 } from "@/features/whatsapp/hooks/useWhatsapp";
 import { useGuest, useGuests, useGuestConversation } from "@/features/guests/hooks/useGuests";
@@ -81,6 +82,7 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
   const reservationTicketsQuery = useTickets(hotelId, activeReservationId ? { reservation_id: activeReservationId } : { reservation_id: "__none__" });
   const createTicket = useCreateTicket(hotelId);
 
+  const [searchDraft, setSearchDraft] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
 
@@ -126,6 +128,7 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
 
   const sendMessage = useSendWhatsappMessage(hotelId, activeConversationId || "");
   const updateConversation = useUpdateWhatsappConversation(hotelId, activeConversationId || "");
+  const deleteConversation = useDeleteWhatsappConversation(hotelId, activeConversationId || "");
   const deleteConversationProfile = useDeleteWhatsappConversationProfile(hotelId, activeConversationId || "");
   const [text, setText] = useState("");
   const [quickTicketDraft, setQuickTicketDraft] = useState<{
@@ -133,6 +136,7 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
     description: string;
   } | null>(null);
   const [deleteProfileOpen, setDeleteProfileOpen] = useState(false);
+  const [deleteConversationOpen, setDeleteConversationOpen] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -213,6 +217,26 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
     } catch (error) {
       showApiErrorToast(error);
     }
+  }
+
+  async function handleDeleteConversation() {
+    if (!selectedConversation) {
+      return;
+    }
+
+    try {
+      await deleteConversation.mutateAsync();
+      toast.success("WhatsApp conversation removed");
+      setDeleteConversationOpen(false);
+      router.push(`/${hotelId}/whatsapp`);
+    } catch (error) {
+      showApiErrorToast(error);
+    }
+  }
+
+  function handleConversationSearch(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSearchQuery(searchDraft.trim());
   }
 
   // Conversation counters
@@ -305,6 +329,37 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={deleteConversationOpen} onOpenChange={setDeleteConversationOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete WhatsApp Conversation</DialogTitle>
+            <DialogDescription>
+              This removes the selected conversation from hotel records. Existing message history is retained for audit references.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+            <p className="font-medium">{guestQuery.data?.name || selectedConversation?.phone || "Selected conversation"}</p>
+            <p className="mt-1 text-xs text-slate-500">{selectedConversation?.phone}</p>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setDeleteConversationOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={deleteConversation.isPending}
+              type="button"
+              variant="danger"
+              onClick={handleDeleteConversation}
+            >
+              {deleteConversation.isPending ? <Loader2 className="animate-spin" /> : <Trash2 />}
+              Delete
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="flex min-h-[85vh] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm lg:h-[85vh] lg:flex-row">
       
       {/* LEFT PANE: CONVERSATION LIST */}
@@ -327,15 +382,18 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
             </div>
           ) : null}
           
-          <div className="relative mb-3">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+          <form className="relative mb-3" onSubmit={handleConversationSearch}>
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <Input 
               placeholder="Search guests, phones..." 
-              className="pl-9 h-9" 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-9 pl-9 pr-10"
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
             />
-          </div>
+            <Button className="absolute right-1 top-1 size-7" size="icon" type="submit" variant="ghost">
+              <Search className="size-4" />
+            </Button>
+          </form>
 
           <div className="flex flex-wrap gap-1">
             <FilterButton active={activeFilter === "all"} onClick={() => setActiveFilter("all")}>
@@ -496,6 +554,13 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
                     >
                       <Unlink />
                       Remove profile link
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-rose-700"
+                      onClick={() => setDeleteConversationOpen(true)}
+                    >
+                      <Trash2 />
+                      Delete conversation
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>

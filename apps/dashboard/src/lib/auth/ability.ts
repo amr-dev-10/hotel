@@ -68,7 +68,7 @@ export function buildAbility(user: CurrentUser | null): AppAbility {
   grant(permissions, Permissions.GUEST_VIEW_BASIC, () => can("view", "Guest"));
   grant(permissions, Permissions.GUEST_VIEW_SENSITIVE, () => can(["view", "viewSensitive"], "Guest"));
   grant(permissions, Permissions.GUEST_CREATE, () => can("create", "Guest"));
-  grant(permissions, Permissions.GUEST_EDIT, () => can("edit", "Guest"));
+  grant(permissions, Permissions.GUEST_EDIT, () => can(["edit", "delete"], "Guest"));
 
   grant(permissions, Permissions.RESERVATION_VIEW, () => can("view", "Reservation"));
   grant(permissions, Permissions.RESERVATION_MANAGE, () => can(["view", "create", "edit"], "Reservation"));

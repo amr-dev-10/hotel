@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { apiGet, apiGetEnvelope, apiPatch, apiPost } from "@/lib/api/client";
+import { apiDelete, apiGet, apiGetEnvelope, apiPatch, apiPost } from "@/lib/api/client";
 import { queryKeys } from "@/lib/api/query-keys";
 import type {
   ApiEnvelope,
@@ -217,6 +217,18 @@ export function useUpdateTicket(hotelId: string) {
     onSuccess: (_ticket, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.tickets.all(hotelId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.tickets.timeline(hotelId, variables.ticketId) });
+    },
+  });
+}
+
+export function useDeleteTicket(hotelId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (ticketId: string) => apiDelete<{ deleted: boolean; ticket_id: string }>(`/hotels/${hotelId}/tickets/${ticketId}`),
+    onSuccess: (_ticket, ticketId) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.tickets.all(hotelId) });
+      queryClient.invalidateQueries({ queryKey: ["tickets", hotelId, ticketId] });
     },
   });
 }

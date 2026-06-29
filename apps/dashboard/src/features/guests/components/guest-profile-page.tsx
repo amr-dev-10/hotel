@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { format, formatDistanceToNow } from "date-fns";
+import { useRouter } from "next/navigation";
+import { format } from "date-fns";
 import {
   ArrowLeft,
   CalendarDays,
@@ -12,10 +13,9 @@ import {
   ShieldCheck,
   UserRound,
   FileText,
-  Clock,
   Loader2,
   Pencil,
-  Ticket
+  Trash2
 } from "lucide-react";
 import { toast } from "sonner";
 import { showApiErrorToast } from "@/lib/api/error-toast";
@@ -35,14 +35,10 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Can } from "@/lib/auth/can";
-import { compactId, titleCase } from "@/lib/utils";
-import type { Guest, Reservation, WhatsAppConversation } from "@/types/domain";
-import { useGuest, useGuestConsent, useGuestTimeline, useUpdateGuest } from "@/features/guests/hooks/useGuests";
+import { titleCase } from "@/lib/utils";
+import type { Guest } from "@/types/domain";
+import { useDeleteGuest, useGuest, useGuestConsent, useGuestTimeline, useUpdateGuest } from "@/features/guests/hooks/useGuests";
 import { useReservations } from "@/features/reservations/hooks/useReservations";
-import {
-  useWhatsappConversations,
-  useWhatsappMessages,
-} from "@/features/whatsapp/hooks/useWhatsapp";
 
 export function GuestProfilePage({
   hotelId,
@@ -51,38 +47,26 @@ export function GuestProfilePage({
   hotelId: string;
   guestId: string;
 }) {
+  const router = useRouter();
   const guest = useGuest(hotelId, guestId);
   const reservations = useReservations(hotelId);
   const consent = useGuestConsent(hotelId, guestId);
-  const conversations = useWhatsappConversations(hotelId);
   const updateGuest = useUpdateGuest(hotelId, guestId);
+  const deleteGuest = useDeleteGuest(hotelId);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const guestReservations = useMemo(
     () => (reservations.data ?? []).filter((reservation) => reservation.guest_id === guestId),
     [guestId, reservations.data],
   );
 
-  const conversation = useMemo(() => {
-    if (!guest.data) {
-      return null;
-    }
-
-    return (
-      (conversations.data ?? []).find((item) => item.guest_id === guestId) ??
-      (conversations.data ?? []).find((item) =>
-        [guest.data?.whatsapp_phone, guest.data?.phone].filter(Boolean).includes(item.phone),
-      ) ??
-      null
-    );
-  }, [conversations.data, guest.data, guestId]);
-
-  if (guest.isLoading || reservations.isLoading || conversations.isLoading) {
+  if (guest.isLoading || reservations.isLoading) {
     return <DataState isLoading />;
   }
 
-  if (guest.error || reservations.error || conversations.error) {
-    return <DataState error={guest.error ?? reservations.error ?? conversations.error} />;
+  if (guest.error || reservations.error) {
+    return <DataState error={guest.error ?? reservations.error} />;
   }
 
   if (!guest.data) {
@@ -95,6 +79,17 @@ export function GuestProfilePage({
   const activeReservation = guestReservations.find((reservation) =>
     reservation.status.toLowerCase().includes("checked_in"),
   );
+
+  async function handleDeleteGuest() {
+    try {
+      await deleteGuest.mutateAsync(guestId);
+      toast.success("Guest deleted");
+      setDeleteDialogOpen(false);
+      router.push(`/${hotelId}/guests`);
+    } catch (error) {
+      showApiErrorToast(error);
+    }
+  }
 
   return (
     <div className="grid gap-5">
@@ -124,6 +119,12 @@ export function GuestProfilePage({
             <Button size="sm" type="button" variant="secondary" onClick={() => setEditDialogOpen(true)}>
               <Pencil />
               Edit
+            </Button>
+          </Can>
+          <Can I="delete" a="Guest">
+            <Button size="sm" type="button" variant="danger" onClick={() => setDeleteDialogOpen(true)}>
+              <Trash2 />
+              Delete
             </Button>
           </Can>
           <Button asChild size="sm" variant="secondary">
@@ -197,7 +198,50 @@ export function GuestProfilePage({
           }
         }}
       />
+      <DeleteGuestDialog
+        isPending={deleteGuest.isPending}
+        name={guest.data.name}
+        open={deleteDialogOpen}
+        onConfirm={handleDeleteGuest}
+        onOpenChange={setDeleteDialogOpen}
+      />
     </div>
+  );
+}
+
+function DeleteGuestDialog({
+  isPending,
+  name,
+  open,
+  onConfirm,
+  onOpenChange,
+}: {
+  isPending: boolean;
+  name: string;
+  open: boolean;
+  onConfirm: () => Promise<void>;
+  onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Delete guest</DialogTitle>
+          <DialogDescription>
+            This removes {name} from active hotel records and unlinks any WhatsApp conversation.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button disabled={isPending} type="button" variant="danger" onClick={onConfirm}>
+            {isPending ? <Loader2 className="animate-spin" /> : <Trash2 />}
+            Delete
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -441,28 +485,6 @@ function guestStatusVariant(status: string) {
     return "teal";
   }
   return "default";
-}
-
-function reservationStatusVariant(status: string) {
-  const normalized = status.toLowerCase();
-  if (normalized.includes("check") || normalized.includes("stay")) {
-    return "green";
-  }
-  if (normalized.includes("cancel")) {
-    return "rose";
-  }
-  if (normalized.includes("book")) {
-    return "blue";
-  }
-  return "default";
-}
-
-function formatDate(value: string | null) {
-  if (!value) {
-    return "Not set";
-  }
-
-  return format(new Date(value), "dd MMM yyyy");
 }
 
 function toDateInput(value: string | null) {

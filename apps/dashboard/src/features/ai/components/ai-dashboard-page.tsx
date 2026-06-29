@@ -1,17 +1,20 @@
 "use client";
 
+import { format, formatDistanceToNow } from "date-fns";
 import Link from "next/link";
-import { Bot, Settings, Zap } from "lucide-react";
+import { AlertCircle, Bot, Bug, CheckCircle2, Settings, Zap } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
 import { titleCase } from "@/lib/utils";
-import { useAiAnalytics, useAiSettings } from "@/features/ai/hooks/useAiSettings";
+import { useAiAnalytics, useAiDebugLogs, useAiSettings } from "@/features/ai/hooks/useAiSettings";
+import type { AIDebugLog } from "@/types/domain";
 
 export function AiDashboardPage({ hotelId }: { hotelId: string }) {
   const settings = useAiSettings(hotelId);
   const analytics = useAiAnalytics(hotelId);
+  const debugLogs = useAiDebugLogs(hotelId);
 
   if (settings.isLoading || analytics.isLoading) {
     return <DataState isLoading />;
@@ -94,6 +97,26 @@ export function AiDashboardPage({ hotelId }: { hotelId: string }) {
           </p>
         </div>
       </section>
+
+      <section className="grid gap-4 rounded-md border border-slate-200 bg-white p-4">
+        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-2">
+            <Bug className="size-4 text-[#0F3D91]" />
+            <h3 className="text-base font-semibold">AI Debugger</h3>
+          </div>
+          <Badge variant={debugLogs.error ? "rose" : "blue"}>{debugLogs.data?.length ?? 0} runs</Badge>
+        </div>
+        {debugLogs.isLoading ? <DataState isLoading /> : null}
+        {debugLogs.error ? <DataState error={debugLogs.error} /> : null}
+        {!debugLogs.isLoading && !debugLogs.error && !debugLogs.data?.length ? (
+          <DataState empty emptyTitle="No AI debug runs yet." />
+        ) : null}
+        <div className="grid gap-3">
+          {(debugLogs.data ?? []).map((log) => (
+            <DebugRun key={log.id} log={log} />
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
@@ -113,5 +136,58 @@ function Status({ label, active }: { label: string; active: boolean }) {
       <span>{label}</span>
       <Badge variant={active ? "green" : "amber"}>{active ? "On" : "Off"}</Badge>
     </p>
+  );
+}
+
+function DebugRun({ log }: { log: AIDebugLog }) {
+  return (
+    <article className="grid gap-3 rounded-md border border-slate-200 p-3">
+      <div className="flex flex-col justify-between gap-2 md:flex-row md:items-start">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant={log.error ? "rose" : log.reply_sent ? "green" : "amber"}>
+              {log.error ? "Error" : log.reply_sent ? "Reply sent" : "No auto reply"}
+            </Badge>
+            <span className="text-sm font-semibold">{titleCase(log.request_type)}</span>
+            <span className="text-xs text-slate-500">
+              {log.provider}/{log.model}
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-slate-500">
+            {format(new Date(log.created_at), "dd MMM yyyy, HH:mm")} ·{" "}
+            {formatDistanceToNow(new Date(log.created_at), { addSuffix: true })}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2 text-xs">
+          <Badge>{log.intent_detected ?? "unknown"}</Badge>
+          <Badge>{log.confidence === null ? "n/a" : `${Math.round(log.confidence * 100)}%`}</Badge>
+          {log.ticket_id ? <Badge variant="blue">Ticket</Badge> : null}
+          {log.escalated ? <Badge variant="rose">Escalated</Badge> : null}
+        </div>
+      </div>
+      {log.error ? (
+        <div className="flex items-start gap-2 rounded-md border border-rose-100 bg-rose-50 p-2 text-sm text-rose-900">
+          <AlertCircle className="mt-0.5 size-4 shrink-0" />
+          <span>{log.error}</span>
+        </div>
+      ) : null}
+      <div className="grid gap-2">
+        {log.steps.slice(-12).map((step) => (
+          <div className="grid gap-2 rounded-md bg-slate-50 p-2 text-xs md:grid-cols-[11rem_minmax(0,1fr)]" key={step.id}>
+            <div className="flex items-center gap-2 font-medium text-slate-700">
+              {step.status === "error" ? (
+                <AlertCircle className="size-3.5 text-rose-600" />
+              ) : (
+                <CheckCircle2 className="size-3.5 text-emerald-600" />
+              )}
+              <span className="truncate">{titleCase(step.tool_name.replace(/^debug\./, ""))}</span>
+            </div>
+            <pre className="max-h-24 overflow-auto whitespace-pre-wrap break-words rounded bg-white p-2 text-[11px] text-slate-600">
+              {step.error ?? JSON.stringify(step.tool_input ?? step.tool_output ?? {}, null, 2)}
+            </pre>
+          </div>
+        ))}
+      </div>
+    </article>
   );
 }

@@ -8,6 +8,7 @@ from app.api.dependencies import require_permission
 from app.core.database import get_db
 from app.core.exceptions import bad_request, not_found
 from app.core.responses import ok
+from app.models.base import utcnow
 from app.models.guest import Guest
 from app.models.room import Room
 from app.models.user import User
@@ -30,6 +31,7 @@ from app.schemas.reservation import (
     RoomChangeRequest,
     StayRecordRead,
 )
+from app.services.audit_service import AuditService
 from app.services.reservation_service import ReservationService
 
 router = APIRouter()
@@ -130,6 +132,36 @@ def update_reservation(
         actor_id=current_user.id,
     )
     return ok(ReservationRead.model_validate(reservation).model_dump())
+
+
+@router.delete("/{reservation_id}")
+def delete_reservation(
+    hotel_id: str,
+    reservation_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("reservation.cancel")),
+) -> dict:
+    repo = ReservationRepository(db)
+    reservation = repo.get_for_hotel(hotel_id, reservation_id)
+    if not reservation:
+        raise not_found("Reservation not found")
+
+    service = ReservationService(db)
+    service.availability.release_by_reference(hotel_id, "reservation", reservation.id)
+    if reservation.room_id and reservation.status != "checked_in":
+        room = service.rooms.get_for_hotel(hotel_id, reservation.room_id)
+        if room and room.status != "occupied":
+            room.status = "available"
+    AuditService(db).log(
+        hotel_id,
+        "reservation.deleted",
+        "reservation",
+        reservation.id,
+        current_user.id,
+        payload={"reservation_no": reservation.reservation_no, "status": reservation.status},
+    )
+    repo.soft_delete(reservation, utcnow(), current_user.id)
+    return ok({"deleted": True, "reservation_id": reservation_id})
 
 
 @router.get("/{reservation_id}/guests")

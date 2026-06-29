@@ -20,6 +20,7 @@ type BadgeVariant = "default" | "blue" | "teal" | "amber" | "rose" | "green";
 
 export function AuditLogsPage({ hotelId }: { hotelId: string }) {
   const currentUser = useAuthStore((state) => state.currentUser);
+  const [searchDraft, setSearchDraft] = useState("");
   const [search, setSearch] = useState("");
   const [action, setAction] = useState("all");
   const [entity, setEntity] = useState("all");
@@ -73,6 +74,11 @@ export function AuditLogsPage({ hotelId }: { hotelId: string }) {
     return <DataState empty emptyTitle="Audit logs are available only to hotel admins." />;
   }
 
+  function handleSearch(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSearch(searchDraft.trim());
+  }
+
   return (
     <div className="grid gap-5">
       <div className="flex flex-col justify-between gap-3 xl:flex-row xl:items-center">
@@ -99,15 +105,18 @@ export function AuditLogsPage({ hotelId }: { hotelId: string }) {
 
       <section className="grid gap-3 rounded-md border border-slate-200 bg-white p-4">
         <div className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_180px_180px_220px_120px]">
-          <label className="relative block">
+          <form className="relative block" onSubmit={handleSearch}>
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <Input
-              className="pl-9"
+              className="pl-9 pr-10"
               placeholder="Search action, entity, record, user, IP"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              value={searchDraft}
+              onChange={(event) => setSearchDraft(event.target.value)}
             />
-          </label>
+            <Button className="absolute right-1 top-1 size-8" size="icon" type="submit" variant="ghost">
+              <Search className="size-4" />
+            </Button>
+          </form>
           <Select value={action} onChange={(event) => setAction(event.target.value)}>
             <option value="all">All actions</option>
             {actionOptions.map((option) => (
@@ -159,7 +168,7 @@ function AuditLogTable({
   return (
     <section className="overflow-hidden rounded-md border border-slate-200 bg-white">
       <div className="overflow-x-auto">
-        <div className="grid min-w-[1100px] grid-cols-[170px_190px_170px_150px_170px_130px_1fr] border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-normal text-slate-500">
+        <div className="grid min-w-[1100px] grid-cols-[170px_190px_170px_150px_170px_130px_1fr] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-normal text-slate-500">
           <span>Time</span>
           <span>Actor</span>
           <span>Action</span>

@@ -1,3 +1,4 @@
+import logging
 import time
 
 from sqlalchemy import select
@@ -9,6 +10,7 @@ from app.models.ai_models import AIConversationSummary
 from app.schemas.ai import (
     AIChatResponse,
     AIDecision,
+    AIDebugStep,
     AIProcessingResult,
     AISuggestReplyRead,
     AITicketSuggestion,
@@ -23,6 +25,9 @@ from app.services.ai_settings_service import AISettingsService
 from app.services.ai_tool_executor import AIToolExecutor
 
 
+logger = logging.getLogger(__name__)
+
+
 class AIOrchestratorService:
     @staticmethod
     async def process_message(
@@ -33,18 +38,41 @@ class AIOrchestratorService:
         message_id: str | None = None,
         source: str = "whatsapp",
     ) -> AIProcessingResult:
+        debug_steps: list[AIDebugStep] = []
         try:
+            AIOrchestratorService._debug_step(
+                debug_steps,
+                "process_start",
+                {
+                    "source": source,
+                    "message_id": message_id,
+                    "message_length": len(message or ""),
+                },
+                hotel_id=hotel_id,
+                conversation_id=conversation_id,
+            )
             config, decision, response, latency_ms, context = AIOrchestratorService._decide(
                 db,
                 hotel_id,
                 conversation_id,
                 message,
                 source=source,
+                debug_steps=debug_steps,
             )
             action = AIDecisionEngine.evaluate(
                 decision,
                 config,
                 has_open_ticket=bool(context.open_tickets),
+            )
+            AIOrchestratorService._debug_step(
+                debug_steps,
+                "action_selected",
+                {
+                    "action": action.model_dump(),
+                    "has_open_ticket": bool(context.open_tickets),
+                },
+                hotel_id=hotel_id,
+                conversation_id=conversation_id,
             )
             usage_log = AIAnalyticsService.log_request(
                 db,
@@ -70,6 +98,14 @@ class AIOrchestratorService:
                 usage_log.id,
                 config,
             )
+            AIOrchestratorService._debug_step(
+                debug_steps,
+                "tool_execution_completed",
+                execution.model_dump(),
+                hotel_id=hotel_id,
+                conversation_id=conversation_id,
+            )
+            AIOrchestratorService._persist_debug_steps(db, hotel_id, usage_log.id, debug_steps)
             usage_log.ticket_created = execution.ticket_created
             usage_log.ticket_id = execution.ticket_id or execution.escalation_ticket_id
             usage_log.escalated = execution.escalated
@@ -81,6 +117,7 @@ class AIOrchestratorService:
                 action=action,
                 reply_sent=execution.reply_sent,
                 reply_text=execution.reply_text,
+                outbound_message_id=execution.outbound_message_id,
                 suggested_reply=execution.suggested_reply,
                 ticket_created=execution.ticket_created,
                 ticket_id=execution.ticket_id,
@@ -88,17 +125,36 @@ class AIOrchestratorService:
                 escalation_ticket_id=execution.escalation_ticket_id,
                 latency_ms=latency_ms,
                 usage_log_id=usage_log.id,
+                debug_steps=debug_steps,
             )
         except Exception as exc:
             db.rollback()
-            AIOrchestratorService._log_error(
+            AIOrchestratorService._debug_step(
+                debug_steps,
+                "process_failed",
+                {"source": source, "message_id": message_id},
+                status="error",
+                error=str(exc),
+                hotel_id=hotel_id,
+                conversation_id=conversation_id,
+            )
+            usage_log = AIOrchestratorService._log_error(
                 db,
                 hotel_id,
                 conversation_id,
                 request_type="chat",
                 error=str(exc),
+                commit=False,
             )
-            return AIProcessingResult(processed=False, error=str(exc))
+            if usage_log:
+                AIOrchestratorService._persist_debug_steps(db, hotel_id, usage_log.id, debug_steps)
+                db.commit()
+            return AIProcessingResult(
+                processed=False,
+                error=str(exc),
+                usage_log_id=usage_log.id if usage_log else None,
+                debug_steps=debug_steps,
+            )
 
     @staticmethod
     async def generate_reply(
@@ -241,8 +297,16 @@ class AIOrchestratorService:
         message: str,
         staff_context: str | None = None,
         source: str = "whatsapp",
+        debug_steps: list[AIDebugStep] | None = None,
     ):
         config = AISettingsService(db).get(hotel_id)
+        AIOrchestratorService._debug_step(
+            debug_steps,
+            "settings_loaded",
+            AIOrchestratorService._debug_config(config),
+            hotel_id=hotel_id,
+            conversation_id=conversation_id,
+        )
         context = AIContextBuilder.build_context(
             db,
             hotel_id,
@@ -250,19 +314,107 @@ class AIOrchestratorService:
             int(config.get("max_context_messages") or 20),
         )
         context.language = config.get("language") or "en"
-        context.knowledge = AIKnowledgeLoader.load_relevant_knowledge(db, hotel_id, message)
-        provider = AIOrchestratorService._provider(db, hotel_id, config)
-        messages = AIRequestBuilder.build_chat_messages(config, context, message, staff_context)
-        started = time.perf_counter()
-        raw_response = provider.chat(
-            messages,
-            temperature=float(config.get("temperature") or 0.3),
-            max_tokens=1200,
-            response_format="json_object",
+        AIOrchestratorService._debug_step(
+            debug_steps,
+            "context_built",
+            {
+                "message_count": len(context.messages),
+                "open_ticket_count": len(context.open_tickets),
+                "has_guest": bool(context.guest),
+                "has_reservation": bool(context.reservation),
+                "has_room": bool(context.room),
+            },
+            hotel_id=hotel_id,
+            conversation_id=conversation_id,
         )
+        context.knowledge = AIKnowledgeLoader.load_relevant_knowledge(db, hotel_id, message)
+        AIOrchestratorService._debug_step(
+            debug_steps,
+            "knowledge_loaded",
+            {"knowledge_count": len(context.knowledge)},
+            hotel_id=hotel_id,
+            conversation_id=conversation_id,
+        )
+        provider = AIOrchestratorService._provider(db, hotel_id, config)
+        AIOrchestratorService._debug_step(
+            debug_steps,
+            "provider_selected",
+            {
+                "provider": getattr(provider, "provider_name", config.get("provider") or "local"),
+                "model": config.get("model"),
+            },
+            hotel_id=hotel_id,
+            conversation_id=conversation_id,
+        )
+        messages = AIRequestBuilder.build_chat_messages(config, context, message, staff_context)
+        AIOrchestratorService._debug_step(
+            debug_steps,
+            "request_built",
+            {
+                "message_count": len(messages),
+                "source": source,
+                "staff_context_present": bool(staff_context),
+            },
+            hotel_id=hotel_id,
+            conversation_id=conversation_id,
+        )
+        started = time.perf_counter()
+        try:
+            raw_response = provider.chat(
+                messages,
+                temperature=float(config.get("temperature") or 0.3),
+                max_tokens=1200,
+                response_format="json_object",
+            )
+        except Exception as exc:
+            AIOrchestratorService._debug_step(
+                debug_steps,
+                "provider_chat_failed",
+                {"provider": config.get("provider") or "local", "model": config.get("model")},
+                status="error",
+                error=str(exc),
+                hotel_id=hotel_id,
+                conversation_id=conversation_id,
+            )
+            raise
         latency_ms = int((time.perf_counter() - started) * 1000)
         response = AIChatResponse.model_validate(raw_response)
+        AIOrchestratorService._debug_step(
+            debug_steps,
+            "provider_chat_completed",
+            {
+                "provider": response.provider,
+                "model": response.model,
+                "latency_ms": latency_ms,
+                "prompt_tokens": response.prompt_tokens,
+                "completion_tokens": response.completion_tokens,
+                "finish_reason": response.finish_reason,
+                "content_length": len(response.content or ""),
+            },
+            hotel_id=hotel_id,
+            conversation_id=conversation_id,
+        )
         decision = AIResponseParser.parse(response.model_dump())
+        greeting_fallback_applied = (
+            AIOrchestratorService._is_greeting(message)
+            and not (decision.reply_required and decision.reply)
+        )
+        decision = AIOrchestratorService._apply_greeting_fallback(decision, message)
+        if greeting_fallback_applied:
+            AIOrchestratorService._debug_step(
+                debug_steps,
+                "greeting_fallback_applied",
+                {"reply": decision.reply, "confidence": decision.confidence},
+                hotel_id=hotel_id,
+                conversation_id=conversation_id,
+            )
+        AIOrchestratorService._debug_step(
+            debug_steps,
+            "decision_parsed",
+            decision.model_dump(),
+            hotel_id=hotel_id,
+            conversation_id=conversation_id,
+        )
         return config, decision, response, latency_ms, context
 
     @staticmethod
@@ -278,10 +430,11 @@ class AIOrchestratorService:
         conversation_id: str | None,
         request_type: str,
         error: str,
-    ) -> None:
+        commit: bool = True,
+    ):
         try:
             config = AISettingsService(db).get(hotel_id)
-            AIAnalyticsService.log_request(
+            return AIAnalyticsService.log_request(
                 db,
                 hotel_id=hotel_id,
                 conversation_id=conversation_id,
@@ -292,7 +445,123 @@ class AIOrchestratorService:
                 completion_tokens=0,
                 latency_ms=0,
                 error=error,
-                commit=True,
+                commit=commit,
             )
         except Exception:
             db.rollback()
+            return None
+
+    @staticmethod
+    def log_debug_event(
+        db: Session,
+        hotel_id: str,
+        usage_log_id: str | None,
+        event: str,
+        details: dict | None = None,
+        result: dict | None = None,
+        status: str = "success",
+        error: str | None = None,
+    ) -> None:
+        AIToolExecutor._log_execution(
+            db,
+            hotel_id,
+            usage_log_id,
+            AIOrchestratorService._debug_tool_name(event),
+            details,
+            result,
+            status=status,
+            error=error,
+        )
+        logger.info(
+            "ai_debug event=%s hotel_id=%s usage_log_id=%s status=%s details=%s error=%s",
+            event,
+            hotel_id,
+            usage_log_id,
+            status,
+            details or {},
+            error,
+        )
+
+    @staticmethod
+    def _persist_debug_steps(
+        db: Session,
+        hotel_id: str,
+        usage_log_id: str | None,
+        debug_steps: list[AIDebugStep],
+    ) -> None:
+        for step in debug_steps:
+            AIOrchestratorService.log_debug_event(
+                db,
+                hotel_id,
+                usage_log_id,
+                step.step,
+                details=step.details,
+                result={"status": step.status},
+                status=step.status,
+                error=step.error,
+            )
+
+    @staticmethod
+    def _debug_step(
+        debug_steps: list[AIDebugStep] | None,
+        step: str,
+        details: dict | None = None,
+        status: str = "success",
+        error: str | None = None,
+        hotel_id: str | None = None,
+        conversation_id: str | None = None,
+    ) -> None:
+        item = AIDebugStep(step=step, status=status, details=details or {}, error=error)
+        if debug_steps is not None:
+            debug_steps.append(item)
+        logger.info(
+            "ai_debug step=%s hotel_id=%s conversation_id=%s status=%s details=%s error=%s",
+            step,
+            hotel_id,
+            conversation_id,
+            status,
+            details or {},
+            error,
+        )
+
+    @staticmethod
+    def _debug_config(config: dict) -> dict:
+        return {
+            "provider": config.get("provider"),
+            "model": config.get("model"),
+            "status": config.get("status"),
+            "is_active": config.get("is_active"),
+            "enable_auto_reply": config.get("enable_auto_reply"),
+            "enable_ticket_creation": config.get("enable_ticket_creation"),
+            "high_confidence_threshold": config.get("high_confidence_threshold"),
+            "low_confidence_threshold": config.get("low_confidence_threshold"),
+            "max_context_messages": config.get("max_context_messages"),
+            "language": config.get("language"),
+        }
+
+    @staticmethod
+    def _debug_tool_name(event: str) -> str:
+        return f"debug.{event}"[:50]
+
+    @staticmethod
+    def _apply_greeting_fallback(decision: AIDecision, message: str) -> AIDecision:
+        if not AIOrchestratorService._is_greeting(message):
+            return decision
+        if decision.reply_required and decision.reply:
+            return decision
+        return decision.model_copy(
+            update={
+                "intent": "information_request",
+                "confidence": max(decision.confidence, 0.96),
+                "sentiment": decision.sentiment or "neutral",
+                "ticket_required": False,
+                "reply_required": True,
+                "ticket": None,
+                "reply": "Hello! How can I help you today?",
+                "reason": "Greeting fallback generated a guest-facing reply.",
+            }
+        )
+
+    @staticmethod
+    def _is_greeting(message: str) -> bool:
+        return message.strip().lower() in {"hi", "hello", "hey", "menu", "start", "good morning", "good evening"}
