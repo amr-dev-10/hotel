@@ -8,7 +8,7 @@ import {
   MessageCircle, Settings, Search, User,
   Loader2, Send, CheckCircle, MapPin,
   Ticket as TicketIcon, Paperclip, Mic, Image as ImageIcon, FileText,
-  AlertCircle, Wrench, Sparkles, Utensils
+  AlertCircle, Wrench, Sparkles, Utensils, MoreHorizontal, Trash2, Unlink
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -32,7 +32,8 @@ import {
   useWhatsappConversations, 
   useWhatsappMessages, 
   useSendWhatsappMessage,
-  useUpdateWhatsappConversation
+  useUpdateWhatsappConversation,
+  useDeleteWhatsappConversationProfile
 } from "@/features/whatsapp/hooks/useWhatsapp";
 import { useGuest, useGuests, useGuestConversation } from "@/features/guests/hooks/useGuests";
 import { useCreateTicket, useTicketTimeline, useTickets } from "@/features/tickets/hooks/useTickets";
@@ -124,11 +125,13 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
 
   const sendMessage = useSendWhatsappMessage(hotelId, activeConversationId || "");
   const updateConversation = useUpdateWhatsappConversation(hotelId, activeConversationId || "");
+  const deleteConversationProfile = useDeleteWhatsappConversationProfile(hotelId, activeConversationId || "");
   const [text, setText] = useState("");
   const [quickTicketDraft, setQuickTicketDraft] = useState<{
     config: QuickTicketConfig;
     description: string;
   } | null>(null);
+  const [deleteProfileOpen, setDeleteProfileOpen] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -197,6 +200,20 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
     }
   }
 
+  async function handleDeleteConversationProfile() {
+    if (!selectedConversation) {
+      return;
+    }
+
+    try {
+      await deleteConversationProfile.mutateAsync();
+      toast.success("WhatsApp profile link removed");
+      setDeleteProfileOpen(false);
+    } catch (error) {
+      toast.error(apiErrorMessage(error));
+    }
+  }
+
   // Conversation counters
   const unreadCount = conversationRows.filter(c => c.unread_count > 0).length;
   const openCount = conversationRows.filter(c => c.status === "open").length;
@@ -253,6 +270,37 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteProfileOpen} onOpenChange={setDeleteProfileOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Remove WhatsApp Profile Link</DialogTitle>
+            <DialogDescription>
+              This removes the guest profile from the selected WhatsApp conversation. Message history stays available.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+            <p className="font-medium">{guestQuery.data?.name || selectedConversation?.phone || "Selected conversation"}</p>
+            <p className="mt-1 text-xs text-slate-500">{selectedConversation?.phone}</p>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setDeleteProfileOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={deleteConversationProfile.isPending}
+              type="button"
+              variant="danger"
+              onClick={handleDeleteConversationProfile}
+            >
+              {deleteConversationProfile.isPending ? <Loader2 className="animate-spin" /> : <Trash2 />}
+              Remove Link
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -433,6 +481,24 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
                   </DropdownMenuContent>
                 </DropdownMenu>
 
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="icon" variant="secondary" className="size-8" title="Conversation actions">
+                      <MoreHorizontal className="size-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      className="text-rose-700"
+                      disabled={!selectedConversation.guest_id}
+                      onClick={() => setDeleteProfileOpen(true)}
+                    >
+                      <Unlink />
+                      Remove profile link
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
                 {selectedConversation.status === "open" ? (
                   <Button 
                     size="sm" 
@@ -546,11 +612,17 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
                   <p className="text-sm font-semibold text-slate-800">4 Stays</p>
                 </div>
                 <div className="col-span-2">
-                  <Button asChild variant="secondary" className="h-8 w-full text-xs">
-                    <Link href={`/${hotelId}/guests/${selectedConversation.guest_id || ""}`}>
-                      View Full Profile
-                    </Link>
-                  </Button>
+                  {selectedConversation.guest_id ? (
+                    <Button asChild variant="secondary" className="h-8 w-full text-xs">
+                      <Link href={`/${hotelId}/guests/${selectedConversation.guest_id}`}>
+                        View Full Profile
+                      </Link>
+                    </Button>
+                  ) : (
+                    <Button disabled type="button" variant="secondary" className="h-8 w-full text-xs">
+                      No Profile Linked
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>

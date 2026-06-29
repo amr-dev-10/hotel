@@ -1,11 +1,14 @@
 from fastapi import APIRouter, Depends
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import require_permission
 from app.core.database import get_db
+from app.core.exceptions import not_found
 from app.core.responses import ok
 from app.models.base import utcnow
 from app.models.user import User
+from app.models.whatsapp_session import WhatsAppSession
 from app.repositories.whatsapp_repository import (
     ConversationWindowRepository,
     WhatsAppAccountRepository,
@@ -228,6 +231,41 @@ def update_conversation(
         if payload.assigned_staff_id != conversation.assigned_staff_id:
             conversation.assigned_staff_id = payload.assigned_staff_id
             conversation.assigned_at = utcnow() if payload.assigned_staff_id else None
+
+    db.commit()
+    db.refresh(conversation)
+    return ok(WhatsAppConversationRead.model_validate(conversation).model_dump())
+
+
+@router.delete("/conversations/{conversation_id}/profile")
+def delete_conversation_profile(
+    hotel_id: str,
+    conversation_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("ticket.assign")),
+) -> dict:
+    repo = WhatsAppConversationRepository(db)
+    conversation = repo.get_for_hotel(hotel_id, conversation_id)
+    if not conversation:
+        raise not_found("Conversation not found")
+
+    previous_guest_id = conversation.guest_id
+    conversation.guest_id = None
+
+    if previous_guest_id:
+        sessions = db.execute(
+            select(WhatsAppSession).where(
+                WhatsAppSession.hotel_id == hotel_id,
+                WhatsAppSession.phone == conversation.phone,
+                WhatsAppSession.guest_id == previous_guest_id,
+            )
+        ).scalars().all()
+        for session in sessions:
+            session.guest_id = None
+            session.room_id = None
+            session.state = "new"
+            session.pending_action = None
+            session.form_responses = {}
 
     db.commit()
     db.refresh(conversation)

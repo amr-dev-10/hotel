@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { apiGet, apiPatch, apiPost, apiPut } from "@/lib/api/client";
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "@/lib/api/client";
 import { queryKeys } from "@/lib/api/query-keys";
 import type {
   WhatsAppAccount,
@@ -67,6 +67,19 @@ export function useUpdateWhatsappConversation(hotelId: string, conversationId: s
       apiPatch<WhatsAppConversation>(`/hotels/${hotelId}/whatsapp/conversations/${conversationId}`, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.whatsapp.conversations(hotelId) });
+    },
+  });
+}
+
+export function useDeleteWhatsappConversationProfile(hotelId: string, conversationId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () =>
+      apiDelete<WhatsAppConversation>(`/hotels/${hotelId}/whatsapp/conversations/${conversationId}/profile`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.whatsapp.conversations(hotelId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.guests(hotelId) });
     },
   });
 }

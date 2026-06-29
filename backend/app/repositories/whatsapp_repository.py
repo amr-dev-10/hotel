@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.models.base import utcnow
@@ -98,21 +98,55 @@ class WhatsAppConversationRepository(BaseRepository[WhatsAppConversation]):
         guest_id: str | None,
         whatsapp_account_id: str | None = None,
     ) -> WhatsAppConversation:
+        now = utcnow()
+        if guest_id:
+            conversation = self.db.execute(
+                select(WhatsAppConversation).where(
+                    WhatsAppConversation.hotel_id == hotel_id,
+                    WhatsAppConversation.guest_id == guest_id,
+                )
+            ).scalar_one_or_none()
+            if conversation:
+                conversation.phone = phone
+                if whatsapp_account_id and not conversation.whatsapp_account_id:
+                    conversation.whatsapp_account_id = whatsapp_account_id
+                conversation.last_message_at = now
+                return conversation
+
         statement = select(WhatsAppConversation).where(
             WhatsAppConversation.hotel_id == hotel_id,
             WhatsAppConversation.phone == phone,
         )
         if whatsapp_account_id:
             statement = statement.where(
-                WhatsAppConversation.whatsapp_account_id == whatsapp_account_id,
+                or_(
+                    WhatsAppConversation.whatsapp_account_id == whatsapp_account_id,
+                    WhatsAppConversation.whatsapp_account_id.is_(None),
+                )
             )
-        conversation = self.db.execute(statement).scalar_one_or_none()
+        order_by = [
+            WhatsAppConversation.guest_id.is_not(None),
+            WhatsAppConversation.last_message_at.desc(),
+            WhatsAppConversation.started_at.desc(),
+        ]
+        if whatsapp_account_id:
+            order_by.insert(0, WhatsAppConversation.whatsapp_account_id.is_(None))
+        conversation = self.db.execute(
+            statement.order_by(*order_by)
+        ).scalars().first()
+        if (
+            conversation
+            and guest_id
+            and conversation.guest_id
+            and conversation.guest_id != guest_id
+        ):
+            conversation = None
         if conversation:
             if guest_id and not conversation.guest_id:
                 conversation.guest_id = guest_id
             if whatsapp_account_id and not conversation.whatsapp_account_id:
                 conversation.whatsapp_account_id = whatsapp_account_id
-            conversation.last_message_at = utcnow()
+            conversation.last_message_at = now
             return conversation
         conversation = WhatsAppConversation(
             hotel_id=hotel_id,
@@ -120,8 +154,8 @@ class WhatsAppConversationRepository(BaseRepository[WhatsAppConversation]):
             phone=phone,
             guest_id=guest_id,
             status="open",
-            started_at=utcnow(),
-            last_message_at=utcnow(),
+            started_at=now,
+            last_message_at=now,
         )
         self.db.add(conversation)
         self.db.flush()

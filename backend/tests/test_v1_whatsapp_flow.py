@@ -2,8 +2,11 @@ from uuid import uuid4
 
 from fastapi.testclient import TestClient
 import pytest
+from sqlalchemy import select
 
+from app.core.database import SessionLocal
 from app.main import app
+from app.models.whatsapp_session import WhatsAppSession
 from app.services import whatsapp_service
 from app.services.whatsapp_service import WhatsAppService
 
@@ -283,6 +286,64 @@ def test_whatsapp_webhook_deduplicates_retried_meta_message_id() -> None:
         assert messages.status_code == 200
         assert len(messages.json()["data"]) == 2
         assert messages.json()["data"][0]["meta_message_id"] == meta_message_id
+
+
+def test_delete_whatsapp_conversation_profile_unlinks_guest_and_session() -> None:
+    suffix = uuid4().hex[:8]
+    phone_number_id = f"profile_delete_{suffix}"
+    guest_phone = f"9195555{suffix[:5]}"
+
+    with TestClient(app) as client:
+        hotel_id, headers = _bootstrap_hotel(client, f"profile-delete-{suffix}", phone_number_id, "451")
+
+        assert client.post(
+            "/webhook/whatsapp",
+            json=_meta_payload(phone_number_id, guest_phone, text="Hi"),
+        ).status_code == 200
+        assert client.post(
+            "/webhook/whatsapp",
+            json=_meta_payload(phone_number_id, guest_phone, text="Profile Delete Guest"),
+        ).status_code == 200
+        assert client.post(
+            "/webhook/whatsapp",
+            json=_meta_payload(phone_number_id, guest_phone, text="451"),
+        ).status_code == 200
+
+        conversations = client.get(
+            f"/api/v1/hotels/{hotel_id}/whatsapp/conversations",
+            headers=headers,
+        )
+        assert conversations.status_code == 200
+        conversation = next(item for item in conversations.json()["data"] if item["phone"] == guest_phone)
+        assert conversation["guest_id"]
+
+        deleted = client.delete(
+            f"/api/v1/hotels/{hotel_id}/whatsapp/conversations/{conversation['id']}/profile",
+            headers=headers,
+        )
+        assert deleted.status_code == 200
+        assert deleted.json()["data"]["guest_id"] is None
+
+        db = SessionLocal()
+        try:
+            session = db.execute(
+                select(WhatsAppSession).where(
+                    WhatsAppSession.hotel_id == hotel_id,
+                    WhatsAppSession.phone == guest_phone,
+                )
+            ).scalar_one()
+            assert session.guest_id is None
+            assert session.room_id is None
+            assert session.state == "new"
+        finally:
+            db.close()
+
+        messages = client.get(
+            f"/api/v1/hotels/{hotel_id}/whatsapp/conversations/{conversation['id']}/messages",
+            headers=headers,
+        )
+        assert messages.status_code == 200
+        assert messages.json()["data"]
 
 
 def test_whatsapp_status_webhook_updates_existing_message_status() -> None:
