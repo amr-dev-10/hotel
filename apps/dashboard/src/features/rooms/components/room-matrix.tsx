@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { BedDouble, Layers, Loader2, Pencil } from "lucide-react";
 import { toast } from "sonner";
+import { showApiErrorToast } from "@/lib/api/error-toast";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,7 +19,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { apiErrorMessage } from "@/lib/api/client";
 import { cn, titleCase } from "@/lib/utils";
 import type { Room } from "@/types/domain";
 import { useRooms, useUpdateRoom } from "@/features/rooms/hooks/useRooms";
@@ -80,7 +80,7 @@ export function RoomMatrix({ hotelId }: { hotelId: string }) {
             toast.success("Room updated");
             setEditingRoom(null);
           } catch (error) {
-            toast.error(apiErrorMessage(error));
+            showApiErrorToast(error);
           }
         }}
       />

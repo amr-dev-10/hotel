@@ -18,6 +18,7 @@ import {
   Ticket
 } from "lucide-react";
 import { toast } from "sonner";
+import { showApiErrorToast } from "@/lib/api/error-toast";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,7 +35,6 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Can } from "@/lib/auth/can";
-import { apiErrorMessage } from "@/lib/api/client";
 import { compactId, titleCase } from "@/lib/utils";
 import type { Guest, Reservation, WhatsAppConversation } from "@/types/domain";
 import { useGuest, useGuestConsent, useGuestTimeline, useUpdateGuest } from "@/features/guests/hooks/useGuests";
@@ -193,7 +193,7 @@ export function GuestProfilePage({
             toast.success("Guest updated");
             setEditDialogOpen(false);
           } catch (error) {
-            toast.error(apiErrorMessage(error));
+            showApiErrorToast(error);
           }
         }}
       />

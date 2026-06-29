@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Plus } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { showApiErrorToast } from "@/lib/api/error-toast";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -21,7 +22,6 @@ import { Label } from "@/components/ui/label";
 import { EntitySearchSelect, type EntitySearchOption } from "@/components/ui/entity-search-select";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { apiErrorMessage } from "@/lib/api/client";
 import { useRooms } from "@/features/rooms/hooks/useRooms";
 import { useStaff } from "@/features/staff/hooks/useStaff";
 import {
@@ -79,7 +79,7 @@ export function CreateHousekeepingDialog({ hotelId }: { hotelId: string }) {
       setSelectedStaffLabel("");
       setOpen(false);
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   });
 

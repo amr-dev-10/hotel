@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Plus, Search, UserCheck, UserPlus, X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { showApiErrorToast } from "@/lib/api/error-toast";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -22,7 +23,6 @@ import { EntitySearchSelect, type EntitySearchOption } from "@/components/ui/ent
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { apiErrorMessage } from "@/lib/api/client";
 import { useRooms } from "@/features/rooms/hooks/useRooms";
 import { useGuests } from "@/features/guests/hooks/useGuests";
 import {
@@ -113,7 +113,7 @@ export function CreateReservationDialog({ hotelId }: { hotelId: string }) {
       setSelectedRoomLabel("");
       setOpen(false);
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   });
 

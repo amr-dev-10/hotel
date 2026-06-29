@@ -11,7 +11,7 @@ import { DataState } from "@/components/ui/data-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { apiErrorMessage } from "@/lib/api/client";
+import { showApiErrorToast } from "@/lib/api/error-toast";
 import { titleCase } from "@/lib/utils";
 import {
   useCreateWhatsappTemplate,
@@ -40,7 +40,7 @@ export function WhatsAppTemplatesPage({ hotelId }: { hotelId: string }) {
       setName("");
       toast.success("Template created");
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   }
 
@@ -49,7 +49,7 @@ export function WhatsAppTemplatesPage({ hotelId }: { hotelId: string }) {
       await syncTemplates.mutateAsync();
       toast.success("Templates synced");
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   }
 

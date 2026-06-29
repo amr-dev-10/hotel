@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, CalendarClock, Loader2, Save } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { showApiErrorToast } from "@/lib/api/error-toast";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,6 @@ import { DataState } from "@/components/ui/data-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { apiErrorMessage } from "@/lib/api/client";
 import { titleCase } from "@/lib/utils";
 import { useDepartments } from "@/features/departments/hooks/useDepartments";
 import { shiftSchema, type ShiftValues } from "@/features/staff/schemas/create-staff.schema";
@@ -73,7 +73,7 @@ export function StaffShiftsPage({ hotelId }: { hotelId: string }) {
         notes: "",
       });
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   });
 

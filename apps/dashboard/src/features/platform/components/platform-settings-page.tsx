@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { KeyRound, Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
+import { showApiErrorToast } from "@/lib/api/error-toast";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,7 +17,6 @@ import {
   usePlatformSettings,
   useSavePlatformSettings,
 } from "@/features/platform/hooks/usePlatform";
-import { apiErrorMessage } from "@/lib/api/client";
 import { titleCase } from "@/lib/utils";
 
 export function PlatformSettingsPage() {
@@ -74,7 +74,7 @@ function PlatformSettingsContent() {
         setParseError(error.message);
         return;
       }
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   }
 
@@ -94,7 +94,7 @@ function PlatformSettingsContent() {
       });
       toast.success("Platform password changed");
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   }
 

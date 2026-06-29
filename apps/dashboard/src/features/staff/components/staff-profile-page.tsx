@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { showApiErrorToast } from "@/lib/api/error-toast";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,7 +32,6 @@ import { DataState } from "@/components/ui/data-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { apiErrorMessage } from "@/lib/api/client";
 import { Can } from "@/lib/auth/can";
 import { cn, compactId, titleCase } from "@/lib/utils";
 import { useDepartments } from "@/features/departments/hooks/useDepartments";
@@ -144,7 +144,7 @@ export function StaffProfilePage({
       await assignRoles.mutateAsync(selectedRoles);
       toast.success("Role assignment saved");
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   }
 
@@ -159,7 +159,7 @@ export function StaffProfilePage({
       toast.success("Staff profile updated");
       setEditing(false);
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   });
 
@@ -173,7 +173,7 @@ export function StaffProfilePage({
       toast.success("Staff member deleted");
       router.push(`/${hotelId}/settings/staff`);
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   }
 

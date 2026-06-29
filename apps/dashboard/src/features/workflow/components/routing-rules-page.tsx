@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
+import { showApiErrorToast } from "@/lib/api/error-toast";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,6 @@ import { DataState } from "@/components/ui/data-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { apiErrorMessage } from "@/lib/api/client";
 import { titleCase } from "@/lib/utils";
 import {
   useCreateRoutingRule,
@@ -62,7 +62,7 @@ export function RoutingRulesPage({ hotelId }: { hotelId: string }) {
       }
       clearForm();
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   }
 
@@ -74,7 +74,7 @@ export function RoutingRulesPage({ hotelId }: { hotelId: string }) {
       }
       toast.success("Routing rule deleted");
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   }
 

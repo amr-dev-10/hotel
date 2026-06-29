@@ -6,13 +6,13 @@ import Link from "next/link";
 import { format, formatDistanceToNow } from "date-fns";
 import { CheckCircle2, Clock3, LogIn, LogOut, ThumbsDown, ThumbsUp, TicketCheck } from "lucide-react";
 import { toast } from "sonner";
+import { showApiErrorToast } from "@/lib/api/error-toast";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
 import { useShifts, useUpdateShift } from "@/features/staff/hooks/useStaff";
 import { useAcceptTicket, useCompleteTicket, useRejectTicket, useTickets } from "@/features/tickets/hooks/useTickets";
-import { apiErrorMessage } from "@/lib/api/client";
 import { titleCase } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth.store";
 import type { EmployeeShift, Ticket } from "@/types/domain";
@@ -66,7 +66,7 @@ export function StaffPortalPage({ hotelId }: { hotelId: string }) {
       await acceptTicket.mutateAsync(ticketId);
       toast.success("Ticket accepted");
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   }
 
@@ -75,7 +75,7 @@ export function StaffPortalPage({ hotelId }: { hotelId: string }) {
       await rejectTicket.mutateAsync(ticketId);
       toast.success("Ticket rejected");
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   }
 
@@ -84,7 +84,7 @@ export function StaffPortalPage({ hotelId }: { hotelId: string }) {
       await completeTicket.mutateAsync(ticketId);
       toast.success("Ticket sent for approval");
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   }
 
@@ -100,7 +100,7 @@ export function StaffPortalPage({ hotelId }: { hotelId: string }) {
       });
       toast.success(status === "checked_in" ? "Checked in" : "Checked out");
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   }
 

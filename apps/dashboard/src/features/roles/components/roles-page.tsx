@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { Loader2, Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { showApiErrorToast } from "@/lib/api/error-toast";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
-import { apiErrorMessage } from "@/lib/api/client";
 import { useDeleteRole, useRoles } from "@/features/roles/hooks/useRoles";
 
 export function RolesPage({ hotelId }: { hotelId: string }) {
@@ -19,7 +19,7 @@ export function RolesPage({ hotelId }: { hotelId: string }) {
       await deleteRole.mutateAsync(roleId);
       toast.success("Role deleted");
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   }
 

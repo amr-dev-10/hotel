@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Bot, Loader2, RotateCcw, Save, TestTube2 } from "lucide-react";
 import { toast } from "sonner";
+import { showApiErrorToast } from "@/lib/api/error-toast";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,6 @@ import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { apiErrorMessage } from "@/lib/api/client";
 import { titleCase } from "@/lib/utils";
 import {
   useAiSettings,
@@ -89,7 +89,7 @@ export function AiSettingsPage({ hotelId }: { hotelId: string }) {
       setApiKey("");
       toast.success("AI settings saved");
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   }
 
@@ -98,7 +98,7 @@ export function AiSettingsPage({ hotelId }: { hotelId: string }) {
       const result = await testConnection.mutateAsync();
       toast.success(result.response_preview || "AI provider responded");
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   }
 
@@ -107,7 +107,7 @@ export function AiSettingsPage({ hotelId }: { hotelId: string }) {
       await resetSettings.mutateAsync();
       toast.success("AI settings reset");
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   }
 

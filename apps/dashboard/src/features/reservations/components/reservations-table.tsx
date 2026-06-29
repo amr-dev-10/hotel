@@ -6,6 +6,7 @@ import { createColumnHelper, flexRender, getCoreRowModel, useReactTable } from "
 import { format } from "date-fns";
 import { Ban, Eye, LogIn, LogOut, Search } from "lucide-react";
 import { toast } from "sonner";
+import { showApiErrorToast } from "@/lib/api/error-toast";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,6 @@ import { DataState } from "@/components/ui/data-state";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Can } from "@/lib/auth/can";
-import { apiErrorMessage } from "@/lib/api/client";
 import { titleCase } from "@/lib/utils";
 import type { Reservation } from "@/types/domain";
 import { CancelReservationDialog } from "@/features/reservations/components/cancel-reservation-dialog";
@@ -151,7 +151,7 @@ export function ReservationsTable({ hotelId }: { hotelId: string }) {
                       await checkIn.mutateAsync(row.original.id);
                       toast.success("Reservation checked in");
                     } catch (error) {
-                      toast.error(apiErrorMessage(error));
+                      showApiErrorToast(error);
                     }
                   }}
                 >
@@ -170,7 +170,7 @@ export function ReservationsTable({ hotelId }: { hotelId: string }) {
                       await checkOut.mutateAsync(row.original.id);
                       toast.success("Reservation checked out");
                     } catch (error) {
-                      toast.error(apiErrorMessage(error));
+                      showApiErrorToast(error);
                     }
                   }}
                 >
@@ -305,7 +305,7 @@ export function ReservationsTable({ hotelId }: { hotelId: string }) {
             toast.success("Reservation cancelled");
             setReservationToCancel(null);
           } catch (error) {
-            toast.error(apiErrorMessage(error));
+            showApiErrorToast(error);
           }
         }}
         onOpenChange={(open) => {

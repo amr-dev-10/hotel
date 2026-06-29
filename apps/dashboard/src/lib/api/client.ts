@@ -13,6 +13,25 @@ export interface AccessDeniedEventDetail {
   kind: "missing_permission" | "missing_any_permission" | "scope" | "forbidden";
 }
 
+export interface ApiErrorField {
+  field: string;
+  message: string;
+  type?: string;
+}
+
+export interface ApiErrorDetails {
+  message: string;
+  code?: string;
+  cause?: string;
+  hint?: string;
+  requestId?: string;
+  fields: ApiErrorField[];
+  context?: Record<string, unknown>;
+  status?: number;
+  method?: string;
+  url?: string;
+}
+
 const defaultHeaders = apiBaseURL.includes("ngrok")
   ? {
       "ngrok-skip-browser-warning": "true",
@@ -92,12 +111,25 @@ export async function apiDelete<T>(url: string, config?: AxiosRequestConfig) {
 }
 
 export function apiErrorMessage(error: unknown) {
+  return apiErrorDetails(error).message;
+}
+
+export function apiErrorDetails(error: unknown): ApiErrorDetails {
   if (axios.isAxiosError(error)) {
-    const detail = error.response?.data as { detail?: string; message?: string } | undefined;
-    return detail?.detail ?? detail?.message ?? error.message;
+    const data = error.response?.data;
+    const detail = normalizeApiErrorDetail(data, error.message);
+    return {
+      ...detail,
+      status: error.response?.status,
+      method: (error.config?.method ?? "get").toUpperCase(),
+      url: error.config?.url ?? "",
+    };
   }
 
-  return error instanceof Error ? error.message : "Something went wrong";
+  return {
+    message: error instanceof Error ? error.message : "Something went wrong",
+    fields: [],
+  };
 }
 
 export function accessDeniedDetailFromError(error: unknown): AccessDeniedEventDetail | null {
@@ -110,8 +142,8 @@ export function accessDeniedDetailFromError(error: unknown): AccessDeniedEventDe
     return null;
   }
 
-  const detail = error.response.data as { detail?: string; message?: string } | undefined;
-  const message = detail?.detail ?? detail?.message ?? "You do not have access to perform this action.";
+  const detail = apiErrorDetails(error);
+  const message = detail.message || "You do not have access to perform this action.";
   const requiredPermissions = parseRequiredPermissions(message);
   const lowerMessage = message.toLowerCase();
   const kind: AccessDeniedEventDetail["kind"] = lowerMessage.includes("missing one of permissions")
@@ -129,6 +161,57 @@ export function accessDeniedDetailFromError(error: unknown): AccessDeniedEventDe
     url,
     kind,
   };
+}
+
+function normalizeApiErrorDetail(data: unknown, fallbackMessage: string): Omit<ApiErrorDetails, "status" | "method" | "url"> {
+  if (isRecord(data)) {
+    const detail = data.detail;
+    if (isRecord(detail)) {
+      return {
+        message: stringValue(detail.message) || stringValue(data.message) || fallbackMessage,
+        code: stringValue(detail.code) || undefined,
+        cause: stringValue(detail.cause) || undefined,
+        hint: stringValue(detail.hint) || undefined,
+        requestId: stringValue(detail.request_id) || stringValue(detail.requestId) || undefined,
+        fields: arrayValue(detail.fields).map(normalizeApiErrorField),
+        context: recordValue(detail.context),
+      };
+    }
+
+    return {
+      message: stringValue(detail) || stringValue(data.message) || fallbackMessage,
+      fields: [],
+    };
+  }
+
+  return { message: fallbackMessage, fields: [] };
+}
+
+function normalizeApiErrorField(value: unknown): ApiErrorField {
+  if (!isRecord(value)) {
+    return { field: "", message: String(value || "Invalid value") };
+  }
+  return {
+    field: stringValue(value.field) || "",
+    message: stringValue(value.message) || "Invalid value",
+    type: stringValue(value.type) || undefined,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function recordValue(value: unknown) {
+  return isRecord(value) ? value : undefined;
+}
+
+function arrayValue(value: unknown) {
+  return Array.isArray(value) ? value : [];
+}
+
+function stringValue(value: unknown) {
+  return typeof value === "string" ? value : "";
 }
 
 function parseRequiredPermissions(message: string) {

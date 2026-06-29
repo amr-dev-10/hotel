@@ -7,11 +7,11 @@ import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import { CheckCircle2, Clock3, PlayCircle } from "lucide-react";
 import { toast } from "sonner";
+import { showApiErrorToast } from "@/lib/api/error-toast";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
-import { apiErrorMessage } from "@/lib/api/client";
 import { compactId, titleCase } from "@/lib/utils";
 import type { HousekeepingTask } from "@/types/domain";
 import { useHousekeeping, useUpdateHousekeeping } from "@/features/housekeeping/hooks/useHousekeeping";
@@ -56,7 +56,7 @@ export function HousekeepingPlanner({ hotelId }: { hotelId: string }) {
       await updateTask.mutateAsync({ taskId: task.id, payload: { status } });
       toast.success(`Task marked ${titleCase(status)}`);
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   }
 

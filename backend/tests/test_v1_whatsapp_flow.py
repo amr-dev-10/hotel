@@ -195,7 +195,10 @@ def test_whatsapp_webhook_rejects_unmapped_phone_number_id() -> None:
             json=_meta_payload(unknown_phone_number_id, guest_phone, text="Hi"),
         )
         assert webhook.status_code == 404
-        assert "not mapped" in webhook.json()["detail"]
+        error = webhook.json()["detail"]
+        assert "not mapped" in error["message"]
+        assert error["code"] == "not_found"
+        assert error["request_id"]
 
         conversations = client.get(
             f"/api/v1/hotels/{hotel_id}/whatsapp/conversations",

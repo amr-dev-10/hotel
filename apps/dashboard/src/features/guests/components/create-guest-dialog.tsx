@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Plus } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { showApiErrorToast } from "@/lib/api/error-toast";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -18,7 +19,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { apiErrorMessage } from "@/lib/api/client";
 import {
   createGuestSchema,
   type CreateGuestValues,
@@ -55,7 +55,7 @@ export function CreateGuestDialog({ hotelId }: { hotelId: string }) {
       form.reset();
       setOpen(false);
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   });
 

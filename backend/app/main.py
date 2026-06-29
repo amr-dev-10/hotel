@@ -9,6 +9,7 @@ from app.api.v1.webhooks import router as whatsapp_webhook_router
 from app.api.ws.routes import router as websocket_router
 from app.core.config import settings
 from app.core.database import init_db
+from app.core.error_handlers import register_error_handlers
 from app.core.performance import PerformanceMetricsMiddleware
 from app.core.rate_limiter import RateLimitMiddleware
 
@@ -36,6 +37,7 @@ app.add_middleware(
 )
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(PerformanceMetricsMiddleware)
+register_error_handlers(app)
 
 
 @app.get("/health", tags=["system"])

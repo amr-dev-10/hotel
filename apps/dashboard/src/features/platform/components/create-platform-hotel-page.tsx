@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, CheckCircle2, Copy, Loader2, Plus } from "lucide-react";
 import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
+import { showApiErrorToast } from "@/lib/api/error-toast";
 
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
@@ -20,7 +21,6 @@ import {
   createPlatformHotelSchema,
   type CreatePlatformHotelValues,
 } from "@/features/platform/schemas/create-platform-hotel.schema";
-import { apiErrorMessage } from "@/lib/api/client";
 
 export function CreatePlatformHotelPage() {
   return (
@@ -84,7 +84,7 @@ function CreatePlatformHotelContent() {
       setCreatedHotelId(result.hotel.id);
       toast.success("Hotel created");
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   });
 

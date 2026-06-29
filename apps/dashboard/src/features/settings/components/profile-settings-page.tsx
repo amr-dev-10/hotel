@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Bell, KeyRound, Languages, Loader2, Moon, Save, UserCircle } from "lucide-react";
 import { toast } from "sonner";
+import { showApiErrorToast } from "@/lib/api/error-toast";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Select } from "@/components/ui/select";
-import { apiErrorMessage, apiPost } from "@/lib/api/client";
+import { apiPost } from "@/lib/api/client";
 import { titleCase } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth.store";
 
@@ -57,7 +58,7 @@ export function ProfileSettingsPage() {
       });
       toast.success("Password changed");
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     } finally {
       setIsChangingPassword(false);
     }

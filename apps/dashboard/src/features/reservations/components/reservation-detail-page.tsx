@@ -18,6 +18,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { toast } from "sonner";
+import { showApiErrorToast } from "@/lib/api/error-toast";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,7 +35,6 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Can } from "@/lib/auth/can";
-import { apiErrorMessage } from "@/lib/api/client";
 import { compactId, money, titleCase } from "@/lib/utils";
 import type { Folio, Reservation, Room, StayRecord } from "@/types/domain";
 import { useGuest } from "@/features/guests/hooks/useGuests";
@@ -82,7 +82,7 @@ export function ReservationDetailPage({
       await checkIn.mutateAsync(reservationId);
       toast.success("Reservation checked in");
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   }
 
@@ -91,7 +91,7 @@ export function ReservationDetailPage({
       await checkOut.mutateAsync(reservationId);
       toast.success("Reservation checked out");
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   }
 
@@ -101,7 +101,7 @@ export function ReservationDetailPage({
       toast.success("Reservation cancelled");
       setCancelDialogOpen(false);
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   }
 
@@ -263,7 +263,7 @@ export function ReservationDetailPage({
             toast.success("Reservation updated");
             setEditDialogOpen(false);
           } catch (error) {
-            toast.error(apiErrorMessage(error));
+            showApiErrorToast(error);
           }
         }}
       />
