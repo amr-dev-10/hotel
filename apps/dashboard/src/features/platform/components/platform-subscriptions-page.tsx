@@ -5,6 +5,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { CreditCard, Edit3, Search } from "lucide-react";
 import { toast } from "sonner";
+import { showApiErrorToast } from "@/lib/api/error-toast";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,7 +28,6 @@ import {
   useUpdatePlatformSubscription,
   type PlatformSubscriptionUpdatePayload,
 } from "@/features/platform/hooks/usePlatform";
-import { apiErrorMessage } from "@/lib/api/client";
 import { titleCase } from "@/lib/utils";
 import type { PlatformSubscriptionSummary } from "@/types/domain";
 
@@ -129,7 +129,7 @@ function PlatformSubscriptionsContent() {
       toast.success("Subscription updated");
       setEditingSubscription(null);
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   }
 

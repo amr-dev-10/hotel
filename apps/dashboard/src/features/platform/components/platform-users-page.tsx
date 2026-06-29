@@ -5,6 +5,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { Edit3, KeyRound, Loader2, Search, UsersRound } from "lucide-react";
 import { toast } from "sonner";
+import { showApiErrorToast } from "@/lib/api/error-toast";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,7 +30,6 @@ import {
   useUpdatePlatformUser,
   type PlatformUserUpdatePayload,
 } from "@/features/platform/hooks/usePlatform";
-import { apiErrorMessage } from "@/lib/api/client";
 import { titleCase } from "@/lib/utils";
 import type { PlatformUserSummary } from "@/types/domain";
 
@@ -150,7 +150,7 @@ function PlatformUsersContent() {
       toast.success("User profile updated");
       setEditingUser(null);
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   }
 
@@ -169,7 +169,7 @@ function PlatformUsersContent() {
       setPasswordUser(null);
       setPasswordForm(emptyPasswordForm());
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   }
 

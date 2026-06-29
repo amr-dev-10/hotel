@@ -4,12 +4,12 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { ArrowLeft, Loader2, Send } from "lucide-react";
-import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
 import { Input } from "@/components/ui/input";
+import { showApiErrorToast } from "@/lib/api/error-toast";
 import { cn, titleCase } from "@/lib/utils";
 import { useSendWhatsappMessage, useWhatsappMessages } from "@/features/whatsapp/hooks/useWhatsapp";
 
@@ -39,7 +39,7 @@ export function WhatsAppConversationPage({
       await sendMessage.mutateAsync({ message: text });
       setText("");
     } catch (error) {
-      toast.error("Failed to send message");
+      showApiErrorToast(error, "Failed to send message");
     }
   }
 

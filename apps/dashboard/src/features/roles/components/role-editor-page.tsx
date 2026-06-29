@@ -5,13 +5,13 @@ import Link from "next/link";
 import { ArrowLeft, Loader2, Save } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { showApiErrorToast } from "@/lib/api/error-toast";
 
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { apiErrorMessage } from "@/lib/api/client";
 import { PermissionMatrix } from "@/features/roles/components/permission-matrix";
 import {
   useCreateRole,
@@ -77,7 +77,7 @@ export function RoleEditorPage({
       }
       router.push(`/${hotelId}/settings/roles`);
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   }
 

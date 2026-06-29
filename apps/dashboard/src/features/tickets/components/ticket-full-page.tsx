@@ -23,6 +23,7 @@ import {
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
+import { showApiErrorToast } from "@/lib/api/error-toast";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,7 +40,6 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Can } from "@/lib/auth/can";
-import { apiErrorMessage } from "@/lib/api/client";
 import { cn, compactId, titleCase } from "@/lib/utils";
 import { useDepartments } from "@/features/departments/hooks/useDepartments";
 import { useGuests } from "@/features/guests/hooks/useGuests";
@@ -116,7 +116,7 @@ export function TicketFullPage({
       await action();
       toast.success(label);
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   }
 
@@ -130,7 +130,7 @@ export function TicketFullPage({
       setDiscussionMessage("");
       toast.success("Message posted");
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   }
 
@@ -147,7 +147,7 @@ export function TicketFullPage({
       setGuestReply("");
       toast.success("Guest message sent");
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   }
 
@@ -386,7 +386,7 @@ export function TicketFullPage({
             toast.success("Ticket updated");
             setEditDialogOpen(false);
           } catch (error) {
-            toast.error(apiErrorMessage(error));
+            showApiErrorToast(error);
           }
         }}
       />

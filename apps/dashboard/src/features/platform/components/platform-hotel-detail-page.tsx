@@ -5,6 +5,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { ArrowLeft, Building2, Edit3, ExternalLink, Hotel, Ticket, UsersRound } from "lucide-react";
 import { toast } from "sonner";
+import { showApiErrorToast } from "@/lib/api/error-toast";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,7 +28,6 @@ import {
   useUpdatePlatformHotel,
   type PlatformHotelUpdatePayload,
 } from "@/features/platform/hooks/usePlatform";
-import { apiErrorMessage } from "@/lib/api/client";
 import { compactId, titleCase } from "@/lib/utils";
 
 interface HotelFormState {
@@ -99,7 +99,7 @@ function PlatformHotelDetailContent({ hotelId }: { hotelId: string }) {
       toast.success("Hotel updated");
       setEditOpen(false);
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   }
 

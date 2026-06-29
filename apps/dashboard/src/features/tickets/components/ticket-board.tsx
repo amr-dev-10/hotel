@@ -7,6 +7,7 @@ import { formatDistanceToNow } from "date-fns";
 import { MoreHorizontal, Timer, UserCheck } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
+import { showApiErrorToast } from "@/lib/api/error-toast";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Can } from "@/lib/auth/can";
-import { apiErrorMessage } from "@/lib/api/client";
 import { cn, titleCase } from "@/lib/utils";
 import type { Ticket } from "@/types/domain";
 import {
@@ -100,7 +100,7 @@ export function TicketBoard({ hotelId }: { hotelId: string }) {
       await updateStage.mutateAsync({ ticketId: ticket.id, stage: nextStage });
       toast.success("Ticket stage updated");
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   }
 

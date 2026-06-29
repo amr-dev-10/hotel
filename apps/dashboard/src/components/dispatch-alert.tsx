@@ -3,12 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { BellRing, Clock, Loader2, ThumbsDown, ThumbsUp, X } from "lucide-react";
 import { toast } from "sonner";
+import { showApiErrorToast } from "@/lib/api/error-toast";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useMarkNotificationRead } from "@/features/notifications/hooks/useNotifications";
 import { useAcceptTicket, useRejectTicket } from "@/features/tickets/hooks/useTickets";
-import { apiErrorMessage } from "@/lib/api/client";
 import { compactId } from "@/lib/utils";
 import { useNotificationStore } from "@/stores/notification.store";
 
@@ -68,7 +68,7 @@ export function DispatchAlert({ hotelId }: { hotelId: string }) {
       toast.success("Ticket accepted");
       await closeAndMarkRead();
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   }
 
@@ -82,7 +82,7 @@ export function DispatchAlert({ hotelId }: { hotelId: string }) {
       toast.success("Ticket rejected");
       await closeAndMarkRead();
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   }
 

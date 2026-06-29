@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { apiErrorMessage } from "@/lib/api/client";
+import { showApiErrorToast } from "@/lib/api/error-toast";
 import { cn, titleCase, compactId } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth.store";
 import { 
@@ -147,8 +148,8 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
     try {
       await sendMessage.mutateAsync({ message: text, reservation_id: activeReservationId || undefined });
       setText("");
-    } catch {
-      toast.error("Failed to send message");
+    } catch (error) {
+      showApiErrorToast(error, "Failed to send message");
     }
   }
 
@@ -196,7 +197,7 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
       toast.success("Ticket created");
       setQuickTicketDraft(null);
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   }
 
@@ -210,7 +211,7 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
       toast.success("WhatsApp profile link removed");
       setDeleteProfileOpen(false);
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   }
 

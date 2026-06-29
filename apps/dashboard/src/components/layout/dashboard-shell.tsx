@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 
 import { DispatchAlert } from "@/components/dispatch-alert";
+import { apiErrorDetails } from "@/lib/api/client";
 import { NotificationBell } from "@/components/notification-bell";
 import { Button } from "@/components/ui/button";
 import { Permissions, ticketViewPermissions } from "@/constants/permissions";
@@ -349,8 +350,7 @@ function isSessionExpiredError(error: unknown) {
   }
 
   const status = error.response?.status ?? 0;
-  const detail = error.response?.data as { detail?: string; message?: string } | undefined;
-  const message = `${detail?.detail ?? detail?.message ?? ""}`.toLowerCase();
+  const message = apiErrorDetails(error).message.toLowerCase();
 
   if (status === 429 || message.includes("rate limit")) {
     return false;

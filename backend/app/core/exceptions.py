@@ -1,3 +1,5 @@
+from typing import Any
+
 from fastapi import HTTPException, status
 
 
@@ -6,6 +8,33 @@ class DomainError(Exception):
         self.message = message
         self.code = code
         super().__init__(message)
+
+
+def error_detail(
+    message: str,
+    code: str,
+    *,
+    cause: str | None = None,
+    hint: str | None = None,
+    request_id: str | None = None,
+    fields: list[dict[str, Any]] | None = None,
+    context: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    detail: dict[str, Any] = {
+        "message": message,
+        "code": code,
+    }
+    if cause:
+        detail["cause"] = cause
+    if hint:
+        detail["hint"] = hint
+    if request_id:
+        detail["request_id"] = request_id
+    if fields:
+        detail["fields"] = fields
+    if context:
+        detail["context"] = context
+    return detail
 
 
 def not_found(message: str = "Resource not found") -> HTTPException:

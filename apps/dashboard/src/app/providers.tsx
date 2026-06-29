@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
 
 import { AccessDeniedDialog } from "@/components/access-denied-dialog";
+import { ApiErrorDetailsDialog } from "@/components/api-error-details-dialog";
 import { WebSocketProvider } from "@/lib/realtime/websocket-provider";
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -25,6 +26,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <WebSocketProvider>{children}</WebSocketProvider>
       <AccessDeniedDialog />
+      <ApiErrorDetailsDialog />
       <Toaster richColors position="top-right" />
     </QueryClientProvider>
   );

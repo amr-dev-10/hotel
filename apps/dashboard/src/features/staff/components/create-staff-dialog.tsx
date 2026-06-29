@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, UserPlus } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { showApiErrorToast } from "@/lib/api/error-toast";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -19,7 +20,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Select } from "@/components/ui/select";
-import { apiErrorMessage } from "@/lib/api/client";
 import { useDepartments } from "@/features/departments/hooks/useDepartments";
 import { createStaffSchema, type CreateStaffValues } from "@/features/staff/schemas/create-staff.schema";
 import { useCreateStaff, useStaff } from "@/features/staff/hooks/useStaff";
@@ -55,7 +55,7 @@ export function CreateStaffDialog({ hotelId }: { hotelId: string }) {
       form.reset();
       setOpen(false);
     } catch (error) {
-      toast.error(apiErrorMessage(error));
+      showApiErrorToast(error);
     }
   });
 
