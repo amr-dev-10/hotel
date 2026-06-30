@@ -409,6 +409,31 @@ export interface GuestPortalSession {
   profile: GuestPortalProfile;
 }
 
+export interface GuestChatConversation {
+  id: string;
+  status: string;
+  last_message_at: string | null;
+}
+
+export interface GuestChatMessage {
+  id: string;
+  conversation_id: string;
+  direction: string;
+  message_text: string | null;
+  status: string;
+  created_at: string;
+}
+
+export interface GuestChatSendResponse {
+  conversation_id: string;
+  inbound_message: GuestChatMessage;
+  ai_reply: GuestChatMessage | null;
+  intent: string | null;
+  confidence: number | null;
+  ticket_id: string | null;
+  error: string | null;
+}
+
 export interface HousekeepingTask {
   id: string;
   hotel_id: string;

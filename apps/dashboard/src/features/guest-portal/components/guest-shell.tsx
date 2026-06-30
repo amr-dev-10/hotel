@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { ClipboardList, ConciergeBell, LogOut, ShoppingCart, Soup } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { GuestChatWidget } from "@/features/guest-portal/components/guest-chat-widget";
 import { cn } from "@/lib/utils";
 import { useGuestCartStore } from "@/stores/guest-cart.store";
 import { useGuestSessionStore } from "@/stores/guest-session.store";
@@ -54,30 +55,33 @@ export function GuestShell({ children }: { children: React.ReactNode }) {
         <main className="flex-1 px-4 pb-24 pt-4">{children}</main>
 
         {profile ? (
-          <nav className="fixed bottom-0 left-1/2 z-30 grid w-full max-w-3xl -translate-x-1/2 grid-cols-4 border-t border-slate-200 bg-white">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const active = pathname === item.href;
-              return (
-                <Link
-                  className={cn(
-                    "relative grid min-h-14 place-items-center gap-0.5 px-1 py-2 text-xs font-medium text-slate-500",
-                    active && "text-[#0F3D91]",
-                  )}
-                  href={item.href}
-                  key={item.href}
-                >
-                  <Icon className="size-5" />
-                  <span>{item.label}</span>
-                  {item.href === "/guest/cart" && cartCount ? (
-                    <span className="absolute right-5 top-1 rounded-full bg-emerald-600 px-1.5 text-[10px] font-semibold text-white">
-                      {cartCount}
-                    </span>
-                  ) : null}
-                </Link>
-              );
-            })}
-          </nav>
+          <>
+            <GuestChatWidget />
+            <nav className="fixed bottom-0 left-1/2 z-30 grid w-full max-w-3xl -translate-x-1/2 grid-cols-4 border-t border-slate-200 bg-white">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                const active = pathname === item.href;
+                return (
+                  <Link
+                    className={cn(
+                      "relative grid min-h-14 place-items-center gap-0.5 px-1 py-2 text-xs font-medium text-slate-500",
+                      active && "text-[#0F3D91]",
+                    )}
+                    href={item.href}
+                    key={item.href}
+                  >
+                    <Icon className="size-5" />
+                    <span>{item.label}</span>
+                    {item.href === "/guest/cart" && cartCount ? (
+                      <span className="absolute right-5 top-1 rounded-full bg-emerald-600 px-1.5 text-[10px] font-semibold text-white">
+                        {cartCount}
+                      </span>
+                    ) : null}
+                  </Link>
+                );
+              })}
+            </nav>
+          </>
         ) : null}
       </div>
     </div>

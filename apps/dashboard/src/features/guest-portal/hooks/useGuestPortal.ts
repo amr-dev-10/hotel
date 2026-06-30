@@ -7,6 +7,9 @@ import { useGuestSessionStore } from "@/stores/guest-session.store";
 import type {
   GuestPortalProfile,
   GuestPortalSession,
+  GuestChatConversation,
+  GuestChatMessage,
+  GuestChatSendResponse,
   MenuCategory,
   MenuItem,
   RestaurantOrder,
@@ -131,5 +134,33 @@ export function useCreateGuestRequest() {
       priority?: number;
     }) => guestPost<Ticket>("/guest-portal/requests", payload),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.guestPortal.requests() }),
+  });
+}
+
+export function useGuestChatConversation(enabled = true) {
+  const token = useGuestSessionStore((state) => state.token);
+  return useQuery({
+    queryKey: queryKeys.guestPortal.chatConversation(),
+    queryFn: () => guestGet<GuestChatConversation>("/guest-portal/chat/conversation"),
+    enabled: Boolean(token && enabled),
+  });
+}
+
+export function useGuestChatMessages(enabled = true) {
+  const token = useGuestSessionStore((state) => state.token);
+  return useQuery({
+    queryKey: queryKeys.guestPortal.chatMessages(),
+    queryFn: () => guestGet<GuestChatMessage[]>("/guest-portal/chat/messages"),
+    enabled: Boolean(token && enabled),
+    refetchInterval: enabled ? 3000 : false,
+  });
+}
+
+export function useSendGuestChatMessage() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (message: string) =>
+      guestPost<GuestChatSendResponse>("/guest-portal/chat/send", { message }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.guestPortal.chatMessages() }),
   });
 }
