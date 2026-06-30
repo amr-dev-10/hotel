@@ -106,9 +106,8 @@ export function AuditLogsPage({ hotelId }: { hotelId: string }) {
       <section className="grid gap-3 rounded-md border border-slate-200 bg-white p-4">
         <div className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_180px_180px_220px_120px]">
           <form className="relative block" onSubmit={handleSearch}>
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <Input
-              className="pl-9 pr-10"
+              className="pr-10"
               placeholder="Search action, entity, record, user, IP"
               value={searchDraft}
               onChange={(event) => setSearchDraft(event.target.value)}

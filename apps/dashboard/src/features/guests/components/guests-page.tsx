@@ -84,9 +84,8 @@ export function GuestsPage({ hotelId: hotelIdProp }: { hotelId?: string }) {
         <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_12rem]">
           <form className="relative block" onSubmit={handleSearch}>
             <span className="sr-only">Search guests</span>
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <Input
-              className="pl-9 pr-10"
+              className="pr-10"
               placeholder="Search by name, phone, or email"
               value={searchDraft}
               onChange={(event) => setSearchDraft(event.target.value)}

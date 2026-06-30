@@ -383,10 +383,9 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
           ) : null}
           
           <form className="relative mb-3" onSubmit={handleConversationSearch}>
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <Input 
               placeholder="Search guests, phones..." 
-              className="h-9 pl-9 pr-10"
+              className="h-9 pr-10"
               value={searchDraft}
               onChange={(e) => setSearchDraft(e.target.value)}
             />
