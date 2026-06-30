@@ -88,7 +88,7 @@ export function StaffPortalPage({ hotelId }: { hotelId: string }) {
     }
   }
 
-  async function updateShiftStatus(shift: EmployeeShift, status: "checked_in" | "completed") {
+  async function handleShiftStatus(shift: EmployeeShift, status: "checked_in" | "completed") {
     try {
       await updateShift.mutateAsync({
         shiftId: shift.id,
@@ -109,24 +109,10 @@ export function StaffPortalPage({ hotelId }: { hotelId: string }) {
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div>
           <h2 className="text-xl font-semibold">Staff Portal</h2>
-          <p className="text-sm text-slate-500">{currentUser.name}</p>
+          <p className="text-sm text-slate-500">
+            {currentUser.name} - Manage today&apos;s shift and assigned tickets.
+          </p>
         </div>
-        {currentShift ? (
-          <div className="flex flex-wrap gap-2">
-            {currentShift.status !== "checked_in" && currentShift.status !== "completed" ? (
-              <Button disabled={updateShift.isPending} type="button" onClick={() => updateShiftStatus(currentShift, "checked_in")}>
-                <LogIn />
-                Check in
-              </Button>
-            ) : null}
-            {currentShift.status === "checked_in" ? (
-              <Button disabled={updateShift.isPending} type="button" variant="secondary" onClick={() => updateShiftStatus(currentShift, "completed")}>
-                <LogOut />
-                Check out
-              </Button>
-            ) : null}
-          </div>
-        ) : null}
       </div>
 
       <div className="grid gap-3 md:grid-cols-4">
@@ -137,9 +123,16 @@ export function StaffPortalPage({ hotelId }: { hotelId: string }) {
       </div>
 
       <section className="grid gap-3 rounded-md border border-slate-200 bg-white p-4">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
           <h3 className="text-base font-semibold">Today</h3>
-          {currentShift ? <Badge variant={shiftVariant(currentShift.status)}>{shiftTime(currentShift)}</Badge> : <Badge>No shift</Badge>}
+          <div className="flex flex-wrap items-center gap-2">
+            {currentShift ? <Badge variant={shiftVariant(currentShift.status)}>{shiftTime(currentShift)}</Badge> : <Badge>No shift</Badge>}
+            <ShiftAction
+              isPending={updateShift.isPending}
+              shift={currentShift}
+              onUpdate={handleShiftStatus}
+            />
+          </div>
         </div>
         {currentShift ? (
           <div className="grid gap-2 text-sm text-slate-600 sm:grid-cols-3">
@@ -148,7 +141,7 @@ export function StaffPortalPage({ hotelId }: { hotelId: string }) {
             <Info label="End" value={timeLabel(currentShift.actual_end ?? currentShift.shift_end)} />
           </div>
         ) : (
-          <p className="text-sm text-slate-500">No shift scheduled for today.</p>
+          <p className="text-sm text-slate-500">No shift is scheduled for your account today, so check-in is not available yet.</p>
         )}
       </section>
 
@@ -173,6 +166,58 @@ export function StaffPortalPage({ hotelId }: { hotelId: string }) {
         )}
       </section>
     </div>
+  );
+}
+
+function ShiftAction({
+  shift,
+  isPending,
+  onUpdate,
+}: {
+  shift: EmployeeShift | undefined;
+  isPending: boolean;
+  onUpdate: (shift: EmployeeShift, status: "checked_in" | "completed") => void;
+}) {
+  if (!shift) {
+    return (
+      <Button className="h-8 text-xs" disabled type="button" variant="secondary">
+        <LogIn />
+        No shift today
+      </Button>
+    );
+  }
+
+  const status = normalizeStage(shift.status);
+
+  if (status === "checked_in") {
+    return (
+      <Button
+        className="h-8 text-xs"
+        disabled={isPending}
+        type="button"
+        variant="secondary"
+        onClick={() => onUpdate(shift, "completed")}
+      >
+        <LogOut />
+        Check out
+      </Button>
+    );
+  }
+
+  if (["completed", "on_leave"].includes(status)) {
+    return (
+      <Button className="h-8 text-xs" disabled type="button" variant="secondary">
+        <CheckCircle2 />
+        {titleCase(status)}
+      </Button>
+    );
+  }
+
+  return (
+    <Button className="h-8 text-xs" disabled={isPending} type="button" onClick={() => onUpdate(shift, "checked_in")}>
+      <LogIn />
+      Check in
+    </Button>
   );
 }
 

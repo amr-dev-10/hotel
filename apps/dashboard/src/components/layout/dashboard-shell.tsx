@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -9,6 +10,7 @@ import {
   Bot,
   CalendarDays,
   ChefHat,
+  LogIn,
   Gauge,
   GitBranch,
   ListChecks,
@@ -26,18 +28,21 @@ import {
   Utensils,
   type LucideIcon,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { DispatchAlert } from "@/components/dispatch-alert";
 import { apiErrorDetails } from "@/lib/api/client";
 import { NotificationBell } from "@/components/notification-bell";
 import { Button } from "@/components/ui/button";
 import { Permissions, ticketViewPermissions } from "@/constants/permissions";
+import { useShifts, useUpdateShift } from "@/features/staff/hooks/useStaff";
 import { useRouteHotelId } from "@/hooks/useRouteHotelId";
 import { useWebSocket } from "@/hooks/useWebSocket";
-import { api } from "@/lib/api/client";
+import { api, apiGet } from "@/lib/api/client";
+import { showApiErrorToast } from "@/lib/api/error-toast";
 import { cn, titleCase } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth.store";
-import type { ApiEnvelope, CurrentUser } from "@/types/domain";
+import type { ApiEnvelope, CurrentUser, EmployeeShift } from "@/types/domain";
 
 type NavItem = {
   label: string;
@@ -45,6 +50,11 @@ type NavItem = {
   icon: LucideIcon;
   permissions?: string[];
   adminOnly?: boolean;
+};
+
+type ShellHotel = {
+  id: string;
+  name: string;
 };
 
 const navItems: NavItem[] = [
@@ -95,6 +105,12 @@ export function DashboardShell({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const lastAuthRefreshAt = useRef(0);
   useWebSocket(hotelId);
+  const hotelQuery = useQuery({
+    queryKey: ["hotel", hotelId, "shell"],
+    queryFn: () => apiGet<ShellHotel>(`/hotels/${hotelId}`),
+    enabled: Boolean(token && hotelId),
+    staleTime: 60_000,
+  });
 
   const refreshCurrentUser = useCallback(async () => {
     if (!token) {
@@ -190,6 +206,8 @@ export function DashboardShell({
     () => allNavItems.find((item) => pathname?.includes(`/${item.href}`))?.label ?? "Dashboard",
     [allNavItems, pathname],
   );
+  const isStaffPortalRoute = pathname === `/${hotelId}/staff-portal` || pathname?.startsWith(`/${hotelId}/staff-portal/`);
+  const hotelName = hotelQuery.data?.name ?? "Arcadia";
 
   if (!mounted) {
     return <div className="min-h-screen bg-slate-50" />;
@@ -264,24 +282,7 @@ export function DashboardShell({
           })}
         </nav>
 
-        <div className="mt-auto border-t border-slate-200 p-4">
-          <div className="mb-3 rounded-md bg-slate-50 p-3">
-            <p className="truncate text-sm font-semibold">{currentUser?.name ?? "Not signed in"}</p>
-            <p className="truncate text-xs text-slate-500">{currentUser?.email ?? "Login required"}</p>
-          </div>
-          <Button
-            className="w-full justify-start"
-            type="button"
-            variant="ghost"
-            onClick={() => {
-              logout();
-              router.replace("/login");
-            }}
-          >
-            <LogOut />
-            Sign out
-          </Button>
-        </div>
+        <div className="mt-auto h-3" />
       </aside>
 
       {sidebarOpen ? (
@@ -294,8 +295,8 @@ export function DashboardShell({
       ) : null}
 
       <div className="lg:pl-[17rem]">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-slate-200 bg-white/95 px-4 backdrop-blur lg:px-8">
-          <div className="flex items-center gap-3">
+        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-4 backdrop-blur lg:px-8">
+          <div className="flex min-w-0 items-center gap-3">
             <Button
               aria-label="Open navigation"
               className="lg:hidden"
@@ -306,24 +307,156 @@ export function DashboardShell({
             >
               <Menu />
             </Button>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Hotel workspace</p>
-              <h1 className="text-lg font-semibold">{activeSection}</h1>
+            <div className="min-w-0">
+              <p className="truncate text-xs font-semibold uppercase tracking-normal text-slate-500">{hotelName}</p>
+              <h1 className="truncate text-lg font-semibold">{activeSection}</h1>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex shrink-0 items-center gap-2">
+            {isStaffPortalRoute ? <StaffPortalHeaderActions currentUser={currentUser} hotelId={hotelId} /> : null}
+            <HeaderUserPill currentUser={currentUser} />
             <NotificationBell hotelId={hotelId} />
             <span className="hidden rounded bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 sm:inline-flex">
               Live sync
             </span>
+            <Button
+              aria-label="Sign out"
+              className="sm:hidden"
+              size="icon"
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                logout();
+                router.replace("/login");
+              }}
+            >
+              <LogOut />
+            </Button>
+            <Button
+              className="hidden sm:inline-flex"
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                logout();
+                router.replace("/login");
+              }}
+            >
+              <LogOut />
+              Sign out
+            </Button>
           </div>
         </header>
 
-        <main className="mx-auto grid w-full max-w-[1500px] gap-6 p-4 lg:p-8">{children}</main>
+        <main className="grid min-w-0 w-full gap-6 p-4 lg:p-6 2xl:p-8">{children}</main>
       </div>
       <DispatchAlert hotelId={hotelId} />
     </div>
+  );
+}
+
+function HeaderUserPill({ currentUser }: { currentUser: CurrentUser | null }) {
+  if (!currentUser) {
+    return null;
+  }
+
+  return (
+    <div className="hidden min-w-0 items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 md:flex">
+      <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-[#0F3D91]/10 text-xs font-semibold text-[#0F3D91]">
+        {currentUser.name?.[0]?.toUpperCase() ?? "U"}
+      </div>
+      <div className="min-w-0">
+        <p className="max-w-36 truncate text-xs font-semibold leading-4 text-slate-900">{currentUser.name}</p>
+        <p className="max-w-36 truncate text-[10px] leading-3 text-slate-500">
+          {titleCase(currentUser.job_role ?? currentUser.staff_level ?? "Hotel team")}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function StaffPortalHeaderActions({
+  hotelId,
+  currentUser,
+}: {
+  hotelId: string;
+  currentUser: CurrentUser | null;
+}) {
+  const shifts = useShifts(hotelId);
+  const updateShift = useUpdateShift(hotelId);
+  const today = new Date().toISOString().slice(0, 10);
+  const currentShift = useMemo(() => {
+    const todayShifts = (shifts.data ?? []).filter(
+      (shift) => shift.user_id === currentUser?.id && shift.shift_date === today,
+    );
+
+    return todayShifts.find((shift) => !["completed", "on_leave"].includes(shift.status)) ?? todayShifts[0];
+  }, [currentUser?.id, shifts.data, today]);
+
+  async function updateShiftStatus(shift: EmployeeShift, status: "checked_in" | "completed") {
+    try {
+      await updateShift.mutateAsync({
+        shiftId: shift.id,
+        payload: {
+          status,
+          actual_start: status === "checked_in" ? new Date().toISOString() : shift.actual_start,
+          actual_end: status === "completed" ? new Date().toISOString() : shift.actual_end,
+        },
+      });
+      toast.success(status === "checked_in" ? "Checked in" : "Checked out");
+    } catch (error) {
+      showApiErrorToast(error);
+    }
+  }
+
+  if (shifts.isLoading) {
+    return <span className="hidden rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-500 md:inline-flex">Shift loading</span>;
+  }
+
+  if (!currentShift) {
+    return (
+      <Button className="h-8 px-2 text-xs sm:px-3" disabled type="button" variant="secondary">
+        <LogIn />
+        <span className="hidden sm:inline">No shift</span>
+      </Button>
+    );
+  }
+
+  if (currentShift.status === "checked_in") {
+    return (
+      <Button
+        aria-label="Check out"
+        className="h-8 px-2 text-xs sm:px-3"
+        disabled={updateShift.isPending}
+        type="button"
+        variant="secondary"
+        onClick={() => updateShiftStatus(currentShift, "completed")}
+      >
+        <LogOut />
+        <span className="hidden sm:inline">Check out</span>
+      </Button>
+    );
+  }
+
+  if (["completed", "on_leave"].includes(currentShift.status)) {
+    return (
+      <span className="hidden rounded bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 sm:inline-flex">
+        {titleCase(currentShift.status)}
+      </span>
+    );
+  }
+
+  return (
+    <Button
+      aria-label="Check in"
+      className="h-8 px-2 text-xs sm:px-3"
+      disabled={updateShift.isPending}
+      type="button"
+      onClick={() => updateShiftStatus(currentShift, "checked_in")}
+    >
+      <LogIn />
+      <span className="hidden sm:inline">Check in</span>
+    </Button>
   );
 }
 
