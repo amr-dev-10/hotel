@@ -8,7 +8,8 @@ import {
   MessageCircle, Settings, Search, User,
   Loader2, Send, CheckCircle, MapPin,
   Ticket as TicketIcon, Paperclip, Mic, Image as ImageIcon, FileText,
-  AlertCircle, Wrench, Sparkles, Utensils, MoreHorizontal, Trash2, Unlink
+  AlertCircle, Wrench, Sparkles, Utensils, MoreHorizontal, Trash2, Unlink,
+  Info as InfoIcon
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -27,7 +28,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { apiErrorMessage } from "@/lib/api/client";
 import { showApiErrorToast } from "@/lib/api/error-toast";
-import { cn, titleCase, compactId } from "@/lib/utils";
+import { cn, titleCase } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth.store";
 import { 
   useWhatsappConversations, 
@@ -360,10 +361,10 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
         </DialogContent>
       </Dialog>
 
-      <div className="flex min-h-[85vh] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm lg:h-[85vh] lg:flex-row">
+      <div className="flex min-h-[85vh] min-w-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm lg:h-[85vh] lg:flex-row">
       
       {/* LEFT PANE: CONVERSATION LIST */}
-      <div className="flex w-full flex-col border-b border-slate-200 bg-slate-50/50 lg:w-1/4 lg:min-w-[300px] lg:border-b-0 lg:border-r">
+      <div className="flex w-full flex-col border-b border-slate-200 bg-slate-50/50 lg:min-w-[300px] lg:basis-[clamp(300px,20vw,420px)] lg:shrink-0 lg:border-b-0 lg:border-r">
         <div className="border-b border-slate-200 p-4">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-slate-800">Inbox</h2>
@@ -383,10 +384,9 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
           ) : null}
           
           <form className="relative mb-3" onSubmit={handleConversationSearch}>
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <Input 
               placeholder="Search guests, phones..." 
-              className="h-9 pl-9 pr-10"
+              className="h-9 pr-10"
               value={searchDraft}
               onChange={(e) => setSearchDraft(e.target.value)}
             />
@@ -645,13 +645,13 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
       </div>
 
       {/* RIGHT PANE: CONTEXT */}
-      <div className="flex w-full flex-col border-t border-slate-200 bg-white lg:w-[320px] lg:border-l lg:border-t-0">
+      <div className="flex w-full min-w-0 flex-col overflow-hidden border-t border-slate-200 bg-white lg:basis-[clamp(320px,18vw,460px)] lg:shrink-0 lg:border-l lg:border-t-0">
         {!activeConversationId || !selectedConversation ? (
           <div className="flex h-full items-center justify-center p-4 text-center text-sm text-slate-400">
             Select a conversation to view context
           </div>
         ) : (
-          <div className="flex-1 overflow-y-auto p-4 space-y-6">
+          <div className="flex-1 space-y-5 overflow-y-auto overflow-x-hidden p-3 sm:p-4">
             
             {/* 1. GUEST CARD */}
             <div className="rounded-xl border border-slate-200 overflow-hidden shadow-sm">
@@ -698,29 +698,34 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
               <DataState isLoading />
             ) : reservationQuery.data ? (
               <div>
-                <h4 className="mb-2 text-xs font-bold uppercase text-slate-500 flex items-center gap-2"><MapPin className="size-4" /> Reservation Context</h4>
-                <div className="rounded-lg border border-slate-200 p-3 bg-blue-50/30">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-semibold text-slate-800">{reservationQuery.data.reservation_no}</span>
-                    <Badge variant={reservationQuery.data.status === 'checked_in' ? 'green' : 'blue'}>{titleCase(reservationQuery.data.status)}</Badge>
+                <h4 className="mb-2 flex items-center gap-2 text-xs font-bold uppercase text-slate-500">
+                  <MapPin className="size-4" /> Reservation Context <StatusLegendInfo />
+                </h4>
+                <div className={cn("min-w-0 overflow-hidden rounded-lg border border-l-4 border-slate-200 bg-blue-50/30 p-3", statusTone(reservationQuery.data.status).borderClassName)}>
+                  <div className="mb-3 flex min-w-0 items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-slate-800" title={reservationQuery.data.reservation_no}>
+                        {reservationQuery.data.reservation_no}
+                      </p>
+                      <p className="text-[11px] font-medium text-slate-500">Reservation</p>
+                    </div>
+                    <StatusDot status={reservationQuery.data.status} />
                   </div>
-                  <div className="space-y-2 text-sm text-slate-600">
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">Room</span>
-                      <span className="font-medium text-slate-900">{reservationQuery.data.room_id ? compactId(reservationQuery.data.room_id) : "Unassigned"}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">Stay</span>
-                      <span className="font-medium text-slate-900">{format(new Date(reservationQuery.data.checkin_date), "MMM d")} → {format(new Date(reservationQuery.data.checkout_date), "MMM d")}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">Source</span>
-                      <span className="font-medium text-slate-900">{titleCase(reservationQuery.data.source)}</span>
-                    </div>
+                  <div className="grid gap-1.5 text-xs text-slate-600">
+                    <ContextRow
+                      label="Room"
+                      title={reservationQuery.data.room_number ?? reservationQuery.data.room_id ?? "Unassigned"}
+                      value={reservationQuery.data.room_number ?? compactContextId(reservationQuery.data.room_id)}
+                    />
+                    <ContextRow
+                      label="Stay"
+                      value={`${format(new Date(reservationQuery.data.checkin_date), "MMM d")} - ${format(new Date(reservationQuery.data.checkout_date), "MMM d")}`}
+                    />
+                    <ContextRow label="Source" value={titleCase(reservationQuery.data.source)} />
                     {reservationQuery.data.notes && (
-                      <div className="pt-1 mt-1 border-t border-slate-200">
-                        <span className="text-xs text-slate-500 block mb-1">Special Requests</span>
-                        <p className="text-xs font-medium text-slate-800">{reservationQuery.data.notes}</p>
+                      <div className="mt-1 rounded bg-white/70 p-2">
+                        <span className="block text-[10px] font-semibold uppercase text-slate-500">Special Requests</span>
+                        <p className="mt-1 break-words text-[11px] font-medium leading-4 text-slate-800">{reservationQuery.data.notes}</p>
                       </div>
                     )}
                   </div>
@@ -743,7 +748,7 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
                   disabled={createTicket.isPending}
                   type="button"
                   variant="secondary"
-                  className="h-9 justify-start text-xs"
+                  className="h-9 min-w-0 justify-start gap-1.5 whitespace-nowrap px-2 text-[10px]"
                   onClick={() =>
                     handleQuickTicket({
                       label: "General",
@@ -754,14 +759,14 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
                     })
                   }
                 >
-                  <TicketIcon className="size-4" />
-                  Create Ticket
+                  <TicketIcon className="size-3.5 shrink-0" />
+                  <span className="min-w-0 truncate">Create Ticket</span>
                 </Button>
                 <Button
                   disabled={createTicket.isPending}
                   type="button"
                   variant="secondary"
-                  className="h-9 justify-start text-xs"
+                  className="h-9 min-w-0 justify-start gap-1.5 whitespace-nowrap px-2 text-[10px]"
                   onClick={() =>
                     handleQuickTicket({
                       label: "Housekeeping",
@@ -771,14 +776,14 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
                     })
                   }
                 >
-                  <Sparkles className="size-4" />
-                  Housekeeping
+                  <Sparkles className="size-3.5 shrink-0" />
+                  <span className="min-w-0 truncate">Housekeeping</span>
                 </Button>
                 <Button
                   disabled={createTicket.isPending}
                   type="button"
                   variant="secondary"
-                  className="h-9 justify-start text-xs"
+                  className="h-9 min-w-0 justify-start gap-1.5 whitespace-nowrap px-2 text-[10px]"
                   onClick={() =>
                     handleQuickTicket({
                       label: "Maintenance",
@@ -788,14 +793,14 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
                     })
                   }
                 >
-                  <Wrench className="size-4" />
-                  Maintenance
+                  <Wrench className="size-3.5 shrink-0" />
+                  <span className="min-w-0 truncate">Maintenance</span>
                 </Button>
                 <Button
                   disabled={createTicket.isPending}
                   type="button"
                   variant="secondary"
-                  className="h-9 justify-start text-xs"
+                  className="h-9 min-w-0 justify-start gap-1.5 whitespace-nowrap px-2 text-[10px]"
                   onClick={() =>
                     handleQuickTicket({
                       label: "Room service",
@@ -806,8 +811,8 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
                     })
                   }
                 >
-                  <Utensils className="size-4" />
-                  Room Service
+                  <Utensils className="size-3.5 shrink-0" />
+                  <span className="min-w-0 truncate">Room Service</span>
                 </Button>
               </div>
             </div>
@@ -831,12 +836,12 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
                 <h4 className="mb-2 flex items-center gap-2 text-xs font-bold uppercase text-slate-500">
                   <MessageCircle className="size-4" /> Ticket Discussion Preview
                 </h4>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <Link className="truncate text-sm font-semibold text-[#0F3D91]" href={`/${hotelId}/tickets/${focusTicket.id}`}>
+                <div className="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <div className="mb-2 flex min-w-0 items-center justify-between gap-2">
+                    <Link className="min-w-0 truncate text-sm font-semibold text-[#0F3D91]" href={`/${hotelId}/tickets/${focusTicket.id}`}>
                       {focusTicket.ticket_code}
                     </Link>
-                    <Badge variant={isTicketClosed(focusTicket.stage) ? "green" : "amber"}>{titleCase(focusTicket.stage)}</Badge>
+                    <StatusDot status={focusTicket.stage} />
                   </div>
                   {focusTicketTimeline.isLoading ? (
                     <p className="text-sm text-slate-500">Loading discussion...</p>
@@ -898,7 +903,7 @@ function TicketListBlock({
   return (
     <div>
       <h4 className="mb-2 flex items-center gap-2 text-xs font-bold uppercase text-slate-500">
-        <TicketIcon className="size-4" /> {title}
+        <TicketIcon className="size-4" /> {title} <StatusLegendInfo />
       </h4>
       <div className="grid gap-2">
         {isLoading ? <p className="text-sm text-slate-500">Loading tickets...</p> : null}
@@ -908,21 +913,126 @@ function TicketListBlock({
           </div>
         ) : null}
         {tickets.slice(0, 4).map((ticket) => (
-          <Link
-            className="rounded-lg border border-slate-200 p-3 transition-colors hover:bg-slate-50"
-            href={`/${hotelId}/tickets/${ticket.id}`}
-            key={ticket.id}
-          >
-            <div className="mb-1 flex items-center justify-between gap-2">
-              <span className="truncate text-sm font-semibold text-slate-800">{ticket.ticket_code}</span>
-              <Badge variant={isTicketClosed(ticket.stage) ? "green" : "amber"}>{titleCase(ticket.stage)}</Badge>
-            </div>
-            <p className="line-clamp-2 text-xs text-slate-500">{ticket.item_description}</p>
-          </Link>
+          <TicketContextCard hotelId={hotelId} key={ticket.id} ticket={ticket} />
         ))}
       </div>
     </div>
   );
+}
+
+function TicketContextCard({ hotelId, ticket }: { hotelId: string; ticket: TicketRecord }) {
+  const tone = statusTone(ticket.stage);
+  const meta = [ticket.type, ticket.task_category_name ?? ticket.task_category].filter(Boolean).join(" / ");
+
+  return (
+    <Link
+      className={cn(
+        "block min-w-0 overflow-hidden rounded-lg border border-l-4 border-slate-200 bg-white p-3 transition-colors hover:bg-slate-50",
+        tone.borderClassName,
+      )}
+      href={`/${hotelId}/tickets/${ticket.id}`}
+    >
+      <div className="flex min-w-0 items-start gap-2">
+        <StatusDot status={ticket.stage} />
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-slate-800" title={ticket.ticket_code}>
+            {ticket.ticket_code}
+          </p>
+          {meta ? <p className="truncate text-[11px] text-slate-500" title={meta}>{meta}</p> : null}
+        </div>
+      </div>
+
+      <div className="mt-2 grid gap-1.5">
+        <ContextRow label="Priority" value={`P${ticket.priority}`} />
+        {ticket.room_number || ticket.room_id ? (
+          <ContextRow
+            label="Room"
+            title={ticket.room_number ?? ticket.room_id ?? ""}
+            value={ticket.room_number ?? compactContextId(ticket.room_id)}
+          />
+        ) : null}
+        {ticket.sla_due_at ? (
+          <ContextRow label="Due" value={formatDistanceToNow(new Date(ticket.sla_due_at), { addSuffix: true })} />
+        ) : null}
+      </div>
+
+      <p className="mt-2 line-clamp-2 break-words text-[11px] leading-4 text-slate-600">
+        {ticket.item_description}
+      </p>
+    </Link>
+  );
+}
+
+function ContextRow({ label, value, title }: { label: string; value: string; title?: string }) {
+  return (
+    <div className="flex min-w-0 items-center justify-between gap-2 rounded bg-white/70 px-2 py-1">
+      <span className="shrink-0 text-[11px] font-medium text-slate-500">{label}</span>
+      <span className="min-w-0 truncate text-right text-[11px] font-semibold text-slate-900" title={title ?? value}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+const STATUS_LEGEND =
+  "Color code: red means cancelled, rejected, failed, or urgent; brown means pending or waiting; green means approved, completed, resolved, or checked in; blue means created, open, accepted, or in progress.";
+
+function StatusLegendInfo() {
+  return (
+    <span
+      aria-label={STATUS_LEGEND}
+      className="inline-flex size-4 items-center justify-center rounded-full text-slate-400 hover:text-slate-700"
+      title={STATUS_LEGEND}
+    >
+      <InfoIcon className="size-3.5" />
+    </span>
+  );
+}
+
+function StatusDot({ status }: { status: string }) {
+  const tone = statusTone(status);
+
+  return (
+    <span
+      aria-label={`${titleCase(status)} status`}
+      className={cn("mt-1 size-2.5 shrink-0 rounded-full", tone.dotClassName)}
+      title={titleCase(status)}
+    />
+  );
+}
+
+function statusTone(status: string) {
+  const normalized = status.toLowerCase().replaceAll(" ", "_");
+
+  if (["cancelled", "canceled", "rejected", "failed", "error", "urgent"].some((value) => normalized.includes(value))) {
+    return { borderClassName: "border-l-rose-500", dotClassName: "bg-rose-600" };
+  }
+
+  if (["pending", "waiting", "hold", "late"].some((value) => normalized.includes(value))) {
+    return { borderClassName: "border-l-amber-700", dotClassName: "bg-amber-700" };
+  }
+
+  if (["approved", "completed", "closed", "resolved", "checked_in"].some((value) => normalized.includes(value))) {
+    return { borderClassName: "border-l-emerald-500", dotClassName: "bg-emerald-600" };
+  }
+
+  if (["created", "open", "new", "accepted", "in_progress", "reopened", "scheduled"].some((value) => normalized.includes(value))) {
+    return { borderClassName: "border-l-[#0F3D91]", dotClassName: "bg-[#0F3D91]" };
+  }
+
+  return { borderClassName: "border-l-slate-300", dotClassName: "bg-slate-400" };
+}
+
+function compactContextId(value: string | null | undefined) {
+  if (!value) {
+    return "Unassigned";
+  }
+
+  if (value.length <= 18) {
+    return value;
+  }
+
+  return `${value.slice(0, 10)}...${value.slice(-6)}`;
 }
 
 function isTicketClosed(stage: string) {

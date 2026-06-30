@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createColumnHelper, flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table";
 import { format } from "date-fns";
-import { Ban, Eye, LogIn, LogOut, Search } from "lucide-react";
+import { Ban, Eye, LogIn, LogOut, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { showApiErrorToast } from "@/lib/api/error-toast";
 
@@ -73,6 +73,14 @@ export function ReservationsTable({ hotelId }: { hotelId: string }) {
   function handleSearch(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSearch(searchDraft.trim());
+  }
+
+  function resetFilters() {
+    setSearchDraft("");
+    setSearch("");
+    setStatus("all");
+    setFromDate("");
+    setToDate("");
   }
 
   const columns = [
@@ -203,27 +211,16 @@ export function ReservationsTable({ hotelId }: { hotelId: string }) {
     getCoreRowModel: getCoreRowModel(),
   });
 
-  if (reservations.isLoading) {
-    return <DataState isLoading />;
-  }
-
-  if (reservations.error) {
-    return <DataState error={reservations.error} />;
-  }
-
-  if (!reservations.data?.length) {
-    return <DataState empty emptyTitle="No reservations yet." />;
-  }
+  const hasActiveFilters = Boolean(search || status !== "all" || fromDate || toDate);
 
   return (
     <div className="grid gap-4">
       <section className="grid gap-3 rounded-md border border-slate-200 bg-white p-4">
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_12rem_10rem_10rem]">
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_12rem_10rem_10rem_auto]">
           <form className="relative block" onSubmit={handleSearch}>
             <span className="sr-only">Search reservations</span>
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <Input
-              className="pl-9 pr-10"
+              className="pr-10"
               placeholder="Search by reservation, guest, room, or source"
               value={searchDraft}
               onChange={(event) => setSearchDraft(event.target.value)}
@@ -250,11 +247,19 @@ export function ReservationsTable({ hotelId }: { hotelId: string }) {
             <span className="sr-only">To date</span>
             <Input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
           </label>
+          <Button disabled={!hasActiveFilters && !searchDraft} type="button" variant="secondary" onClick={resetFilters}>
+            <X />
+            Reset
+          </Button>
         </div>
       </section>
 
-      {!rows.length ? (
-        <DataState empty emptyTitle="No reservations match these filters." />
+      {reservations.isLoading ? (
+        <DataState isLoading />
+      ) : reservations.error ? (
+        <DataState error={reservations.error} />
+      ) : !rows.length ? (
+        <DataState empty emptyTitle={hasActiveFilters ? "No reservations match these filters." : "No reservations yet."} />
       ) : (
         <div className="grid gap-3">
           <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">

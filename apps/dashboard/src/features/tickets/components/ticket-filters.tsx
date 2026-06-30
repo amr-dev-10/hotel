@@ -106,9 +106,8 @@ export function TicketFilters() {
 
       <div className="grid gap-3 xl:grid-cols-[1fr_180px_180px_190px_170px_auto]">
         <form className="relative" onSubmit={applySearch}>
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
           <Input
-            className="pl-9 pr-10"
+            className="pr-10"
             value={queryDraft}
             placeholder="Search ticket code, item, room or assignee"
             onChange={(event) => setQueryDraft(event.target.value)}
