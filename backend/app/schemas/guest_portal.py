@@ -51,6 +51,35 @@ class GuestPortalRequestCreate(BaseModel):
     priority: int = Field(default=2, ge=1, le=5)
 
 
+class GuestChatConversationRead(BaseModel):
+    id: str
+    status: str
+    last_message_at: datetime | None = None
+
+
+class GuestChatMessageRead(BaseModel):
+    id: str
+    conversation_id: str
+    direction: str
+    message_text: str | None = None
+    status: str
+    created_at: datetime
+
+
+class GuestChatSendRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=4000)
+
+
+class GuestChatSendResponse(BaseModel):
+    conversation_id: str
+    inbound_message: GuestChatMessageRead
+    ai_reply: GuestChatMessageRead | None = None
+    intent: str | None = None
+    confidence: float | None = None
+    ticket_id: str | None = None
+    error: str | None = None
+
+
 class GuestPortalMenu(BaseModel):
     categories: list[MenuCategoryRead]
     items: list[MenuItemRead]

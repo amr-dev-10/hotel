@@ -33,6 +33,8 @@ export const queryKeys = {
     orders: () => ["guest-portal", "orders"] as const,
     requests: () => ["guest-portal", "requests"] as const,
     requestCategories: () => ["guest-portal", "request-categories"] as const,
+    chatConversation: () => ["guest-portal", "chat", "conversation"] as const,
+    chatMessages: () => ["guest-portal", "chat", "messages"] as const,
   },
   reservationDetail: (hotelId: string, reservationId: string) =>
     ["reservations", hotelId, reservationId] as const,

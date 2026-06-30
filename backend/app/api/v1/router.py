@@ -12,6 +12,7 @@ from app.api.v1 import (
     feedback,
     folios,
     guest_portal,
+    guest_portal_chat,
     guests,
     hierarchy,
     housekeeping,
@@ -47,6 +48,7 @@ from app.api.v1 import (
 api_router = APIRouter()
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(guest_portal.router, prefix="/guest-portal", tags=["guest-portal"])
+api_router.include_router(guest_portal_chat.router, prefix="/guest-portal", tags=["guest-portal-chat"])
 api_router.include_router(platform_admin.router, prefix="/platform", tags=["platform-admin"])
 api_router.include_router(organizations.router, prefix="/orgs", tags=["organizations"])
 api_router.include_router(hotels.router, prefix="/hotels", tags=["hotels"])
