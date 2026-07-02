@@ -152,10 +152,10 @@ export function StaffDirectory({ hotelId }: { hotelId: string }) {
       <section className="grid gap-3 rounded-md border border-slate-200 bg-white p-4">
         <div className="grid gap-3 lg:grid-cols-[1.2fr_repeat(4,minmax(0,1fr))]">
           <label className="relative block">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <Input
               aria-label="Search staff"
-              className="pl-9"
+              className="pr-9"
               placeholder="Search name, email, role, manager"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
@@ -276,7 +276,7 @@ function StaffCard({
     <article className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <Link href={`/${hotelId}/settings/staff/${user.id}`} className="hover:text-[#0F3D91]" prefetch={false}>
+          <Link href={`/${hotelId}/settings/staff/${user.id}`} className="hover:text-[var(--primary)]" prefetch={false}>
             <h2 className="truncate text-base font-semibold">{user.name}</h2>
           </Link>
           <p className="mt-1 flex items-center gap-2 truncate text-sm text-slate-500">

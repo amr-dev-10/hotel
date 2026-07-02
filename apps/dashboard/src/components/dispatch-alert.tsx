@@ -87,16 +87,16 @@ export function DispatchAlert({ hotelId }: { hotelId: string }) {
   }
 
   return (
-    <div className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-md rounded-md border border-[#0F3D91]/20 bg-white p-4 shadow-2xl">
+    <div className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-md rounded-md border border-[var(--primary-soft)] bg-[var(--panel)] p-4 text-[var(--foreground)] shadow-[var(--shadow-panel)]">
       <div className="flex items-start justify-between gap-3">
         <div className="flex gap-3">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-[#0F3D91]/10 text-[#0F3D91]">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-[var(--primary-soft)] text-[var(--primary)]">
             <BellRing className="size-5" />
           </div>
           <div className="min-w-0">
             <p className="text-sm font-semibold">New Ticket Dispatch</p>
-            <p className="mt-1 text-base font-semibold text-slate-950">{activeDispatch.ticket.ticket_code}</p>
-            <p className="mt-1 line-clamp-2 text-sm text-slate-600">{activeDispatch.ticket.item_description}</p>
+            <p className="mt-1 text-base font-semibold text-[var(--foreground)]">{activeDispatch.ticket.ticket_code}</p>
+            <p className="mt-1 line-clamp-2 text-sm text-[var(--muted-strong)]">{activeDispatch.ticket.item_description}</p>
           </div>
         </div>
         <Button aria-label="Dismiss dispatch alert" size="icon" type="button" variant="ghost" onClick={() => setActiveDispatch(null)}>
@@ -104,7 +104,7 @@ export function DispatchAlert({ hotelId }: { hotelId: string }) {
         </Button>
       </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-2 text-xs text-slate-500">
+      <div className="mt-4 grid grid-cols-3 gap-2 text-xs text-[var(--muted)]">
         <Info
           label="Room"
           value={activeDispatch.ticket.room_number ? `Room ${activeDispatch.ticket.room_number}` : compactId(activeDispatch.ticket.room_id)}
@@ -113,7 +113,7 @@ export function DispatchAlert({ hotelId }: { hotelId: string }) {
         <Info label="Source" value={activeDispatch.ticket.source} />
       </div>
 
-      <div className="mt-4 flex items-center gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+      <div className="mt-4 flex items-center gap-2 rounded-md bg-[var(--warning-soft)] px-3 py-2 text-sm text-[var(--warning)]">
         <Clock className="size-4" />
         {remaining == null ? "Escalation timer active" : `Auto-escalates in ${formatRemaining(remaining)}`}
       </div>
@@ -152,9 +152,9 @@ export function DispatchAlert({ hotelId }: { hotelId: string }) {
 
 function Info({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md bg-slate-50 p-2">
-      <p className="font-semibold uppercase tracking-normal text-slate-400">{label}</p>
-      <p className="mt-1 truncate font-medium text-slate-700">{value}</p>
+    <div className="rounded-md bg-[var(--panel-muted)] p-2">
+      <p className="font-semibold uppercase tracking-normal text-[var(--muted)]">{label}</p>
+      <p className="mt-1 truncate font-medium text-[var(--muted-strong)]">{value}</p>
     </div>
   );
 }

@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
-import { ArrowLeft, Loader2, Plus } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { showApiErrorToast } from "@/lib/api/error-toast";
 
+import { PageBreadcrumbs } from "@/components/layout/page-breadcrumbs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
@@ -122,16 +122,15 @@ export function EscalationRulesPage({ hotelId }: { hotelId: string }) {
 
   return (
     <div className="grid gap-5">
-      <div>
-        <Button asChild type="button" variant="ghost">
-          <Link href={`/${hotelId}/settings/workflow`}>
-            <ArrowLeft />
-            Workflow
-          </Link>
-        </Button>
-        <h2 className="mt-2 text-xl font-semibold">Escalation Rules</h2>
-        <p className="mt-1 text-sm text-slate-500">Rules fire after the ticket SLA due time or after dispatch offer timeout.</p>
-      </div>
+      <PageBreadcrumbs
+        current="Escalation Rules"
+        description="Rules fire after the ticket SLA due time or after dispatch offer timeout."
+        hotelId={hotelId}
+        items={[
+          { label: "Settings" },
+          { label: "Workflow", href: `/${hotelId}/settings/workflow` },
+        ]}
+      />
 
       <section className="grid gap-4 rounded-md border border-slate-200 bg-white p-4 md:grid-cols-3">
         <Field label="Department" id="esc-department">

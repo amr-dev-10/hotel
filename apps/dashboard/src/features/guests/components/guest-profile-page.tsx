@@ -5,13 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import {
-  ArrowLeft,
   CalendarDays,
   Mail,
   MessageCircle,
   Phone,
   ShieldCheck,
-  UserRound,
   FileText,
   Loader2,
   Pencil,
@@ -20,6 +18,7 @@ import {
 import { toast } from "sonner";
 import { showApiErrorToast } from "@/lib/api/error-toast";
 
+import { PageBreadcrumbs } from "@/components/layout/page-breadcrumbs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
@@ -94,25 +93,12 @@ export function GuestProfilePage({
   return (
     <div className="grid gap-5">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-        <div>
-          <Button asChild type="button" variant="ghost">
-            <Link href={`/${hotelId}/guests`}>
-              <ArrowLeft />
-              Guests
-            </Link>
-          </Button>
-          <div className="mt-3 flex items-center gap-3">
-            <div className="flex size-12 items-center justify-center rounded-md bg-[#0F3D91] text-white">
-              <UserRound className="size-6" />
-            </div>
-            <div>
-              <h2 className="text-xl font-semibold">{guest.data.name}</h2>
-              <div className="mt-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600">
-                Guest DB ID: {guest.data.id}
-              </div>
-            </div>
-          </div>
-        </div>
+        <PageBreadcrumbs
+          current={guest.data.name}
+          description={`Guest DB ID: ${guest.data.id}`}
+          hotelId={hotelId}
+          items={[{ label: "Guests", href: `/${hotelId}/guests` }]}
+        />
         <div className="flex items-center gap-2">
           <Badge variant={guestStatusVariant(guest.data.status)}>{titleCase(guest.data.status)}</Badge>
           <Can I="edit" a="Guest">
@@ -151,11 +137,11 @@ export function GuestProfilePage({
 
       <div className="grid gap-5 xl:grid-cols-[1fr_0.9fr]">
         <GuestTimeline hotelId={hotelId} guestId={guestId} />
-        
+
         <div className="flex flex-col gap-5">
           <section className="grid gap-3 rounded-md border border-slate-200 bg-white p-4">
             <div className="flex items-center gap-2">
-              <FileText className="size-4 text-[#0F3D91]" />
+              <FileText className="size-4 text-[var(--primary)]" />
               <h3 className="text-base font-semibold">Internal Notes</h3>
             </div>
             <InternalNotes hotelId={hotelId} guestId={guestId} initialNotes={guest.data.internal_notes || ""} />
@@ -163,7 +149,7 @@ export function GuestProfilePage({
 
           <section className="grid gap-3 rounded-md border border-slate-200 bg-white p-4">
             <div className="flex items-center gap-2">
-              <ShieldCheck className="size-4 text-[#0F3D91]" />
+              <ShieldCheck className="size-4 text-[var(--primary)]" />
               <h3 className="text-base font-semibold">Consent</h3>
             </div>
             {consent.isLoading ? (
@@ -377,7 +363,7 @@ function InternalNotes({ hotelId, guestId, initialNotes }: { hotelId: string, gu
 
   return (
     <div className="grid gap-2">
-      <Textarea 
+      <Textarea
         defaultValue={initialNotes}
         placeholder="Add private notes about this guest..."
         className="min-h-[120px] text-sm"
@@ -399,11 +385,11 @@ function GuestTimeline({ hotelId, guestId }: { hotelId: string, guestId: string 
     <section className="grid gap-3 rounded-md border border-slate-200 bg-white p-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <CalendarDays className="size-4 text-[#0F3D91]" />
+          <CalendarDays className="size-4 text-[var(--primary)]" />
           <h3 className="text-base font-semibold">Reservation Timeline</h3>
         </div>
       </div>
-      
+
       {timeline.isLoading ? (
         <DataState isLoading />
       ) : timeline.error ? (

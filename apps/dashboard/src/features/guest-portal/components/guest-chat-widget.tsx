@@ -24,7 +24,7 @@ export function GuestChatWidget() {
         ) : (
           <button
             aria-label="Open chat"
-            className="pointer-events-auto grid size-14 place-items-center rounded-full bg-[#0F3D91] text-white shadow-lg shadow-slate-900/20 transition hover:bg-[#0b2e6e] focus:outline-none focus:ring-2 focus:ring-[#0F3D91]/25"
+            className="pointer-events-auto grid size-14 place-items-center rounded-full bg-[var(--primary)] text-white shadow-lg shadow-slate-900/20 transition hover:bg-[var(--primary-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--primary-ring)]"
             type="button"
             onClick={() => setOpen(true)}
           >
@@ -66,7 +66,7 @@ function ChatPanel({ onClose }: { onClose: () => void }) {
     <section className="pointer-events-auto flex h-[min(70vh,34rem)] w-full flex-col overflow-hidden rounded-md border border-slate-200 bg-white shadow-2xl shadow-slate-900/20">
       <header className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="grid size-9 place-items-center rounded-full bg-[#0F3D91] text-white">
+          <div className="grid size-9 place-items-center rounded-full bg-[var(--primary)] text-white">
             <Bot className="size-4" />
           </div>
           <div className="min-w-0">
@@ -146,7 +146,7 @@ function MessageBubble({ message }: { message: GuestChatMessage }) {
         className={cn(
           "max-w-[82%] rounded-md px-3 py-2 text-sm leading-5 shadow-sm",
           isGuest
-            ? "bg-[#0F3D91] text-white"
+            ? "bg-[var(--primary)] text-white"
             : "border border-slate-200 bg-white text-slate-700",
         )}
       >

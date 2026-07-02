@@ -2,11 +2,10 @@
 
 import { useMemo } from "react";
 import type { ComponentType } from "react";
-import Link from "next/link";
-import { ArrowLeft, CheckCircle2, Clock3, LogIn, LogOut, UserCheck, X } from "lucide-react";
+import { CheckCircle2, Clock3, LogIn, LogOut, UserCheck, X } from "lucide-react";
 
+import { PageBreadcrumbs } from "@/components/layout/page-breadcrumbs";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
 import { titleCase } from "@/lib/utils";
 import { useShifts, useStaff } from "@/features/staff/hooks/useStaff";
@@ -53,16 +52,15 @@ export function StaffAttendancePage({ hotelId }: { hotelId: string }) {
 
   return (
     <div className="grid gap-5">
-      <div>
-        <Button asChild type="button" variant="ghost">
-          <Link href={`/${hotelId}/settings/staff`}>
-            <ArrowLeft />
-            Staff
-          </Link>
-        </Button>
-        <h2 className="mt-2 text-xl font-semibold">Attendance</h2>
-        <p className="text-sm text-slate-500">Daily staff presence and worked-hour status.</p>
-      </div>
+      <PageBreadcrumbs
+        current="Attendance"
+        description="Daily staff presence and worked-hour status."
+        hotelId={hotelId}
+        items={[
+          { label: "Settings" },
+          { label: "Staff Management", href: `/${hotelId}/settings/staff` },
+        ]}
+      />
 
       <div className="grid gap-3 md:grid-cols-6">
         <Metric icon={UserCheck} label="Present today" value={metrics.present} />

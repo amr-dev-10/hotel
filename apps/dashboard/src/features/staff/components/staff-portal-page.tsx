@@ -8,6 +8,7 @@ import { CheckCircle2, Clock3, LogIn, LogOut, ThumbsDown, ThumbsUp, TicketCheck 
 import { toast } from "sonner";
 import { showApiErrorToast } from "@/lib/api/error-toast";
 
+import { PageBreadcrumbs } from "@/components/layout/page-breadcrumbs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
@@ -106,14 +107,13 @@ export function StaffPortalPage({ hotelId }: { hotelId: string }) {
 
   return (
     <div className="grid gap-5">
-      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-        <div>
-          <h2 className="text-xl font-semibold">Staff Portal</h2>
-          <p className="text-sm text-slate-500">
-            {currentUser.name} - Manage today&apos;s shift and assigned tickets.
-          </p>
-        </div>
-      </div>
+      <PageBreadcrumbs
+        current={currentUser.name}
+        description="Manage today's shift and assigned tickets."
+        hotelId={hotelId}
+        items={[{ label: "Staff Portal", href: `/${hotelId}/staff-portal` }]}
+        srTitle="Staff Portal"
+      />
 
       <div className="grid gap-3 md:grid-cols-4">
         <Metric icon={<TicketCheck />} label="Active" value={activeTickets.length} />
@@ -263,7 +263,7 @@ function TicketCard({
     <article className="rounded-md border border-slate-200 bg-white p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <Link className="font-semibold text-slate-950 hover:text-[#0F3D91]" href={`/${hotelId}/tickets/${ticket.id}`}>
+          <Link className="font-semibold text-slate-950 hover:text-[var(--primary)]" href={`/${hotelId}/tickets/${ticket.id}`}>
             {ticket.ticket_code}
           </Link>
           <p className="mt-1 line-clamp-2 text-sm text-slate-600">{ticket.item_description}</p>

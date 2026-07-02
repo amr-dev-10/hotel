@@ -88,7 +88,7 @@ export function ReservationsTable({ hotelId }: { hotelId: string }) {
       header: "Reservation",
       cell: (info) => (
         <Link
-          className="font-semibold text-slate-950 hover:text-[#0F3D91]"
+          className="font-semibold text-slate-950 hover:text-[var(--primary)]"
           href={`/${hotelId}/reservations/${info.row.original.id}`}
           prefetch={false}
         >
@@ -102,7 +102,7 @@ export function ReservationsTable({ hotelId }: { hotelId: string }) {
         return (
           <div className="min-w-0">
             <Link
-              className="font-medium text-slate-900 hover:text-[#0F3D91]"
+              className="font-medium text-slate-900 hover:text-[var(--primary)]"
               href={`/${hotelId}/guests/${info.getValue()}`}
               prefetch={false}
             >

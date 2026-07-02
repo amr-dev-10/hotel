@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
-import { ArrowLeft, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { showApiErrorToast } from "@/lib/api/error-toast";
 
+import { PageBreadcrumbs } from "@/components/layout/page-breadcrumbs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
@@ -107,15 +107,14 @@ export function TaskSlasPage({ hotelId }: { hotelId: string }) {
   return (
     <div className="grid gap-5">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-        <div>
-          <Button asChild type="button" variant="ghost">
-            <Link href={`/${hotelId}/settings/workflow`}>
-              <ArrowLeft />
-              Workflow
-            </Link>
-          </Button>
-          <h2 className="mt-2 text-xl font-semibold">Task SLAs</h2>
-        </div>
+        <PageBreadcrumbs
+          current="Task SLAs"
+          hotelId={hotelId}
+          items={[
+            { label: "Settings" },
+            { label: "Workflow", href: `/${hotelId}/settings/workflow` },
+          ]}
+        />
         <div className="w-full sm:w-72">
           <Select
             value={departmentId}

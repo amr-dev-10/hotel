@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Background, Controls, ReactFlow, type Edge, type Node } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
+import { PageBreadcrumbs } from "@/components/layout/page-breadcrumbs";
 import { Badge } from "@/components/ui/badge";
 import { DataState } from "@/components/ui/data-state";
 import { Select } from "@/components/ui/select";
@@ -40,10 +41,11 @@ export function HierarchyPage({ hotelId }: { hotelId: string }) {
   return (
     <div className="grid gap-5">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-        <div>
-          <h2 className="text-xl font-semibold">Staff Hierarchy</h2>
-          <p className="text-sm text-slate-500">Department reporting tree and open-ticket load.</p>
-        </div>
+        <PageBreadcrumbs
+          current="Staff Hierarchy"
+          description="Department reporting tree and open-ticket load."
+          hotelId={hotelId}
+        />
         <div className="w-full sm:w-72">
           <Select value={departmentId} onChange={(event) => setSelectedDepartment(event.target.value)}>
             {departments.data.map((department) => (
@@ -119,7 +121,7 @@ function buildGraph(data?: DepartmentHierarchy) {
       id: rootId,
       position: { x: 0, y: 0 },
       data: { label: `${data.department} department` },
-      style: { background: "#0F3D91", color: "white", border: 0 },
+      style: { background: "var(--primary)", color: "white", border: 0 },
     });
   }
 

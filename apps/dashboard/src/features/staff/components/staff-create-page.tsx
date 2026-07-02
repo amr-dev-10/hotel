@@ -1,13 +1,13 @@
 "use client";
 
-import Link from "next/link";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Loader2, UserPlus } from "lucide-react";
+import { Loader2, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { showApiErrorToast } from "@/lib/api/error-toast";
 
+import { PageBreadcrumbs } from "@/components/layout/page-breadcrumbs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -54,15 +54,14 @@ export function StaffCreatePage({ hotelId }: { hotelId: string }) {
   return (
     <form className="grid gap-5" onSubmit={onSubmit}>
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-        <div>
-          <Button asChild type="button" variant="ghost">
-            <Link href={`/${hotelId}/settings/staff`}>
-              <ArrowLeft />
-              Staff
-            </Link>
-          </Button>
-          <h2 className="mt-2 text-xl font-semibold">New Staff Member</h2>
-        </div>
+        <PageBreadcrumbs
+          current="New Staff Member"
+          hotelId={hotelId}
+          items={[
+            { label: "Settings" },
+            { label: "Staff Management", href: `/${hotelId}/settings/staff` },
+          ]}
+        />
         <Button disabled={createStaff.isPending} type="submit">
           {createStaff.isPending ? <Loader2 className="animate-spin" /> : <UserPlus />}
           Create staff
@@ -112,7 +111,7 @@ export function StaffCreatePage({ hotelId }: { hotelId: string }) {
             </Select>
           </Field>
           <label className="flex items-center gap-2 rounded-md border border-slate-200 p-3 text-sm">
-            <input className="size-4 accent-[#0F3D91]" type="checkbox" {...form.register("is_on_duty")} />
+            <input className="size-4 accent-[var(--primary)]" type="checkbox" {...form.register("is_on_duty")} />
             On duty
           </label>
         </div>

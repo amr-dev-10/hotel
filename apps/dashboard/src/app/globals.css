@@ -1,17 +1,62 @@
 @import "tailwindcss";
 
-:root {
-  --background: #f6f8fb;
-  --foreground: #101828;
-  --panel: #ffffff;
-  --panel-muted: #eef3fa;
-  --border: #d8e0eb;
-  --primary: #0f3d91;
-  --primary-strong: #0b2e6e;
-  --teal: #0e7490;
-  --amber: #b7791f;
-  --rose: #be123c;
-  --muted: #64748b;
+@layer base {
+  :root {
+    /* Arcadia ERP theme control center: change app colors here. */
+    --background: #f8fafc;
+    --foreground: #0f172a;
+    --panel: #ffffff;
+    --panel-muted: #f1f5f9;
+    --surface: #1e293b;
+    --background-deep: #0f172a;
+    --border: #e2e8f0;
+    --border-strong: #cbd5e1;
+
+    --primary: #2563eb;
+    --primary-hover: #1d4ed8;
+    --primary-active: #1e40af;
+    --primary-foreground: #ffffff;
+    --primary-soft: #dbeafe;
+    --primary-ring: rgba(37, 99, 235, 0.18);
+
+    --muted: #64748b;
+    --muted-strong: #475569;
+    --success: #16a34a;
+    --success-soft: #dcfce7;
+    --warning: #ca8a04;
+    --warning-soft: #fef3c7;
+    --destructive: #dc2626;
+    --destructive-soft: #fee2e2;
+    --info: #0e7490;
+    --info-soft: #cffafe;
+
+    --shadow-control: 0 1px 2px rgba(15, 23, 42, 0.08);
+    --shadow-panel: 0 12px 32px rgba(15, 23, 42, 0.08);
+  }
+
+  .dark {
+    --background: #0f172a;
+    --foreground: #f8fafc;
+    --panel: #1e293b;
+    --panel-muted: #0f172a;
+    --surface: #1e293b;
+    --background-deep: #020617;
+    --border: #334155;
+    --border-strong: #475569;
+
+    --primary: #3b82f6;
+    --primary-hover: #2563eb;
+    --primary-active: #1d4ed8;
+    --primary-soft: rgba(59, 130, 246, 0.16);
+    --primary-ring: rgba(59, 130, 246, 0.26);
+
+    --muted: #94a3b8;
+    --muted-strong: #cbd5e1;
+    --success-soft: rgba(22, 163, 74, 0.16);
+    --warning-soft: rgba(202, 138, 4, 0.16);
+    --destructive-soft: rgba(220, 38, 38, 0.16);
+    --info-soft: rgba(14, 116, 144, 0.2);
+  }
 }
 
 * {
@@ -20,14 +65,17 @@
 
 html {
   min-height: 100%;
+  overflow-x: hidden;
 }
 
 body {
   min-height: 100%;
   margin: 0;
+  overflow-x: hidden;
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  text-rendering: optimizeLegibility;
 }
 
 button,
@@ -38,5 +86,68 @@ textarea {
 }
 
 ::selection {
-  background: rgba(15, 61, 145, 0.18);
+  background: var(--primary-ring);
+}
+
+[data-tooltip] {
+  position: relative;
+}
+
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 0.5rem);
+  z-index: 60;
+  max-width: 14rem;
+  width: max-content;
+  transform: translateX(-50%) translateY(-0.25rem);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.375rem;
+  background: var(--background-deep);
+  color: #ffffff;
+  box-shadow: var(--shadow-panel);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.25rem;
+  opacity: 0;
+  padding: 0.375rem 0.5rem;
+  pointer-events: none;
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease,
+    visibility 150ms ease;
+  visibility: hidden;
+  white-space: normal;
+}
+
+[data-tooltip]:hover::after,
+[data-tooltip]:focus-visible::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  visibility: visible;
+}
+
+.arcadia-sidebar-scroll {
+  overscroll-behavior: contain;
+  scrollbar-color: rgba(148, 163, 184, 0.34) transparent;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+
+.arcadia-sidebar-scroll::-webkit-scrollbar {
+  width: 0.375rem;
+}
+
+.arcadia-sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.arcadia-sidebar-scroll::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.28);
+  border-radius: 999px;
+}
+
+.arcadia-sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.46);
 }

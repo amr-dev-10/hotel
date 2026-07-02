@@ -17,7 +17,7 @@ import { cn, titleCase } from "@/lib/utils";
 import { useNotificationStore } from "@/stores/notification.store";
 import type { AppNotification } from "@/types/domain";
 
-export function NotificationBell({ hotelId }: { hotelId: string }) {
+export function NotificationBell({ hotelId, triggerClassName }: { hotelId: string; triggerClassName?: string }) {
   const router = useRouter();
   const notificationsQuery = useNotifications(hotelId);
   const markRead = useMarkNotificationRead(hotelId);
@@ -56,20 +56,27 @@ export function NotificationBell({ hotelId }: { hotelId: string }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button aria-label="Notifications" className="relative" size="icon" type="button" variant="ghost">
+        <Button
+          aria-label="Notifications"
+          className={cn("relative", triggerClassName)}
+          data-tooltip="Notifications"
+          size="icon"
+          type="button"
+          variant="ghost"
+        >
           <Bell />
           {unread.length ? (
-            <span className="absolute -right-1 -top-1 flex min-w-5 justify-center rounded-full bg-rose-600 px-1 text-xs font-semibold leading-5 text-white">
+            <span className="absolute -right-1 -top-1 flex min-w-5 justify-center rounded-full bg-[var(--destructive)] px-1 text-xs font-semibold leading-5 text-white shadow-[var(--shadow-control)]">
               {unread.length}
             </span>
           ) : null}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-[22rem] p-2">
-        <div className="flex items-center justify-between border-b border-slate-100 px-2 pb-2">
+        <div className="flex items-center justify-between border-b border-[var(--border)] px-2 pb-2">
           <div>
             <p className="text-sm font-semibold">Notifications</p>
-            <p className="text-xs text-slate-500">{unread.length} unread</p>
+            <p className="text-xs text-[var(--muted)]">{unread.length} unread</p>
           </div>
           <Button disabled={!unread.length || markRead.isPending} size="sm" type="button" variant="ghost" onClick={markAllRead}>
             <CheckCheck />
@@ -87,7 +94,7 @@ export function NotificationBell({ hotelId }: { hotelId: string }) {
                 <span
                   className={cn(
                     "mt-1 size-2 shrink-0 rounded-full",
-                    notification.read_at || notification.status === "read" ? "bg-slate-200" : "bg-[#0F3D91]",
+                    notification.read_at || notification.status === "read" ? "bg-[var(--border-strong)]" : "bg-[var(--primary)]",
                   )}
                 />
                 <span className="min-w-0 flex-1">
@@ -97,13 +104,13 @@ export function NotificationBell({ hotelId }: { hotelId: string }) {
                       {titleCase(notification.notification_type)}
                     </Badge>
                   </span>
-                  <span className="mt-1 line-clamp-2 text-xs text-slate-500">{notification.message}</span>
+                  <span className="mt-1 line-clamp-2 text-xs text-[var(--muted)]">{notification.message}</span>
                 </span>
-                <ExternalLink className="mt-0.5 size-3.5 text-slate-400" />
+                <ExternalLink className="mt-0.5 size-3.5 text-[var(--muted)]" />
               </DropdownMenuItem>
             ))
           ) : (
-            <p className="px-3 py-6 text-center text-sm text-slate-500">No notifications yet.</p>
+            <p className="px-3 py-6 text-center text-sm text-[var(--muted)]">No notifications yet.</p>
           )}
         </div>
       </DropdownMenuContent>

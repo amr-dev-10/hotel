@@ -2,12 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { ComponentType, ReactNode } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Activity,
-  ArrowLeft,
   CalendarClock,
   CheckCircle2,
   ClipboardCheck,
@@ -26,6 +24,7 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { showApiErrorToast } from "@/lib/api/error-toast";
 
+import { PageBreadcrumbs } from "@/components/layout/page-breadcrumbs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
@@ -198,16 +197,17 @@ export function StaffProfilePage({
   return (
     <div className="grid gap-5">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-        <div>
-          <Button asChild type="button" variant="ghost">
-            <Link href={`/${hotelId}/settings/staff`}>
-              <ArrowLeft />
-              Staff
-            </Link>
-          </Button>
-          <h2 className="mt-2 text-xl font-semibold">{user.name}</h2>
-          <p className="text-sm text-slate-500">{user.email}</p>
-        </div>
+        <PageBreadcrumbs
+          current={activeTab === "overview" ? user.name : titleCase(activeTab)}
+          description={user.email}
+          hotelId={hotelId}
+          items={[
+            { label: "Settings" },
+            { label: "Staff Management", href: `/${hotelId}/settings/staff` },
+            ...(activeTab === "overview" ? [] : [{ label: user.name, href: `/${hotelId}/settings/staff/${user.id}` }]),
+          ]}
+          srTitle={user.name}
+        />
         <div className="flex flex-wrap gap-2">
           <Badge variant={user.is_active ? "green" : "rose"}>{user.is_active ? "Active" : "Inactive"}</Badge>
           <Badge variant={user.is_on_duty ? "blue" : "default"}>{user.is_on_duty ? "On duty" : "Off duty"}</Badge>
@@ -228,7 +228,7 @@ export function StaffProfilePage({
 
       <section className="grid gap-4 rounded-md border border-slate-200 bg-white p-4 lg:grid-cols-[1.2fr_2fr]">
         <div className="flex items-center gap-4">
-          <div className="flex size-16 shrink-0 items-center justify-center rounded-md bg-[#0F3D91] text-xl font-semibold text-white">
+          <div className="flex size-16 shrink-0 items-center justify-center rounded-md bg-[var(--primary)] text-xl font-semibold text-white">
             {initials(user.name)}
           </div>
           <div className="min-w-0">
@@ -298,11 +298,11 @@ export function StaffProfilePage({
               </Select>
             </Field>
             <label className="flex items-center gap-2 rounded-md border border-slate-200 p-3 text-sm">
-              <input className="size-4 accent-[#0F3D91]" type="checkbox" {...form.register("is_on_duty")} />
+              <input className="size-4 accent-[var(--primary)]" type="checkbox" {...form.register("is_on_duty")} />
               On duty
             </label>
             <label className="flex items-center gap-2 rounded-md border border-slate-200 p-3 text-sm">
-              <input className="size-4 accent-[#0F3D91]" type="checkbox" {...form.register("is_active")} />
+              <input className="size-4 accent-[var(--primary)]" type="checkbox" {...form.register("is_active")} />
               Active
             </label>
           </div>
@@ -318,7 +318,7 @@ export function StaffProfilePage({
               aria-pressed={active}
               className={cn(
                 "inline-flex h-9 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100",
-                active && "bg-[#0F3D91] text-white hover:bg-[#0F3D91]",
+                active && "bg-[var(--primary)] text-white hover:bg-[var(--primary)]",
               )}
               key={tab.key}
               type="button"
@@ -394,7 +394,7 @@ function PerformancePanel({
             <div className="grid gap-2" key={item.label}>
               <div className="flex h-32 items-end rounded bg-slate-50 p-2">
                 <div
-                  className="w-full rounded bg-[#0F3D91]"
+                  className="w-full rounded bg-[var(--primary)]"
                   style={{ height: `${Math.max(8, item.value * 16)}px` }}
                 />
               </div>
@@ -527,7 +527,7 @@ function TicketsPanel({
             aria-pressed={statusFilter === item}
             className={cn(
               "h-9 shrink-0 rounded-md border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600",
-              statusFilter === item && "border-[#0F3D91] bg-[#0F3D91] text-white",
+              statusFilter === item && "border-[var(--primary)] bg-[var(--primary)] text-white",
             )}
             key={item}
             type="button"
@@ -748,7 +748,7 @@ function PermissionsPanel({
               </span>
               <input
                 checked={selectedRoles.includes(role.id)}
-                className="mt-1 size-4 accent-[#0F3D91]"
+                className="mt-1 size-4 accent-[var(--primary)]"
                 type="checkbox"
                 onChange={() => onToggleRole(role.id)}
               />

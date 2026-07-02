@@ -128,7 +128,7 @@ export function PermissionMatrix({
                     <label className="inline-flex items-center gap-2">
                       <input
                         checked={checked}
-                        className="size-4 accent-[#0F3D91]"
+                        className="size-4 accent-[var(--primary)]"
                         disabled={disabled}
                         type="checkbox"
                         onChange={() => toggle(permission.code)}

@@ -97,9 +97,9 @@ function PlatformHotelsContent() {
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_12rem_12rem]">
           <label className="relative block">
             <span className="sr-only">Search hotels</span>
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <Input
-              className="pl-9"
+              className="pr-9"
               placeholder="Search by name, slug, or tenant ID"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
@@ -152,7 +152,7 @@ function PlatformHotelsContent() {
                       <td className="px-4 py-3 align-middle">
                         <div className="min-w-0">
                           <Link
-                            className="font-semibold text-slate-950 hover:text-[#0F3D91]"
+                            className="font-semibold text-slate-950 hover:text-[var(--primary)]"
                             href={`/platform/hotels/${hotel.id}`}
                           >
                             {hotel.name}

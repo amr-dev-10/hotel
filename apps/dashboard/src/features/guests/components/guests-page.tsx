@@ -5,6 +5,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { Mail, MessageCircle, Phone, Search, UserRound } from "lucide-react";
 
+import { PageBreadcrumbs } from "@/components/layout/page-breadcrumbs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CursorPaginationControls } from "@/components/ui/cursor-pagination-controls";
@@ -71,10 +72,7 @@ export function GuestsPage({ hotelId: hotelIdProp }: { hotelId?: string }) {
   return (
     <div className="grid gap-5">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-        <div>
-          <h2 className="text-xl font-semibold">Guests</h2>
-          <p className="text-sm text-slate-500">Profiles, stays, and communication history.</p>
-        </div>
+        <PageBreadcrumbs current="Guests" description="Profiles, stays, and communication history." hotelId={hotelId} />
         <Can I="create" a="Guest">
           <CreateGuestDialog hotelId={hotelId} />
         </Can>
@@ -159,12 +157,12 @@ function GuestRow({
     <tr className="border-b border-slate-100 last:border-0">
       <td className="px-4 py-3 align-middle">
         <div className="flex items-center gap-3">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-[#0F3D91]/10 text-[#0F3D91]">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-[var(--primary-soft)] text-[var(--primary)]">
             <UserRound className="size-4" />
           </div>
           <div className="min-w-0">
             <Link
-              className="truncate font-semibold text-slate-950 hover:text-[#0F3D91]"
+              className="truncate font-semibold text-slate-950 hover:text-[var(--primary)]"
               href={`/${hotelId}/guests/${guest.id}`}
               prefetch={false}
             >

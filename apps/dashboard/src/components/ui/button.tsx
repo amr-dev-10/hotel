@@ -5,20 +5,27 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex h-9 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4",
+  "inline-flex h-9 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)] disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default: "bg-[#0F3D91] text-white hover:bg-[#0b2e6e]",
-        secondary: "border border-slate-200 bg-white text-slate-900 hover:bg-slate-50",
-        ghost: "text-slate-700 hover:bg-slate-100",
-        danger: "bg-rose-700 text-white hover:bg-rose-800",
+        default:
+          "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-[var(--shadow-control)] hover:bg-[var(--primary-hover)] active:bg-[var(--primary-active)]",
+        secondary:
+          "border border-[var(--border)] bg-[var(--panel)] text-[var(--foreground)] shadow-[var(--shadow-control)] hover:border-[var(--border-strong)] hover:bg-[var(--panel-muted)]",
+        outline:
+          "border border-[var(--primary)] bg-transparent text-[var(--primary)] hover:bg-[var(--primary-soft)]",
+        ghost:
+          "text-[var(--muted-strong)] hover:bg-[var(--panel-muted)] hover:text-[var(--foreground)]",
+        danger:
+          "bg-[var(--destructive)] text-white shadow-[var(--shadow-control)] hover:bg-red-700 active:bg-red-800",
       },
       size: {
         sm: "h-8 px-2.5 text-xs",
         default: "h-9 px-3",
         lg: "h-10 px-4",
         icon: "h-9 w-9 px-0",
+        iconSm: "h-8 w-8 px-0",
       },
     },
     defaultVariants: {

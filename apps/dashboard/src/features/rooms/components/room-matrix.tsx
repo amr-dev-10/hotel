@@ -58,7 +58,7 @@ export function RoomMatrix({ hotelId }: { hotelId: string }) {
         {floors.map(([floor, floorRooms]) => (
           <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm" key={floor}>
             <div className="mb-3 flex items-center gap-2">
-              <Layers className="size-4 text-[#0F3D91]" />
+              <Layers className="size-4 text-[var(--primary)]" />
               <h2 className="text-sm font-semibold">Floor {floor}</h2>
               <Badge>{floorRooms.length}</Badge>
             </div>
@@ -232,7 +232,7 @@ function roomStatusClass(status: string) {
     case "available":
       return "border-emerald-100 bg-emerald-50 text-emerald-900";
     case "occupied":
-      return "border-[#0F3D91]/20 bg-[#0F3D91]/10 text-[#0F3D91]";
+      return "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]";
     case "dirty":
       return "border-amber-100 bg-amber-50 text-amber-900";
     case "maintenance":
