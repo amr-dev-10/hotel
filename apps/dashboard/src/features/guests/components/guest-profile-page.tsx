@@ -91,44 +91,46 @@ export function GuestProfilePage({
   }
 
   return (
-    <div className="grid gap-5">
-      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+    <div className="grid min-w-0 gap-5">
+      <div className="flex min-w-0 flex-col justify-between gap-3 sm:flex-row sm:items-start">
         <PageBreadcrumbs
           current={guest.data.name}
           description={`Guest DB ID: ${guest.data.id}`}
           hotelId={hotelId}
           items={[{ label: "Guests", href: `/${hotelId}/guests` }]}
         />
-        <div className="flex items-center gap-2">
-          <Badge variant={guestStatusVariant(guest.data.status)}>{titleCase(guest.data.status)}</Badge>
+        <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+          <Badge className="shrink-0 whitespace-nowrap" variant={guestStatusVariant(guest.data.status)}>
+            {titleCase(guest.data.status)}
+          </Badge>
           <Can I="edit" a="Guest">
-            <Button size="sm" type="button" variant="secondary" onClick={() => setEditDialogOpen(true)}>
+            <Button className="shrink-0" size="sm" type="button" variant="secondary" onClick={() => setEditDialogOpen(true)}>
               <Pencil />
               Edit
             </Button>
           </Can>
           <Can I="delete" a="Guest">
-            <Button size="sm" type="button" variant="danger" onClick={() => setDeleteDialogOpen(true)}>
+            <Button className="shrink-0" size="sm" type="button" variant="danger" onClick={() => setDeleteDialogOpen(true)}>
               <Trash2 />
               Delete
             </Button>
           </Can>
-          <Button asChild size="sm" variant="secondary">
+          <Button asChild className="w-full min-w-0 sm:w-auto" size="sm" variant="secondary">
             <Link href={`/${hotelId}/whatsapp?guest=${guest.data.id}`}>
-              <MessageCircle className="mr-2 size-3" />
-              Open Communication
+              <MessageCircle />
+              <span className="truncate">Open Communication</span>
             </Link>
           </Button>
         </div>
       </div>
 
-      <section className="grid gap-4 rounded-md border border-slate-200 bg-white p-4 lg:grid-cols-[1.3fr_0.7fr]">
-        <div className="grid gap-3 sm:grid-cols-3">
+      <section className="grid min-w-0 gap-4 rounded-md border border-slate-200 bg-white p-4 lg:grid-cols-[1.3fr_0.7fr]">
+        <div className="grid min-w-0 gap-3 sm:grid-cols-3">
           <Detail icon={Phone} label="Phone" value={guest.data.phone ?? "No phone"} />
           <Detail icon={MessageCircle} label="WhatsApp" value={guest.data.whatsapp_phone ?? "No WhatsApp"} />
           <Detail icon={Mail} label="Email" value={guest.data.email ?? "No email"} />
         </div>
-        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+        <div className="grid min-w-0 gap-3 sm:grid-cols-3 lg:grid-cols-1">
           <Metric label="Reservations" value={String(guestReservations.length)} />
           <Metric label="Completed stays" value={String(totalStays)} />
           <Metric label="Current stay" value={activeReservation ? activeReservation.reservation_no : "None"} />
@@ -382,7 +384,7 @@ function GuestTimeline({ hotelId, guestId }: { hotelId: string, guestId: string 
   const timeline = useGuestTimeline(hotelId, guestId);
 
   return (
-    <section className="grid gap-3 rounded-md border border-slate-200 bg-white p-4">
+    <section className="grid min-w-0 gap-3 rounded-md border border-slate-200 bg-white p-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <CalendarDays className="size-4 text-[var(--primary)]" />
@@ -397,25 +399,25 @@ function GuestTimeline({ hotelId, guestId }: { hotelId: string, guestId: string 
       ) : !timeline.data?.length ? (
         <DataState empty emptyTitle="No reservations found." />
       ) : (
-        <div className="relative border-l border-slate-200 ml-3 mt-4 space-y-6 pb-4">
+        <div className="relative ml-3 mt-4 min-w-0 space-y-6 border-l border-slate-200 pb-4">
           {timeline.data.map((event) => (
-            <div key={event.id} className="relative pl-6">
+            <div key={event.id} className="relative min-w-0 pl-6">
               <div className="absolute -left-2.5 top-1 flex size-5 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm text-slate-500">
                 <CalendarDays className="size-3 text-blue-600" />
               </div>
               <div className="grid gap-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold">{event.title}</span>
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <span className="min-w-0 break-words text-sm font-semibold">{event.title}</span>
                   {event.status && <Badge variant="default" className="h-4 text-[10px] uppercase">{event.status}</Badge>}
-                  <span className="text-xs text-slate-400 ml-auto">
+                  <span className="ml-auto text-xs text-slate-400">
                     {format(new Date(event.timestamp), "MMM d, h:mm a")}
                   </span>
                 </div>
-                <p className="text-sm text-slate-600">{event.description}</p>
+                <p className="break-words text-sm text-slate-600">{event.description}</p>
                 {event.metadata && Object.keys(event.metadata).length > 0 && (
-                  <div className="mt-1 flex gap-2 text-xs text-slate-500">
+                  <div className="mt-1 flex min-w-0 flex-wrap gap-2 text-xs text-slate-500">
                     {Object.entries(event.metadata).map(([k, v]) => (
-                      <span key={k} className="bg-slate-100 px-1.5 py-0.5 rounded">{k}: {v as string}</span>
+                      <span key={k} className="rounded bg-slate-100 px-1.5 py-0.5 break-words">{k}: {v as string}</span>
                     ))}
                   </div>
                 )}
@@ -440,7 +442,7 @@ function Detail({
   value: string;
 }) {
   return (
-    <div className="rounded-md bg-slate-50 p-3">
+    <div className="min-w-0 rounded-md bg-slate-50 p-3">
       <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-normal text-slate-500">
         <Icon className="size-3.5" />
         {label}
@@ -452,7 +454,7 @@ function Detail({
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md bg-slate-50 p-3">
+    <div className="min-w-0 rounded-md bg-slate-50 p-3">
       <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">{label}</p>
       <p className="mt-1 truncate text-sm font-semibold">{value}</p>
     </div>

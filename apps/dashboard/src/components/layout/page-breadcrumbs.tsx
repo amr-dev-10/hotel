@@ -68,7 +68,7 @@ export function PageBreadcrumbs({
           );
         })}
       </nav>
-      {description ? <p className="max-w-full text-sm text-[var(--muted)]">{description}</p> : null}
+      {description ? <p className="max-w-full break-words text-sm text-[var(--muted)]">{description}</p> : null}
     </div>
   );
 }
