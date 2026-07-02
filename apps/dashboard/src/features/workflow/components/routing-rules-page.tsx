@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
-import { ArrowLeft, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { showApiErrorToast } from "@/lib/api/error-toast";
 
+import { PageBreadcrumbs } from "@/components/layout/page-breadcrumbs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
@@ -114,15 +114,14 @@ export function RoutingRulesPage({ hotelId }: { hotelId: string }) {
 
   return (
     <div className="grid gap-5">
-      <div>
-        <Button asChild type="button" variant="ghost">
-          <Link href={`/${hotelId}/settings/workflow`}>
-            <ArrowLeft />
-            Workflow
-          </Link>
-        </Button>
-        <h2 className="mt-2 text-xl font-semibold">Routing Rules</h2>
-      </div>
+      <PageBreadcrumbs
+        current="Routing Rules"
+        hotelId={hotelId}
+        items={[
+          { label: "Settings" },
+          { label: "Workflow", href: `/${hotelId}/settings/workflow` },
+        ]}
+      />
 
       <section className="grid gap-4 rounded-md border border-slate-200 bg-white p-4 md:grid-cols-3">
         <Field label="Ticket type" id="route-ticket-type">
@@ -156,7 +155,7 @@ export function RoutingRulesPage({ hotelId }: { hotelId: string }) {
               <label className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs text-slate-700" key={channel.value}>
                 <input
                   checked={notificationChannels.includes(channel.value)}
-                  className="size-3 accent-[#0F3D91]"
+                  className="size-3 accent-[var(--primary)]"
                   disabled={!notifyImmediately}
                   type="checkbox"
                   onChange={() => toggleChannel(channel.value)}

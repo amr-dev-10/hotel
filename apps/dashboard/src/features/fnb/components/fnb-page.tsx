@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { PageBreadcrumbs } from "@/components/layout/page-breadcrumbs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
@@ -191,16 +192,17 @@ export function FnBPage({ hotelId }: { hotelId: string }) {
   return (
     <div className="grid gap-4">
       <div className="flex flex-col justify-between gap-3 xl:flex-row xl:items-center">
-        <div>
-          <h2 className="text-xl font-semibold">Food & Beverage</h2>
-          <p className="text-sm text-slate-500">Manage menu, categories, taxes, and kitchen-ready orders.</p>
-        </div>
+        <PageBreadcrumbs
+          current="Food & Beverage"
+          description="Manage menu, categories, taxes, and kitchen-ready orders."
+          hotelId={hotelId}
+        />
         <div className="flex flex-wrap gap-2">
           {sections.map((item) => {
             const Icon = item.icon;
             return (
               <Button
-                className={cn(section === item.key && "border-[#0F3D91]/30 bg-[#0F3D91]/5 text-[#0F3D91]")}
+                className={cn(section === item.key && "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]")}
                 key={item.key}
                 type="button"
                 variant="secondary"
@@ -417,8 +419,8 @@ function MenuWorkspace({
       <section className="grid gap-3 rounded-md border border-slate-200 bg-white p-3 xl:grid-cols-[1.5fr_180px_150px_120px_140px_160px]">
         <label className="relative">
           <span className="sr-only">Search menu</span>
-          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-          <Input className="pl-9" placeholder="Search menu items" value={search} onChange={(event) => setSearch(event.target.value)} />
+          <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+          <Input className="pr-9" placeholder="Search menu items" value={search} onChange={(event) => setSearch(event.target.value)} />
         </label>
         <Select value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
           <option value="">All categories</option>
@@ -467,8 +469,8 @@ function MenuWorkspace({
           </div>
           <label className="relative">
             <span className="sr-only">Search categories</span>
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-            <Input className="pl-9" placeholder="Search" value={categorySearch} onChange={(event) => setCategorySearch(event.target.value)} />
+            <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            <Input className="pr-9" placeholder="Search" value={categorySearch} onChange={(event) => setCategorySearch(event.target.value)} />
           </label>
           <CategoryTreeButton active={!categoryId} count={items.length} label="All Items" onClick={() => setCategoryId("")} />
           {visibleCategories.map((category) => (
@@ -552,7 +554,7 @@ function CategoryTreeButton({
     <button
       className={cn(
         "flex min-h-9 flex-1 items-center justify-between gap-2 rounded-md px-3 text-left text-sm font-medium text-slate-600 hover:bg-slate-100",
-        active && "bg-[#0F3D91] text-white hover:bg-[#0F3D91]",
+        active && "bg-[var(--primary)] text-white hover:bg-[var(--primary)]",
       )}
       type="button"
       onClick={onClick}
@@ -585,7 +587,7 @@ function MenuItemCard({
   const itemTaxes = taxes.filter((tax) => item.tax_config_ids.includes(tax.id));
   return (
     <article
-      className="grid cursor-pointer overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm transition-colors hover:border-[#0F3D91]/40"
+      className="grid cursor-pointer overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm transition-colors hover:border-[var(--primary)]"
       onClick={openItem}
     >
       <div className="flex aspect-[16/9] items-center justify-center bg-slate-100">

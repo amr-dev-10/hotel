@@ -57,7 +57,7 @@ export function LoginForm() {
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-7 rounded-md border border-slate-200 bg-white p-8 shadow-sm">
       <div className="flex items-start gap-3">
-        <div className="flex size-11 items-center justify-center rounded-md bg-[#0F3D91] text-white">
+        <div className="flex size-11 items-center justify-center rounded-md bg-[var(--primary)] text-white">
           <Building2 className="size-5" />
         </div>
         <div>

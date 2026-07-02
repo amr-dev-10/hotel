@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { format, formatDistanceToNow } from "date-fns";
 import {
-  ArrowLeft,
   Ban,
   BedDouble,
   CalendarDays,
@@ -22,6 +21,7 @@ import {
 import { toast } from "sonner";
 import { showApiErrorToast } from "@/lib/api/error-toast";
 
+import { PageBreadcrumbs } from "@/components/layout/page-breadcrumbs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
@@ -141,16 +141,12 @@ export function ReservationDetailPage({
   return (
     <div className="grid gap-5">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-        <div>
-          <Button asChild type="button" variant="ghost">
-            <Link href={`/${hotelId}/reservations`}>
-              <ArrowLeft />
-              Reservations
-            </Link>
-          </Button>
-          <h2 className="mt-2 text-xl font-semibold">{reservation.data.reservation_no}</h2>
-          <p className="text-sm text-slate-500">{titleCase(reservation.data.source)}</p>
-        </div>
+        <PageBreadcrumbs
+          current={reservation.data.reservation_no}
+          description={titleCase(reservation.data.source)}
+          hotelId={hotelId}
+          items={[{ label: "Reservations", href: `/${hotelId}/reservations` }]}
+        />
         <div className="flex flex-wrap gap-2">
           <Badge variant={statusVariant(reservation.data.status)}>{titleCase(reservation.data.status)}</Badge>
           <Can I="edit" a="Reservation">
@@ -217,7 +213,7 @@ export function ReservationDetailPage({
         <section className="grid gap-3 rounded-md border border-slate-200 bg-white p-4">
           <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
             <div className="flex items-center gap-2">
-              <UserRound className="size-4 text-[#0F3D91]" />
+              <UserRound className="size-4 text-[var(--primary)]" />
               <h3 className="text-base font-semibold">Guest Summary</h3>
             </div>
             {guest ? (
@@ -492,7 +488,7 @@ function PaymentSummary({
   return (
     <section className="grid gap-3 rounded-md border border-slate-200 bg-white p-4">
       <div className="flex items-center gap-2">
-        <CreditCard className="size-4 text-[#0F3D91]" />
+        <CreditCard className="size-4 text-[var(--primary)]" />
         <h3 className="text-base font-semibold">Payment Summary</h3>
       </div>
       {isLoading ? (
@@ -539,7 +535,7 @@ function StayHistory({
   return (
     <section className="grid gap-3 rounded-md border border-slate-200 bg-white p-4">
       <div className="flex items-center gap-2">
-        <History className="size-4 text-[#0F3D91]" />
+        <History className="size-4 text-[var(--primary)]" />
         <h3 className="text-base font-semibold">Past Check-ins</h3>
       </div>
       {isLoading ? (
@@ -585,7 +581,7 @@ function ReservationCommunication({
     <section className="grid gap-3 rounded-md border border-slate-200 bg-white p-4">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div className="flex items-center gap-2">
-          <MessageCircle className="size-4 text-[#0F3D91]" />
+          <MessageCircle className="size-4 text-[var(--primary)]" />
           <h3 className="text-base font-semibold">Communication Timeline</h3>
         </div>
       </div>
@@ -609,7 +605,7 @@ function ReservationCommunication({
               </p>
             </div>
             <div className="flex items-end justify-end">
-              <Button asChild size="sm" className="h-8 text-xs w-full bg-[#0F3D91] hover:bg-[#0F3D91]/90">
+              <Button asChild size="sm" className="h-8 text-xs w-full bg-[var(--primary)] hover:bg-[var(--primary-hover)]">
                 <Link href={`/${hotelId}/whatsapp?reservation=${reservationId}`}>
                   <MessageCircle className="mr-2 size-3" />
                   Open Thread

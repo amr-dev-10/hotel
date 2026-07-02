@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { ArrowLeft, Loader2, Save } from "lucide-react";
+import { Loader2, Save } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { showApiErrorToast } from "@/lib/api/error-toast";
 
+import { PageBreadcrumbs } from "@/components/layout/page-breadcrumbs";
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
 import { Input } from "@/components/ui/input";
@@ -98,15 +98,14 @@ export function RoleEditorPage({
   return (
     <form className="grid gap-5" onSubmit={handleSubmit}>
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-        <div>
-          <Button asChild type="button" variant="ghost">
-            <Link href={`/${hotelId}/settings/roles`}>
-              <ArrowLeft />
-              Roles
-            </Link>
-          </Button>
-          <h2 className="mt-2 text-xl font-semibold">{roleId ? "Edit Role" : "New Role"}</h2>
-        </div>
+        <PageBreadcrumbs
+          current={roleId ? "Edit Role" : "New Role"}
+          hotelId={hotelId}
+          items={[
+            { label: "Settings" },
+            { label: "Roles & Access", href: `/${hotelId}/settings/roles` },
+          ]}
+        />
         <Button disabled={isSaving || name.trim().length < 2} type="submit">
           {isSaving ? <Loader2 className="animate-spin" /> : <Save />}
           Save role

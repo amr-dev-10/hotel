@@ -40,7 +40,7 @@ export function HousekeepingPlanner({ hotelId }: { hotelId: string }) {
         id: task.id,
         title: `${roomMap.get(task.room_id) ?? "Room"} ${titleCase(task.task_type)}`,
         date: task.scheduled_date,
-        backgroundColor: task.status === "completed" ? "#047857" : task.priority >= 4 ? "#BE123C" : "#0F3D91",
+        backgroundColor: task.status === "completed" ? "#047857" : task.priority >= 4 ? "#BE123C" : "var(--primary)",
         borderColor: "transparent",
       })),
     [housekeeping.data, roomMap],

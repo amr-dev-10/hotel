@@ -14,6 +14,7 @@ import {
 } from "recharts";
 import { BedDouble, CalendarCheck, IndianRupee, ListChecks, MessageSquareText } from "lucide-react";
 
+import { PageBreadcrumbs } from "@/components/layout/page-breadcrumbs";
 import { Badge } from "@/components/ui/badge";
 import { DataState } from "@/components/ui/data-state";
 import { money, percent } from "@/lib/utils";
@@ -60,6 +61,12 @@ export function OverviewDashboard({ hotelId }: { hotelId: string }) {
 
   return (
     <div className="grid gap-6">
+      <PageBreadcrumbs
+        current="Overview"
+        description="Hotel performance, reservations, tickets, and operational signals."
+        hotelId={hotelId}
+      />
+
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <MetricTile
           accent="blue"
@@ -99,11 +106,11 @@ export function OverviewDashboard({ hotelId }: { hotelId: string }) {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.4fr_0.8fr]">
-        <div className="rounded-md border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-md border border-[var(--border)] bg-[var(--panel)] p-5 shadow-[var(--shadow-control)]">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <h2 className="text-base font-semibold">Occupancy and Revenue</h2>
-              <p className="text-sm text-slate-500">Last 7 generated analytics snapshots</p>
+              <p className="text-sm text-[var(--muted)]">Last 7 generated analytics snapshots</p>
             </div>
             <Badge variant="blue">Analytics</Badge>
           </div>
@@ -111,24 +118,24 @@ export function OverviewDashboard({ hotelId }: { hotelId: string }) {
             <div className="h-80">
               <ResponsiveContainer height="100%" width="100%">
                 <AreaChart data={chartData}>
-                  <CartesianGrid stroke="#E2E8F0" strokeDasharray="3 3" />
+                  <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
                   <XAxis dataKey="date" tickLine={false} />
                   <YAxis tickLine={false} />
                   <Tooltip />
                   <Area
                     dataKey="occupancy"
-                    fill="#0F3D91"
+                    fill="var(--primary)"
                     fillOpacity={0.16}
                     name="Occupancy %"
-                    stroke="#0F3D91"
+                    stroke="var(--primary)"
                     strokeWidth={2}
                   />
                   <Area
                     dataKey="revenue"
-                    fill="#0E7490"
+                    fill="var(--info)"
                     fillOpacity={0.1}
                     name="Revenue"
-                    stroke="#0E7490"
+                    stroke="var(--info)"
                     strokeWidth={2}
                   />
                 </AreaChart>
@@ -139,24 +146,24 @@ export function OverviewDashboard({ hotelId }: { hotelId: string }) {
           )}
         </div>
 
-        <div className="rounded-md border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-md border border-[var(--border)] bg-[var(--panel)] p-5 shadow-[var(--shadow-control)]">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <h2 className="text-base font-semibold">Workload Mix</h2>
-              <p className="text-sm text-slate-500">Tickets and WhatsApp volume</p>
+              <p className="text-sm text-[var(--muted)]">Tickets and WhatsApp volume</p>
             </div>
-            <MessageSquareText className="size-5 text-cyan-700" />
+            <MessageSquareText className="size-5 text-[var(--info)]" />
           </div>
           {chartData.length ? (
             <div className="h-80">
               <ResponsiveContainer height="100%" width="100%">
                 <BarChart data={chartData}>
-                  <CartesianGrid stroke="#E2E8F0" strokeDasharray="3 3" />
+                  <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
                   <XAxis dataKey="date" tickLine={false} />
                   <YAxis tickLine={false} />
                   <Tooltip />
-                  <Bar dataKey="tickets" fill="#B7791F" name="Tickets" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="messages" fill="#0E7490" name="Messages" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="tickets" fill="var(--warning)" name="Tickets" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="messages" fill="var(--info)" name="Messages" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -183,25 +190,25 @@ function MetricTile({
   helper: string;
 }) {
   const accents = {
-    blue: "bg-[#0F3D91]/10 text-[#0F3D91]",
-    teal: "bg-cyan-50 text-cyan-800",
-    amber: "bg-amber-50 text-amber-800",
-    rose: "bg-rose-50 text-rose-800",
-    green: "bg-emerald-50 text-emerald-800",
+    blue: "bg-[var(--primary-soft)] text-[var(--primary)]",
+    teal: "bg-[var(--info-soft)] text-[var(--info)]",
+    amber: "bg-[var(--warning-soft)] text-[var(--warning)]",
+    rose: "bg-[var(--destructive-soft)] text-[var(--destructive)]",
+    green: "bg-[var(--success-soft)] text-[var(--success)]",
   };
 
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="rounded-md border border-[var(--border)] bg-[var(--panel)] p-4 shadow-[var(--shadow-control)] transition-colors hover:border-[var(--border-strong)]">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">{label}</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-950">{value}</p>
+          <p className="text-xs font-semibold uppercase tracking-normal text-[var(--muted)]">{label}</p>
+          <p className="mt-2 text-2xl font-semibold text-[var(--foreground)]">{value}</p>
         </div>
         <div className={`flex size-9 items-center justify-center rounded-md ${accents[accent]} [&_svg]:size-4`}>
           {icon}
         </div>
       </div>
-      <p className="mt-3 text-sm text-slate-500">{helper}</p>
+      <p className="mt-3 text-sm text-[var(--muted)]">{helper}</p>
     </div>
   );
 }

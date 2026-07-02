@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Background, Controls, ReactFlow, type Edge, type Node } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
+import { PageBreadcrumbs } from "@/components/layout/page-breadcrumbs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
@@ -27,10 +28,12 @@ export function WorkflowOverviewPage({ hotelId }: { hotelId: string }) {
   return (
     <div className="grid gap-5">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-        <div>
-          <h2 className="text-xl font-semibold">Workflow Settings</h2>
-          <p className="text-sm text-slate-500">Ticket workflows, escalation timers, SLAs, and routing rules.</p>
-        </div>
+        <PageBreadcrumbs
+          current="Workflow Settings"
+          description="Ticket workflows, escalation timers, SLAs, and routing rules."
+          hotelId={hotelId}
+          items={[{ label: "Settings" }]}
+        />
         <div className="flex flex-wrap gap-2">
           <Button asChild type="button" variant="secondary">
             <Link href={`/${hotelId}/settings/workflow/escalation-rules`}>Escalations</Link>
@@ -91,7 +94,7 @@ function buildEscalationGraph(rules: { id: string; escalation_level: number; tri
     data: {
       label: `Level ${rule.escalation_level}: ${rule.target_staff_level ?? "next staff"} ${rule.trigger_after_minutes}m after due`,
     },
-    style: { borderColor: "#0F3D91", borderRadius: 6, fontSize: 12 },
+    style: { borderColor: "var(--primary)", borderRadius: 6, fontSize: 12 },
   }));
   const edges: Edge[] = sorted.slice(1).map((rule, index) => ({
     id: `${sorted[index].id}-${rule.id}`,

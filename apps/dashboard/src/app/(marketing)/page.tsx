@@ -140,7 +140,7 @@ export default function MarketingPage() {
       <section className="bg-slate-50 px-4 py-14 sm:px-6 lg:px-8" id="features">
         <div className="mx-auto max-w-7xl">
           <div className="max-w-3xl">
-            <p className="text-sm font-semibold uppercase tracking-normal text-[#0F3D91]">Core modules</p>
+            <p className="text-sm font-semibold uppercase tracking-normal text-[var(--primary)]">Core modules</p>
             <h2 className="mt-3 text-3xl font-semibold tracking-normal text-slate-950 sm:text-4xl">
               The operations stack already inside your product.
             </h2>
@@ -161,7 +161,7 @@ export default function MarketingPage() {
       <section className="bg-white px-4 py-14 sm:px-6 lg:px-8" id="workflow">
         <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[0.78fr_1.22fr] lg:items-center">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-normal text-[#0F3D91]">Daily control</p>
+            <p className="text-sm font-semibold uppercase tracking-normal text-[var(--primary)]">Daily control</p>
             <h2 className="mt-3 text-3xl font-semibold tracking-normal text-slate-950 sm:text-4xl">
               One view for front desk, service, kitchen, and management.
             </h2>
@@ -232,7 +232,7 @@ export default function MarketingPage() {
                 <Button
                   asChild
                   className={`mt-7 w-full ${
-                    tier.featured ? "bg-[#0F3D91] text-white hover:bg-[#0b2e6e]" : "bg-white text-slate-950 hover:bg-slate-100"
+                    tier.featured ? "bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)]" : "bg-white text-slate-950 hover:bg-slate-100"
                   }`}
                   variant="secondary"
                 >

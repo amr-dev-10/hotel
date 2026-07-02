@@ -5,6 +5,7 @@ import { Loader2, Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { showApiErrorToast } from "@/lib/api/error-toast";
 
+import { PageBreadcrumbs } from "@/components/layout/page-breadcrumbs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
@@ -34,10 +35,12 @@ export function RolesPage({ hotelId }: { hotelId: string }) {
   return (
     <div className="grid gap-5">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-        <div>
-          <h2 className="text-xl font-semibold">Roles & Access</h2>
-          <p className="text-sm text-slate-500">Manage dashboard roles and permission bundles.</p>
-        </div>
+        <PageBreadcrumbs
+          current="Roles & Access"
+          description="Manage dashboard roles and permission bundles."
+          hotelId={hotelId}
+          items={[{ label: "Settings" }]}
+        />
         <Button asChild type="button">
           <Link href={`/${hotelId}/settings/roles/new`}>
             <Plus />
@@ -60,7 +63,7 @@ export function RolesPage({ hotelId }: { hotelId: string }) {
               className="grid grid-cols-[1fr_140px_120px] items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0"
               key={role.id}
             >
-              <Link className="min-w-0 hover:text-[#0F3D91]" href={`/${hotelId}/settings/roles/${role.id}`}>
+              <Link className="min-w-0 hover:text-[var(--primary)]" href={`/${hotelId}/settings/roles/${role.id}`}>
                 <p className="truncate text-sm font-semibold">{role.name}</p>
                 <p className="truncate text-xs text-slate-500">{role.description ?? "No description"}</p>
               </Link>

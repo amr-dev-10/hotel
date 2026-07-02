@@ -31,8 +31,8 @@ export function CursorPaginationControls({
   const canGoNext = hasTotal ? page < pageCount : page < loadedPages || Boolean(hasNextPage);
 
   return (
-    <div className="flex flex-col gap-3 rounded-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
-      <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">
+    <div className="flex flex-col gap-3 rounded-md border border-[var(--border)] bg-[var(--panel)] px-4 py-3 text-sm text-[var(--muted-strong)] shadow-[var(--shadow-control)] sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-xs font-semibold uppercase tracking-normal text-[var(--muted)]">
         Total {hasTotal ? totalItems : loadedPages * pageSize}
       </p>
       <div className="flex items-center gap-2">
@@ -40,7 +40,7 @@ export function CursorPaginationControls({
           <ChevronLeft />
           Previous
         </Button>
-        <span className="min-w-28 rounded-md border border-[#0F3D91] bg-white px-3 py-2 text-center text-xs font-bold uppercase tracking-normal text-[#0F3D91]">
+        <span className="min-w-28 rounded-md border border-[var(--primary)] bg-[var(--primary-soft)] px-3 py-2 text-center text-xs font-bold uppercase tracking-normal text-[var(--primary)]">
           Page {page} / {pageCount}
         </span>
         <Button

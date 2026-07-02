@@ -1,11 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { format, formatDistanceToNowStrict } from "date-fns";
 import {
-  ArrowLeft,
   CheckCircle2,
   Clock,
   FileText,
@@ -27,6 +25,7 @@ import {
 import { toast } from "sonner";
 import { showApiErrorToast } from "@/lib/api/error-toast";
 
+import { PageBreadcrumbs } from "@/components/layout/page-breadcrumbs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
@@ -192,18 +191,16 @@ export function TicketFullPage({
     <div className="grid gap-5">
       <header className="flex flex-col justify-between gap-3 border-b border-slate-200 pb-4 xl:flex-row xl:items-center">
         <div className="min-w-0">
-          <Button asChild type="button" variant="ghost">
-            <Link href={`/${hotelId}/tickets`}>
-              <ArrowLeft />
-              Tickets
-            </Link>
-          </Button>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <h2 className="text-xl font-semibold">{ticket.ticket_code}</h2>
+          <PageBreadcrumbs
+            current={ticket.ticket_code}
+            description={ticket.item_description}
+            hotelId={hotelId}
+            items={[{ label: "Tickets", href: `/${hotelId}/tickets` }]}
+          />
+          <div className="mt-2 flex flex-wrap items-center gap-2">
             <Badge variant={ticket.priority >= 4 ? "rose" : "blue"}>P{ticket.priority}</Badge>
             <Badge variant={ticket.stage === "approved" ? "green" : "amber"}>{titleCase(ticket.stage)}</Badge>
           </div>
-          <p className="mt-1 max-w-4xl text-sm text-slate-500">{ticket.item_description}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Can I="accept" a="Ticket">
@@ -291,7 +288,7 @@ export function TicketFullPage({
 
           <section className="grid gap-3 rounded-md border border-slate-200 bg-white p-4">
             <div className="flex items-center gap-2">
-              <Paperclip className="size-4 text-[#0F3D91]" />
+              <Paperclip className="size-4 text-[var(--primary)]" />
               <h3 className="text-base font-semibold">Attachments</h3>
             </div>
             <p className="text-sm text-slate-500">No attachments have been added to this ticket.</p>
@@ -731,7 +728,7 @@ function TabButton({
 }) {
   return (
     <Button
-      className={cn(active && "border-[#0F3D91]/30 bg-[#0F3D91]/5 text-[#0F3D91]")}
+      className={cn(active && "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]")}
       size="sm"
       type="button"
       variant="secondary"
@@ -888,7 +885,7 @@ function WhatsAppBubble({ message }: { message: WhatsAppMessage }) {
       <div
         className={cn(
           "max-w-[82%] rounded-md border p-3 text-sm",
-          outbound ? "border-[#0F3D91]/15 bg-[#0F3D91]/5" : "border-slate-200 bg-slate-50",
+          outbound ? "border-[var(--primary)] bg-[var(--primary-soft)]" : "border-slate-200 bg-slate-50",
         )}
       >
         <div className="mb-1 flex items-center justify-between gap-3 text-xs text-slate-500">
@@ -913,7 +910,7 @@ function SectionTitle({
   return (
     <div className="flex items-center justify-between gap-3">
       <div className="flex items-center gap-2">
-        <span className="[&_svg]:size-4 [&_svg]:text-[#0F3D91]">{icon}</span>
+        <span className="[&_svg]:size-4 [&_svg]:text-[var(--primary)]">{icon}</span>
         <h3 className="text-base font-semibold">{title}</h3>
       </div>
       <Badge>{count}</Badge>
@@ -942,7 +939,7 @@ function SidePanel({
   return (
     <section className="grid gap-3 rounded-md border border-slate-200 bg-white p-4">
       <div className="flex items-center gap-2">
-        <span className="[&_svg]:size-4 [&_svg]:text-[#0F3D91]">{icon}</span>
+        <span className="[&_svg]:size-4 [&_svg]:text-[var(--primary)]">{icon}</span>
         <h3 className="text-base font-semibold">{title}</h3>
       </div>
       {children}

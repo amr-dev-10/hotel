@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import Link from "next/link";
 import { format } from "date-fns";
-import { ArrowLeft, Loader2, Send } from "lucide-react";
+import { Loader2, Send } from "lucide-react";
 
+import { PageBreadcrumbs } from "@/components/layout/page-breadcrumbs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
@@ -53,16 +53,13 @@ export function WhatsAppConversationPage({
 
   return (
     <div className="grid gap-5">
-      <div>
-        <Button asChild type="button" variant="ghost">
-          <Link href={`/${hotelId}/whatsapp`}>
-            <ArrowLeft />
-            Inbox
-          </Link>
-        </Button>
-        <h2 className="mt-2 text-xl font-semibold">Conversation</h2>
-        <p className="text-sm text-slate-500">{conversationId}</p>
-      </div>
+      <PageBreadcrumbs
+        current={conversationId}
+        description="Conversation"
+        hotelId={hotelId}
+        items={[{ label: "WhatsApp", href: `/${hotelId}/whatsapp` }]}
+        srTitle="WhatsApp Conversation"
+      />
 
       {!messages.data?.length ? (
         <DataState empty emptyTitle="No messages in this conversation yet." />
@@ -82,7 +79,7 @@ export function WhatsAppConversationPage({
                   className={cn(
                     "max-w-[720px] rounded-md border px-4 py-3 text-sm",
                     outbound
-                      ? "border-[#0F3D91] bg-[#0F3D91] text-white"
+                      ? "border-[var(--primary)] bg-[var(--primary)] text-white"
                       : "border-slate-200 bg-slate-50 text-slate-900",
                   )}
                 >

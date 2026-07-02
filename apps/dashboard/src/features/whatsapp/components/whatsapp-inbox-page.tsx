@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { PageBreadcrumbs } from "@/components/layout/page-breadcrumbs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,9 +31,9 @@ import { apiErrorMessage } from "@/lib/api/client";
 import { showApiErrorToast } from "@/lib/api/error-toast";
 import { cn, titleCase } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth.store";
-import { 
-  useWhatsappConversations, 
-  useWhatsappMessages, 
+import {
+  useWhatsappConversations,
+  useWhatsappMessages,
   useSendWhatsappMessage,
   useUpdateWhatsappConversation,
   useDeleteWhatsappConversation,
@@ -361,8 +362,11 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
         </DialogContent>
       </Dialog>
 
+      <div className="grid gap-5">
+      <PageBreadcrumbs current="WhatsApp" description="Guest messaging inbox and conversation context." hotelId={hotelId} />
+
       <div className="flex min-h-[85vh] min-w-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm lg:h-[85vh] lg:flex-row">
-      
+
       {/* LEFT PANE: CONVERSATION LIST */}
       <div className="flex w-full flex-col border-b border-slate-200 bg-slate-50/50 lg:min-w-[300px] lg:basis-[clamp(300px,20vw,420px)] lg:shrink-0 lg:border-b-0 lg:border-r">
         <div className="border-b border-slate-200 p-4">
@@ -382,10 +386,10 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
               Conversations are unavailable. Settings is still available.
             </div>
           ) : null}
-          
+
           <form className="relative mb-3" onSubmit={handleConversationSearch}>
-            <Input 
-              placeholder="Search guests, phones..." 
+            <Input
+              placeholder="Search guests, phones..."
               className="h-9 pr-10"
               value={searchDraft}
               onChange={(e) => setSearchDraft(e.target.value)}
@@ -464,7 +468,7 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
                   <div className="flex items-center justify-between">
                     <p className="truncate text-xs text-slate-500">{conversation.guest_id ? conversation.phone : "Unlinked"}</p>
                     {unread > 0 ? (
-                      <span className="flex size-5 items-center justify-center rounded-full bg-[#0F3D91] text-[10px] font-bold text-white">
+                      <span className="flex size-5 items-center justify-center rounded-full bg-[var(--primary)] text-[10px] font-bold text-white">
                         {unread}
                       </span>
                     ) : (
@@ -566,16 +570,16 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
                 </DropdownMenu>
 
                 {selectedConversation.status === "open" ? (
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     className="h-8 text-xs bg-green-600 hover:bg-green-700"
                     onClick={() => updateConversation.mutate({ status: "resolved" })}
                   >
                     Resolve
                   </Button>
                 ) : (
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     variant="secondary"
                     className="h-8 text-xs"
                     onClick={() => updateConversation.mutate({ status: "open" })}
@@ -622,7 +626,7 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
                 <button type="button" className="p-2 text-slate-400 hover:text-slate-600"><Paperclip className="size-5" /></button>
                 <button type="button" className="p-2 text-slate-400 hover:text-slate-600"><ImageIcon className="size-5" /></button>
                 <button type="button" className="p-2 text-slate-400 hover:text-slate-600"><FileText className="size-5" /></button>
-                
+
                 <input
                   value={text}
                   onChange={(e) => setText(e.target.value)}
@@ -630,9 +634,9 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
                   className="flex-1 bg-transparent px-2 text-sm outline-none"
                   disabled={sendMessage.isPending}
                 />
-                
+
                 {text.trim() ? (
-                  <button type="submit" disabled={sendMessage.isPending} className="p-2 text-[#0F3D91] hover:text-[#0a2a66]">
+                  <button type="submit" disabled={sendMessage.isPending} className="p-2 text-[var(--primary)] hover:text-[var(--primary-active)]">
                     {sendMessage.isPending ? <Loader2 className="animate-spin size-5" /> : <Send className="size-5" />}
                   </button>
                 ) : (
@@ -652,10 +656,10 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
           </div>
         ) : (
           <div className="flex-1 space-y-5 overflow-y-auto overflow-x-hidden p-3 sm:p-4">
-            
+
             {/* 1. GUEST CARD */}
             <div className="rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-              <div className="bg-[#0F3D91] p-4 text-white">
+              <div className="bg-[var(--primary)] p-4 text-white">
                 <div className="flex items-center gap-3">
                   <div className="flex size-12 items-center justify-center rounded-full bg-white/20 text-xl font-semibold">
                     {guestQuery.data?.name?.[0]?.toUpperCase() || <User className="size-6" />}
@@ -838,7 +842,7 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
                 </h4>
                 <div className="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-50 p-3">
                   <div className="mb-2 flex min-w-0 items-center justify-between gap-2">
-                    <Link className="min-w-0 truncate text-sm font-semibold text-[#0F3D91]" href={`/${hotelId}/tickets/${focusTicket.id}`}>
+                    <Link className="min-w-0 truncate text-sm font-semibold text-[var(--primary)]" href={`/${hotelId}/tickets/${focusTicket.id}`}>
                       {focusTicket.ticket_code}
                     </Link>
                     <StatusDot status={focusTicket.stage} />
@@ -865,9 +869,10 @@ export function WhatsAppInboxPage({ hotelId }: { hotelId: string }) {
                 </div>
               </div>
             )}
-            
+
           </div>
         )}
+      </div>
       </div>
       </div>
     </>
@@ -1017,7 +1022,7 @@ function statusTone(status: string) {
   }
 
   if (["created", "open", "new", "accepted", "in_progress", "reopened", "scheduled"].some((value) => normalized.includes(value))) {
-    return { borderClassName: "border-l-[#0F3D91]", dotClassName: "bg-[#0F3D91]" };
+    return { borderClassName: "border-l-[var(--primary)]", dotClassName: "bg-[var(--primary)]" };
   }
 
   return { borderClassName: "border-l-slate-300", dotClassName: "bg-slate-400" };

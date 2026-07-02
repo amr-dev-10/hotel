@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Building2, CalendarClock, ClipboardCheck, Network, Shield, TicketCheck, UserPlus } from "lucide-react";
 
+import { PageBreadcrumbs } from "@/components/layout/page-breadcrumbs";
 import { Button } from "@/components/ui/button";
 import { CreateStaffDialog } from "@/features/staff/components/create-staff-dialog";
 import { StaffDirectory } from "@/features/staff/components/staff-directory";
@@ -21,10 +22,12 @@ export function StaffPage({ hotelId }: { hotelId: string }) {
   return (
     <div className="grid gap-5">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-        <div>
-          <h2 className="text-xl font-semibold">Staff Management</h2>
-          <p className="text-sm text-slate-500">Directory, workforce structure, roster signals, and access control.</p>
-        </div>
+        <PageBreadcrumbs
+          current="Staff Management"
+          description="Directory, workforce structure, roster signals, and access control."
+          hotelId={hotelId}
+          items={[{ label: "Settings" }]}
+        />
         <div className="flex gap-2">
           <Can I="create" a="Staff">
             <Button asChild type="button" variant="secondary">
@@ -42,7 +45,7 @@ export function StaffPage({ hotelId }: { hotelId: string }) {
           const Icon = module.icon;
           return (
             <Link
-              className="flex h-16 items-center gap-3 rounded-md border border-slate-200 bg-white px-4 text-sm font-semibold shadow-sm transition-colors hover:border-[#0F3D91]/40 hover:text-[#0F3D91]"
+              className="flex h-16 items-center gap-3 rounded-md border border-slate-200 bg-white px-4 text-sm font-semibold shadow-sm transition-colors hover:border-[var(--primary)] hover:text-[var(--primary)]"
               href={module.href}
               key={module.href}
             >

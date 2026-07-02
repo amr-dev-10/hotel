@@ -65,7 +65,7 @@ export function GuestShell({ children }: { children: React.ReactNode }) {
                   <Link
                     className={cn(
                       "relative grid min-h-14 place-items-center gap-0.5 px-1 py-2 text-xs font-medium text-slate-500",
-                      active && "text-[#0F3D91]",
+                      active && "text-[var(--primary)]",
                     )}
                     href={item.href}
                     key={item.href}

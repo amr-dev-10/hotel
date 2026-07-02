@@ -4,6 +4,7 @@ import { useEffect, useMemo } from "react";
 import { BellRing, Clock, CookingPot, PackageCheck, ReceiptText } from "lucide-react";
 import { toast } from "sonner";
 
+import { PageBreadcrumbs } from "@/components/layout/page-breadcrumbs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
@@ -47,10 +48,11 @@ export function KitchenPage({ hotelId }: { hotelId: string }) {
   return (
     <div className="grid gap-5">
       <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-center">
-        <div>
-          <h2 className="text-xl font-semibold">Kitchen Operations</h2>
-          <p className="text-sm text-slate-500">Move orders from incoming to delivered as the kitchen works.</p>
-        </div>
+        <PageBreadcrumbs
+          current="Kitchen Operations"
+          description="Move orders from incoming to delivered as the kitchen works."
+          hotelId={hotelId}
+        />
         <Badge variant="green">Live kitchen queue</Badge>
       </div>
 
@@ -65,7 +67,7 @@ export function KitchenPage({ hotelId }: { hotelId: string }) {
             <div className="grid content-start gap-3 rounded-md border border-slate-200 bg-slate-50 p-3" key={column.key}>
               <div className="flex items-center justify-between gap-3">
                 <h3 className="flex items-center gap-2 text-sm font-semibold">
-                  <Icon className="size-4 text-[#0F3D91]" />
+                  <Icon className="size-4 text-[var(--primary)]" />
                   {column.label}
                 </h3>
                 <Badge>{rows.length}</Badge>

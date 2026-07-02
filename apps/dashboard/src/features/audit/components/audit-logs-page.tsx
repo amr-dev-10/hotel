@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { format } from "date-fns";
 import { FileClock, RefreshCw, Search, ShieldCheck } from "lucide-react";
 
+import { PageBreadcrumbs } from "@/components/layout/page-breadcrumbs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
@@ -82,10 +83,12 @@ export function AuditLogsPage({ hotelId }: { hotelId: string }) {
   return (
     <div className="grid gap-5">
       <div className="flex flex-col justify-between gap-3 xl:flex-row xl:items-center">
-        <div>
-          <h2 className="text-xl font-semibold">Audit Logs</h2>
-          <p className="text-sm text-slate-500">Track admin, staff, reservation, ticket, guest, and system changes.</p>
-        </div>
+        <PageBreadcrumbs
+          current="Audit Logs"
+          description="Track admin, staff, reservation, ticket, guest, and system changes."
+          hotelId={hotelId}
+          items={[{ label: "Settings" }]}
+        />
         <Button
           disabled={auditLogs.isFetching}
           type="button"
@@ -194,7 +197,7 @@ function AuditLogTable({
               </div>
               <Badge variant={actionVariant(log.action)}>{titleCase(log.action)}</Badge>
               <div className="flex items-center gap-2">
-                <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-[#0F3D91]/10 text-[#0F3D91]">
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-[var(--primary-soft)] text-[var(--primary)]">
                   <FileClock className="size-4" />
                 </span>
                 <span className="truncate font-medium text-slate-800">{titleCase(log.entity)}</span>
@@ -238,7 +241,7 @@ function Metric({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-md border border-slate-200 bg-white p-4">
       <div className="flex items-center justify-between gap-3">
-        <span className="flex size-9 items-center justify-center rounded-md bg-[#0F3D91]/10 text-[#0F3D91]">
+        <span className="flex size-9 items-center justify-center rounded-md bg-[var(--primary-soft)] text-[var(--primary)]">
           <ShieldCheck className="size-4" />
         </span>
         <span className="text-xs font-semibold uppercase tracking-normal text-slate-400">{label}</span>

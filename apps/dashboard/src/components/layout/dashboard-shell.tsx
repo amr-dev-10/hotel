@@ -10,6 +10,8 @@ import {
   Bot,
   CalendarDays,
   ChefHat,
+  ChevronDown,
+  CircleHelp,
   LogIn,
   Gauge,
   GitBranch,
@@ -18,6 +20,8 @@ import {
   Menu,
   MessageCircle,
   Network,
+  PanelLeftClose,
+  PanelLeftOpen,
   ScrollText,
   Sparkles,
   Shield,
@@ -34,6 +38,13 @@ import { DispatchAlert } from "@/components/dispatch-alert";
 import { apiErrorDetails } from "@/lib/api/client";
 import { NotificationBell } from "@/components/notification-bell";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Permissions, ticketViewPermissions } from "@/constants/permissions";
 import { useShifts, useUpdateShift } from "@/features/staff/hooks/useStaff";
 import { useRouteHotelId } from "@/hooks/useRouteHotelId";
@@ -148,10 +159,37 @@ export function DashboardShell({
     [currentUser, isHotelAdmin],
   );
   const allNavItems = useMemo(() => [...visibleNavItems, ...visibleSettingsNavItems], [visibleNavItems, visibleSettingsNavItems]);
+  const activeNavItem = useMemo(
+    () => allNavItems.find((item) => pathname === `/${hotelId}/${item.href}` || pathname?.startsWith(`/${hotelId}/${item.href}/`)),
+    [allNavItems, hotelId, pathname],
+  );
+  const activeSection = activeNavItem?.label ?? "Dashboard";
+  const sidebarPreferenceKey = currentUser?.id
+    ? `arcadia-sidebar-collapsed:${currentUser.id}`
+    : `arcadia-sidebar-collapsed:${hotelId}`;
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  const updateSidebarCollapsed = useCallback(
+    (collapsed: boolean) => {
+      setSidebarCollapsed(collapsed);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(sidebarPreferenceKey, collapsed ? "true" : "false");
+      }
+    },
+    [sidebarPreferenceKey],
+  );
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!mounted || typeof window === "undefined") {
+      return;
+    }
+
+    setSidebarCollapsed(window.localStorage.getItem(sidebarPreferenceKey) === "true");
+  }, [mounted, sidebarPreferenceKey]);
 
   useEffect(() => {
     if (!mounted || !token) {
@@ -202,37 +240,38 @@ export function DashboardShell({
     switchHotel(hotelId);
   }, [currentUser?.hotel_id, hotelId, mounted, router, switchHotel, token]);
 
-  const activeSection = useMemo(
-    () => allNavItems.find((item) => pathname?.includes(`/${item.href}`))?.label ?? "Dashboard",
-    [allNavItems, pathname],
-  );
   const isStaffPortalRoute = pathname === `/${hotelId}/staff-portal` || pathname?.startsWith(`/${hotelId}/staff-portal/`);
   const hotelName = hotelQuery.data?.name ?? "Arcadia";
+  const sidebarWidthClass = sidebarCollapsed ? "lg:w-[4.75rem] lg:hover:w-[17rem]" : "lg:w-[17rem]";
+  const contentOffsetClass = sidebarCollapsed ? "lg:pl-[4.75rem]" : "lg:pl-[17rem]";
+  const sidebarTextClass = sidebarCollapsed ? "lg:opacity-0 lg:group-hover/sidebar:opacity-100" : "";
+  const ActiveModuleIcon = activeNavItem?.icon ?? Gauge;
 
   if (!mounted) {
-    return <div className="min-h-screen bg-slate-50" />;
+    return <div className="min-h-screen bg-[var(--background)]" />;
   }
 
   return (
-    <div className="min-h-screen bg-[#f6f8fb] text-slate-950">
+    <div className="min-h-screen overflow-x-hidden bg-[var(--background)] text-[var(--foreground)]">
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 flex w-[17rem] -translate-x-full flex-col border-r border-slate-200 bg-white transition-transform lg:translate-x-0",
+          "group/sidebar fixed inset-y-0 left-0 z-40 flex w-[calc(100vw-1rem)] max-w-80 -translate-x-full flex-col overflow-hidden border-r border-white/10 bg-[var(--background-deep)] text-white shadow-2xl transition-[transform,width] duration-200 ease-out sm:w-80 lg:translate-x-0",
+          sidebarWidthClass,
           sidebarOpen && "translate-x-0",
         )}
       >
-        <div className="flex h-16 items-center gap-3 border-b border-slate-200 px-5">
-          <div className="flex size-9 items-center justify-center rounded-md bg-[#0F3D91] text-white">
+        <div className="flex h-16 shrink-0 items-center gap-3 border-b border-white/10 px-5">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-md border border-white/10 bg-[var(--primary)] text-white shadow-[var(--shadow-control)]">
             <BedDouble className="size-5" />
           </div>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold">Arcadia</p>
-            <p className="truncate text-xs text-slate-500">{titleCase(currentUser?.job_role ?? "Hotel team")}</p>
+          <div className={cn("min-w-0 whitespace-nowrap transition-opacity duration-150", sidebarTextClass)}>
+            <p className="truncate text-sm font-semibold uppercase tracking-[0.18em]">Arcadia</p>
+            <p className="truncate text-xs text-white/55">Hotel Platform</p>
           </div>
         </div>
 
-        <nav className="grid gap-1 overflow-y-auto p-3">
-          <p className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-normal text-slate-400">
+        <nav className="arcadia-sidebar-scroll grid min-h-0 flex-1 content-start gap-1 overflow-y-auto p-3">
+          <p className={cn("px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-normal text-white/35 transition-opacity duration-150", sidebarTextClass)}>
             Operations
           </p>
           {visibleNavItems.map((item) => {
@@ -243,20 +282,22 @@ export function DashboardShell({
             return (
               <Link
                 className={cn(
-                  "flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-950",
-                  active && "bg-[#0F3D91] text-white hover:bg-[#0F3D91] hover:text-white",
+                  "flex h-10 items-center gap-3 overflow-hidden rounded-md px-3 text-sm font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white",
+                  active && "bg-[var(--primary)] text-white shadow-[0_10px_22px_rgba(37,99,235,0.28)] hover:bg-[var(--primary-hover)] hover:text-white",
                 )}
                 href={href}
                 key={item.href}
                 onClick={() => setSidebarOpen(false)}
                 prefetch={false}
               >
-                <Icon className="size-4" />
-                {item.label}
+                <Icon className="size-4 shrink-0" />
+                <span className={cn("whitespace-nowrap transition-opacity duration-150", sidebarTextClass)}>
+                  {item.label}
+                </span>
               </Link>
             );
           })}
-          <p className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-normal text-slate-400">
+          <p className={cn("px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-normal text-white/35 transition-opacity duration-150", sidebarTextClass)}>
             Settings
           </p>
           {visibleSettingsNavItems.map((item) => {
@@ -267,39 +308,58 @@ export function DashboardShell({
             return (
               <Link
                 className={cn(
-                  "flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-950",
-                  active && "bg-[#0F3D91] text-white hover:bg-[#0F3D91] hover:text-white",
+                  "flex h-10 items-center gap-3 overflow-hidden rounded-md px-3 text-sm font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white",
+                  active && "bg-[var(--primary)] text-white shadow-[0_10px_22px_rgba(37,99,235,0.28)] hover:bg-[var(--primary-hover)] hover:text-white",
                 )}
                 href={href}
                 key={item.href}
                 onClick={() => setSidebarOpen(false)}
                 prefetch={false}
               >
-                <Icon className="size-4" />
-                {item.label}
+                <Icon className="size-4 shrink-0" />
+                <span className={cn("whitespace-nowrap transition-opacity duration-150", sidebarTextClass)}>
+                  {item.label}
+                </span>
               </Link>
             );
           })}
         </nav>
 
-        <div className="mt-auto h-3" />
+        <div className="shrink-0 p-3">
+          <div className="overflow-hidden rounded-md border border-white/10 bg-white/[0.06] p-3 shadow-[0_14px_30px_rgba(2,6,23,0.24)]">
+            <span
+              className={cn(
+                "hidden size-7 items-center justify-center rounded-md bg-white/10 text-xs font-semibold text-white",
+                sidebarCollapsed && "lg:flex lg:group-hover/sidebar:hidden",
+              )}
+            >
+              {hotelName[0]?.toUpperCase() ?? "H"}
+            </span>
+            <div className={cn("whitespace-nowrap transition-opacity duration-150", sidebarTextClass)}>
+              <p className="text-xs font-semibold uppercase tracking-normal text-white/40">Current Hotel</p>
+              <p className="mt-1 truncate text-sm font-semibold text-white">{hotelName}</p>
+              <p className="mt-0.5 truncate text-xs text-white/55">{titleCase(currentUser?.job_role ?? "Hotel team")}</p>
+            </div>
+          </div>
+        </div>
       </aside>
 
       {sidebarOpen ? (
         <button
           aria-label="Close navigation"
-          className="fixed inset-0 z-30 bg-slate-950/30 lg:hidden"
+          className="fixed inset-0 z-30 bg-slate-950/45 backdrop-blur-[2px] lg:hidden"
           type="button"
           onClick={() => setSidebarOpen(false)}
         />
       ) : null}
 
-      <div className="lg:pl-[17rem]">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-4 backdrop-blur lg:px-8">
-          <div className="flex min-w-0 items-center gap-3">
+      <div className={cn("min-w-0 overflow-x-hidden transition-[padding] duration-200 ease-out", contentOffsetClass)}>
+        <header className="sticky top-0 z-20 flex min-h-16 min-w-0 items-center justify-between gap-2 border-b border-white/10 bg-[linear-gradient(90deg,#08111f_0%,#0f172a_48%,#101c31_100%)] px-3 py-2 text-white shadow-[0_14px_34px_rgba(2,6,23,0.18)] sm:gap-3 sm:px-4 lg:px-8">
+          <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
             <Button
               aria-label="Open navigation"
-              className="lg:hidden"
+              className="text-white hover:bg-white/10 hover:text-white lg:hidden"
+              data-tooltip="Open navigation"
               size="icon"
               type="button"
               variant="ghost"
@@ -307,71 +367,126 @@ export function DashboardShell({
             >
               <Menu />
             </Button>
-            <div className="min-w-0">
-              <p className="truncate text-xs font-semibold uppercase tracking-normal text-slate-500">{hotelName}</p>
-              <h1 className="truncate text-lg font-semibold">{activeSection}</h1>
-            </div>
-          </div>
-
-          <div className="flex shrink-0 items-center gap-2">
-            {isStaffPortalRoute ? <StaffPortalHeaderActions currentUser={currentUser} hotelId={hotelId} /> : null}
-            <HeaderUserPill currentUser={currentUser} />
-            <NotificationBell hotelId={hotelId} />
-            <span className="hidden rounded bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 sm:inline-flex">
-              Live sync
-            </span>
             <Button
-              aria-label="Sign out"
-              className="sm:hidden"
+              aria-label={sidebarCollapsed ? "Keep navigation open" : "Collapse navigation"}
+              className="hidden text-white/80 hover:bg-white/10 hover:text-white lg:inline-flex"
+              data-tooltip={sidebarCollapsed ? "Keep navigation open" : "Collapse navigation"}
               size="icon"
               type="button"
               variant="ghost"
-              onClick={() => {
-                logout();
-                router.replace("/login");
-              }}
+              onClick={() => updateSidebarCollapsed(!sidebarCollapsed)}
             >
-              <LogOut />
+              {sidebarCollapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
             </Button>
+            <div className="hidden h-9 w-px bg-white/10 sm:block" />
+            <div className="flex h-10 min-w-0 max-w-[52vw] items-center gap-2 rounded-md border border-white/12 bg-white/[0.055] px-2.5 shadow-[0_10px_24px_rgba(2,6,23,0.16)] sm:max-w-none">
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-[var(--primary)] text-white shadow-[0_8px_18px_rgba(37,99,235,0.28)]">
+                <ActiveModuleIcon className="size-4" />
+              </span>
+              <span className="truncate text-sm font-semibold text-white">{activeSection}</span>
+            </div>
+          </div>
+
+          <div className="flex min-w-0 shrink-0 items-center gap-1 rounded-md border border-white/10 bg-white/[0.06] p-1 shadow-[0_12px_30px_rgba(2,6,23,0.2)]">
+            {isStaffPortalRoute ? <StaffPortalHeaderActions currentUser={currentUser} hotelId={hotelId} /> : null}
+            <span className="hidden h-8 items-center rounded-md bg-[var(--success-soft)] px-3 text-xs font-semibold text-[var(--success)] lg:inline-flex">
+              Live sync
+            </span>
+            <NotificationBell hotelId={hotelId} triggerClassName="size-8 text-white/80 hover:bg-white/10 hover:text-white" />
             <Button
-              className="hidden sm:inline-flex"
+              aria-label="Help and support"
+              className="hidden size-8 text-white/80 hover:bg-white/10 hover:text-white sm:inline-flex"
+              data-tooltip="Help and support"
+              size="icon"
               type="button"
               variant="ghost"
-              onClick={() => {
+              onClick={() => toast.info("Help center is not configured yet")}
+            >
+              <CircleHelp />
+            </Button>
+            <HeaderUserMenu
+              currentUser={currentUser}
+              hotelName={hotelName}
+              onOpenProfile={() => router.push(`/${hotelId}/settings/profile`)}
+              onSignOut={() => {
                 logout();
                 router.replace("/login");
               }}
-            >
-              <LogOut />
-              Sign out
-            </Button>
+            />
           </div>
         </header>
 
-        <main className="grid min-w-0 w-full gap-6 p-4 lg:p-6 2xl:p-8">{children}</main>
+        <main className="mx-auto grid w-full max-w-[1800px] min-w-0 gap-5 overflow-x-hidden p-3 sm:p-4 lg:gap-6 lg:p-6 2xl:p-8">{children}</main>
       </div>
       <DispatchAlert hotelId={hotelId} />
     </div>
   );
 }
 
-function HeaderUserPill({ currentUser }: { currentUser: CurrentUser | null }) {
+function HeaderUserMenu({
+  currentUser,
+  hotelName,
+  onOpenProfile,
+  onSignOut,
+}: {
+  currentUser: CurrentUser | null;
+  hotelName: string;
+  onOpenProfile: () => void;
+  onSignOut: () => void;
+}) {
   if (!currentUser) {
     return null;
   }
 
+  const role = titleCase(currentUser.job_role ?? currentUser.staff_level ?? "Hotel team");
+
   return (
-    <div className="hidden min-w-0 items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 md:flex">
-      <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-[#0F3D91]/10 text-xs font-semibold text-[#0F3D91]">
-        {currentUser.name?.[0]?.toUpperCase() ?? "U"}
-      </div>
-      <div className="min-w-0">
-        <p className="max-w-36 truncate text-xs font-semibold leading-4 text-slate-900">{currentUser.name}</p>
-        <p className="max-w-36 truncate text-[10px] leading-3 text-slate-500">
-          {titleCase(currentUser.job_role ?? currentUser.staff_level ?? "Hotel team")}
-        </p>
-      </div>
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          className="flex h-10 min-w-0 items-center gap-2 rounded-md px-1.5 pr-2 text-left text-white transition-colors hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+          type="button"
+        >
+          <span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/95 text-xs font-semibold text-[var(--background-deep)] ring-1 ring-white/20">
+            {currentUser.name?.[0]?.toUpperCase() ?? "U"}
+          </span>
+          <span className="hidden min-w-0 md:block">
+            <span className="block max-w-36 truncate text-xs font-semibold leading-4 text-white">{currentUser.name}</span>
+            <span className="block max-w-36 truncate text-[10px] leading-3 text-white/58">{role}</span>
+          </span>
+          <ChevronDown className="hidden size-4 shrink-0 text-white/55 md:block" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-64 p-2">
+        <div className="flex items-center gap-3 rounded-md bg-[var(--panel-muted)] p-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--primary)] text-sm font-semibold text-white">
+            {currentUser.name?.[0]?.toUpperCase() ?? "U"}
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold">{currentUser.name}</p>
+            <p className="truncate text-xs text-[var(--muted)]">{role}</p>
+          </div>
+        </div>
+        <div className="px-2 py-2">
+          <p className="text-[10px] font-semibold uppercase tracking-normal text-[var(--muted)]">Current hotel</p>
+          <p className="mt-0.5 truncate text-xs font-medium text-[var(--foreground)]">{hotelName}</p>
+        </div>
+        <DropdownMenuSeparator className="my-1 h-px bg-[var(--border)]" />
+        <DropdownMenuItem onSelect={onOpenProfile}>
+          <UserCircle />
+          Profile settings
+        </DropdownMenuItem>
+        <div className="flex items-center gap-2 rounded px-2 py-1.5 text-sm text-[var(--success)]">
+          <span className="size-2 rounded-full bg-[var(--success)]" />
+          Live sync active
+        </div>
+        <DropdownMenuSeparator className="my-1 h-px bg-[var(--border)]" />
+        <DropdownMenuItem className="text-[var(--destructive)] focus:text-[var(--destructive)]" onSelect={onSignOut}>
+          <LogOut />
+          Sign out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -410,7 +525,7 @@ function StaffPortalHeaderActions({
   }
 
   if (shifts.isLoading) {
-    return <span className="hidden rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-500 md:inline-flex">Shift loading</span>;
+    return <span className="hidden rounded bg-white/10 px-2 py-1 text-xs font-semibold text-white/70 md:inline-flex">Shift loading</span>;
   }
 
   if (!currentShift) {
@@ -440,7 +555,7 @@ function StaffPortalHeaderActions({
 
   if (["completed", "on_leave"].includes(currentShift.status)) {
     return (
-      <span className="hidden rounded bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 sm:inline-flex">
+      <span className="hidden rounded bg-[var(--success-soft)] px-2 py-1 text-xs font-semibold text-[var(--success)] sm:inline-flex">
         {titleCase(currentShift.status)}
       </span>
     );

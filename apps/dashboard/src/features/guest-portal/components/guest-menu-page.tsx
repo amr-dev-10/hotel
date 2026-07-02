@@ -66,7 +66,7 @@ export function GuestMenuPage() {
 
       {cartItems.length ? (
         <Link
-          className="fixed bottom-16 left-1/2 z-30 flex w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 items-center justify-between rounded-md bg-[#0F3D91] px-4 py-3 text-sm font-semibold text-white shadow-lg"
+          className="fixed bottom-16 left-1/2 z-30 flex w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 items-center justify-between rounded-md bg-[var(--primary)] px-4 py-3 text-sm font-semibold text-white shadow-lg"
           href="/guest/cart"
         >
           <span className="flex items-center gap-2">
@@ -83,7 +83,7 @@ export function GuestMenuPage() {
 function CategoryButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
   return (
     <Button
-      className={cn("shrink-0", active && "border-[#0F3D91]/30 bg-[#0F3D91]/5 text-[#0F3D91]")}
+      className={cn("shrink-0", active && "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]")}
       type="button"
       variant="secondary"
       onClick={onClick}

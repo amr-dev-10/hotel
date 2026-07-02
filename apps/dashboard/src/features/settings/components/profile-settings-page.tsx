@@ -5,12 +5,14 @@ import { Bell, KeyRound, Languages, Loader2, Moon, Save, UserCircle } from "luci
 import { toast } from "sonner";
 import { showApiErrorToast } from "@/lib/api/error-toast";
 
+import { PageBreadcrumbs } from "@/components/layout/page-breadcrumbs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Select } from "@/components/ui/select";
+import { useRouteHotelId } from "@/hooks/useRouteHotelId";
 import { apiPost } from "@/lib/api/client";
 import { titleCase } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth.store";
@@ -18,6 +20,7 @@ import { useAuthStore } from "@/stores/auth.store";
 const events = ["Ticket Assigned", "Ticket Escalated", "Guest Message", "SLA Breach"];
 
 export function ProfileSettingsPage() {
+  const hotelId = useRouteHotelId();
   const currentUser = useAuthStore((state) => state.currentUser);
   const [theme, setTheme] = useState("system");
   const [language, setLanguage] = useState("en");
@@ -66,14 +69,16 @@ export function ProfileSettingsPage() {
 
   return (
     <div className="grid gap-5">
-      <div>
-        <h2 className="text-xl font-semibold">Profile Settings</h2>
-        <p className="text-sm text-slate-500">Account identity and dashboard preferences.</p>
-      </div>
+      <PageBreadcrumbs
+        current="Profile Settings"
+        description="Account identity and dashboard preferences."
+        hotelId={hotelId}
+        items={[{ label: "Settings" }]}
+      />
 
       <section className="grid gap-4 rounded-md border border-slate-200 bg-white p-4">
         <div className="flex items-center gap-3">
-          <span className="flex size-11 items-center justify-center rounded-md bg-[#0F3D91]/10 text-[#0F3D91]">
+          <span className="flex size-11 items-center justify-center rounded-md bg-[var(--primary-soft)] text-[var(--primary)]">
             <UserCircle className="size-6" />
           </span>
           <div>
@@ -165,7 +170,7 @@ export function ProfileSettingsPage() {
                 <label className="flex items-center" key={channel}>
                   <input
                     checked={Boolean(prefs[event]?.[channel])}
-                    className="size-4 accent-[#0F3D91]"
+                    className="size-4 accent-[var(--primary)]"
                     type="checkbox"
                     onChange={() => toggle(event, channel)}
                   />

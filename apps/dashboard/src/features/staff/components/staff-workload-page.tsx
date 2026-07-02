@@ -3,10 +3,10 @@
 import { useMemo } from "react";
 import type { ComponentType } from "react";
 import Link from "next/link";
-import { Activity, ArrowLeft, CheckCircle2, Clock3, TicketCheck } from "lucide-react";
+import { Activity, CheckCircle2, Clock3, TicketCheck } from "lucide-react";
 
+import { PageBreadcrumbs } from "@/components/layout/page-breadcrumbs";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
 import { titleCase } from "@/lib/utils";
 import { useDepartments } from "@/features/departments/hooks/useDepartments";
@@ -53,16 +53,15 @@ export function StaffWorkloadPage({ hotelId }: { hotelId: string }) {
 
   return (
     <div className="grid gap-5">
-      <div>
-        <Button asChild type="button" variant="ghost">
-          <Link href={`/${hotelId}/settings/staff`}>
-            <ArrowLeft />
-            Staff
-          </Link>
-        </Button>
-        <h2 className="mt-2 text-xl font-semibold">Ticket Workload</h2>
-        <p className="text-sm text-slate-500">Assigned tickets, closures, escalation pressure, and SLA risk.</p>
-      </div>
+      <PageBreadcrumbs
+        current="Ticket Workload"
+        description="Assigned tickets, closures, escalation pressure, and SLA risk."
+        hotelId={hotelId}
+        items={[
+          { label: "Settings" },
+          { label: "Staff Management", href: `/${hotelId}/settings/staff` },
+        ]}
+      />
 
       <div className="grid gap-3 md:grid-cols-4">
         <Metric icon={Clock3} label="Open tickets" value={openTickets(allTickets)} />
@@ -87,7 +86,7 @@ export function StaffWorkloadPage({ hotelId }: { hotelId: string }) {
               className="grid min-w-[920px] grid-cols-[1fr_150px_110px_110px_120px_140px_140px] items-center gap-3 border-b border-slate-100 px-4 py-3 text-sm last:border-b-0"
               key={user.id}
             >
-              <Link className="min-w-0 hover:text-[#0F3D91]" href={`/${hotelId}/settings/staff/${user.id}/tickets`} prefetch={false}>
+              <Link className="min-w-0 hover:text-[var(--primary)]" href={`/${hotelId}/settings/staff/${user.id}/tickets`} prefetch={false}>
                 <p className="truncate font-semibold">{user.name}</p>
                 <p className="truncate text-xs text-slate-500">{user.job_role ?? titleCase(user.staff_level)}</p>
               </Link>

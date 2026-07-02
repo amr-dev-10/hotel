@@ -159,10 +159,10 @@ export function CreateReservationDialog({ hotelId }: { hotelId: string }) {
               <div className="relative">
                 <div className="flex gap-2">
                   <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                    <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
                     <Input
                       placeholder="Search existing guests by name or phone..."
-                      className="pl-9"
+                      className="pr-9"
                       value={guestSearch}
                       onChange={(e) => {
                         setGuestSearch(e.target.value);
@@ -182,7 +182,7 @@ export function CreateReservationDialog({ hotelId }: { hotelId: string }) {
                         className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-slate-50 border-b border-slate-100 last:border-0"
                         onClick={() => handleSelectGuest(guest)}
                       >
-                        <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#0F3D91]/10 text-xs font-bold text-[#0F3D91]">
+                        <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--primary-soft)] text-xs font-bold text-[var(--primary)]">
                           {guest.name?.[0]?.toUpperCase()}
                         </div>
                         <div className="min-w-0">

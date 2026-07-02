@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
-import { ArrowLeft, Loader2, Plus, RefreshCcw } from "lucide-react";
+import { Loader2, Plus, RefreshCcw } from "lucide-react";
 import { toast } from "sonner";
 
+import { PageBreadcrumbs } from "@/components/layout/page-breadcrumbs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
@@ -64,15 +64,11 @@ export function WhatsAppTemplatesPage({ hotelId }: { hotelId: string }) {
   return (
     <div className="grid gap-5">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-        <div>
-          <Button asChild type="button" variant="ghost">
-            <Link href={`/${hotelId}/whatsapp`}>
-              <ArrowLeft />
-              Inbox
-            </Link>
-          </Button>
-          <h2 className="mt-2 text-xl font-semibold">WhatsApp Templates</h2>
-        </div>
+        <PageBreadcrumbs
+          current="WhatsApp Templates"
+          hotelId={hotelId}
+          items={[{ label: "WhatsApp", href: `/${hotelId}/whatsapp` }]}
+        />
         <Button disabled={syncTemplates.isPending} type="button" variant="secondary" onClick={handleSync}>
           {syncTemplates.isPending ? <Loader2 className="animate-spin" /> : <RefreshCcw />}
           Sync

@@ -6,6 +6,7 @@ import { Bot, Loader2, RotateCcw, Save, TestTube2 } from "lucide-react";
 import { toast } from "sonner";
 import { showApiErrorToast } from "@/lib/api/error-toast";
 
+import { PageBreadcrumbs } from "@/components/layout/page-breadcrumbs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
@@ -134,10 +135,12 @@ export function AiSettingsPage({ hotelId }: { hotelId: string }) {
   return (
     <div className="grid gap-5">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-        <div>
-          <h2 className="text-xl font-semibold">AI Configuration</h2>
-          <p className="text-sm text-slate-500">Provider, model, and connection status.</p>
-        </div>
+        <PageBreadcrumbs
+          current="AI Configuration"
+          description="Provider, model, and connection status."
+          hotelId={hotelId}
+          items={[{ label: "AI Provider", href: `/${hotelId}/ai` }]}
+        />
         <Button asChild type="button" variant="secondary">
           <Link href={`/${hotelId}/ai`}>Dashboard</Link>
         </Button>
@@ -146,7 +149,7 @@ export function AiSettingsPage({ hotelId }: { hotelId: string }) {
       <section className="grid gap-4 rounded-md border border-slate-200 bg-white p-4">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="flex size-11 items-center justify-center rounded-md bg-[#0F3D91]/10 text-[#0F3D91]">
+            <span className="flex size-11 items-center justify-center rounded-md bg-[var(--primary-soft)] text-[var(--primary)]">
               <Bot className="size-6" />
             </span>
             <div>
@@ -348,7 +351,7 @@ function ToggleField({
       <span className="font-medium text-slate-700">{label}</span>
       <input
         checked={checked}
-        className="size-4 accent-[#0F3D91]"
+        className="size-4 accent-[var(--primary)]"
         id={id}
         type="checkbox"
         onChange={(event) => onChange(event.target.checked)}

@@ -2,13 +2,13 @@
 
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import Link from "next/link";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, CalendarClock, Loader2, Save } from "lucide-react";
+import { CalendarClock, Loader2, Save } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { showApiErrorToast } from "@/lib/api/error-toast";
 
+import { PageBreadcrumbs } from "@/components/layout/page-breadcrumbs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
@@ -88,16 +88,15 @@ export function StaffShiftsPage({ hotelId }: { hotelId: string }) {
   return (
     <div className="grid gap-5">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-        <div>
-          <Button asChild type="button" variant="ghost">
-            <Link href={`/${hotelId}/settings/staff`}>
-              <ArrowLeft />
-              Staff
-            </Link>
-          </Button>
-          <h2 className="mt-2 text-xl font-semibold">Shift Management</h2>
-          <p className="text-sm text-slate-500">Calendar and roster planning for hotel teams.</p>
-        </div>
+        <PageBreadcrumbs
+          current="Shift Management"
+          description="Calendar and roster planning for hotel teams."
+          hotelId={hotelId}
+          items={[
+            { label: "Settings" },
+            { label: "Staff Management", href: `/${hotelId}/settings/staff` },
+          ]}
+        />
         <div className="w-full sm:w-44">
           <Select aria-label="Shift view" value={viewMode} onChange={(event) => setViewMode(event.target.value)}>
             <option value="daily">Daily</option>

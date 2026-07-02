@@ -152,9 +152,9 @@ function PlatformSubscriptionsContent() {
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_12rem_12rem]">
           <label className="relative block">
             <span className="sr-only">Search subscriptions</span>
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <Input
-              className="pl-9"
+              className="pr-9"
               placeholder="Search by hotel, plan, or status"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
@@ -207,7 +207,7 @@ function PlatformSubscriptionsContent() {
                   {paginatedSubscriptions.map((subscription) => (
                     <tr className="border-b border-slate-100 last:border-0" key={subscription.id}>
                       <td className="px-4 py-3 align-middle">
-                        <Link className="font-semibold hover:text-[#0F3D91]" href={`/platform/hotels/${subscription.hotel_id}`}>
+                        <Link className="font-semibold hover:text-[var(--primary)]" href={`/platform/hotels/${subscription.hotel_id}`}>
                           {hotelById.get(subscription.hotel_id) ?? "Unknown hotel"}
                         </Link>
                       </td>

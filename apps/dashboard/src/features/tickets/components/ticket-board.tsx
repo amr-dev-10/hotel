@@ -155,7 +155,7 @@ function BoardColumn({
       ref={setNodeRef}
       className={cn(
         "min-w-30 rounded-md border border-slate-200 bg-slate-50 p-3 transition-colors",
-        isOver && "border-[#0F3D91] bg-[#0F3D91]/5",
+        isOver && "border-[var(--primary)] bg-[var(--primary-soft)]",
       )}
     >
       <div className="mb-3 flex items-center justify-between">

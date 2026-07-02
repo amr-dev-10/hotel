@@ -103,13 +103,13 @@ export function TicketList({ hotelId }: { hotelId: string }) {
         </table>
       </div>
 
-      <div className="grid gap-3 lg:hidden">
+      <div className="grid min-w-0 max-w-full gap-3 lg:hidden">
         {rows.map((ticket) => (
           <MobileTicketCard hotelId={hotelId} key={ticket.id} ticket={ticket} />
         ))}
       </div>
 
-      <div className="mt-3">
+      <div className="mt-3 min-w-0 max-w-full">
         <CursorPaginationControls
           hasNextPage={tickets.hasNextPage}
           isFetchingNextPage={tickets.isFetchingNextPage}
@@ -186,33 +186,35 @@ function MobileTicketCard({ hotelId, ticket }: { hotelId: string; ticket: Ticket
   const openPreview = useOpenPreview(ticket.id);
 
   return (
-    <article className="rounded-md border border-slate-200 bg-white p-4 shadow-sm" onClick={openPreview}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
+    <article className="w-full min-w-0 max-w-full overflow-hidden rounded-md border border-slate-200 bg-white p-4 shadow-sm" onClick={openPreview}>
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-slate-950">{ticket.ticket_code}</p>
           <p className="mt-1 line-clamp-2 text-sm text-slate-600">{ticket.item_description}</p>
         </div>
-        <Button asChild size="icon" type="button" variant="ghost" onClick={(event) => event.stopPropagation()}>
+        <Button asChild className="shrink-0" size="icon" type="button" variant="ghost" onClick={(event) => event.stopPropagation()}>
           <Link href={`/${hotelId}/tickets/${ticket.id}`} aria-label="Open full ticket" prefetch={false}>
             <ArrowUpRight />
           </Link>
         </Button>
       </div>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Badge variant={stageVariant(ticket.stage)}>{titleCase(ticket.stage)}</Badge>
+      <div className="mt-3 flex min-w-0 flex-wrap gap-2 overflow-hidden">
+        <Badge className="max-w-full truncate" variant={stageVariant(ticket.stage)}>{titleCase(ticket.stage)}</Badge>
         <PriorityBadge priority={ticket.priority} />
-        <Badge>{titleCase(ticket.source)}</Badge>
+        <Badge className="max-w-full truncate">{titleCase(ticket.source)}</Badge>
       </div>
       <div className="mt-3 grid gap-2 text-xs text-slate-500">
-        <span className="flex items-center gap-2">
-          <Timer className="size-3.5" />
-          {ticket.sla_due_at
-            ? `Due ${formatDistanceToNow(new Date(ticket.sla_due_at), { addSuffix: true })}`
-            : "SLA not started"}
+        <span className="flex min-w-0 items-center gap-2">
+          <Timer className="size-3.5 shrink-0" />
+          <span className="min-w-0 truncate">
+            {ticket.sla_due_at
+              ? `Due ${formatDistanceToNow(new Date(ticket.sla_due_at), { addSuffix: true })}`
+              : "SLA not started"}
+          </span>
         </span>
-        <span className="flex items-center gap-2">
-          <UserCheck className="size-3.5" />
-          {ticketAssigneeLabel(ticket)}
+        <span className="flex min-w-0 items-center gap-2">
+          <UserCheck className="size-3.5 shrink-0" />
+          <span className="min-w-0 truncate">{ticketAssigneeLabel(ticket)}</span>
         </span>
       </div>
     </article>

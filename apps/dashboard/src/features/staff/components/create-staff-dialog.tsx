@@ -131,7 +131,7 @@ export function CreateStaffDialog({ hotelId }: { hotelId: string }) {
           </div>
 
           <label className="flex items-center gap-2 rounded-md border border-slate-200 p-3 text-sm">
-            <input className="size-4 accent-[#0F3D91]" type="checkbox" {...form.register("is_on_duty")} />
+            <input className="size-4 accent-[var(--primary)]" type="checkbox" {...form.register("is_on_duty")} />
             On duty
           </label>
 

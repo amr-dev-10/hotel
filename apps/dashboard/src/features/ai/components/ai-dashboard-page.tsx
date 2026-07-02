@@ -4,6 +4,7 @@ import { format, formatDistanceToNow } from "date-fns";
 import Link from "next/link";
 import { AlertCircle, Bot, Bug, CheckCircle2, Settings, Zap } from "lucide-react";
 
+import { PageBreadcrumbs } from "@/components/layout/page-breadcrumbs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
@@ -27,10 +28,11 @@ export function AiDashboardPage({ hotelId }: { hotelId: string }) {
   return (
     <div className="grid gap-5">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-        <div>
-          <h2 className="text-xl font-semibold">AI Provider</h2>
-          <p className="text-sm text-slate-500">Current bot provider health for this hotel.</p>
-        </div>
+        <PageBreadcrumbs
+          current="AI Provider"
+          description="Current bot provider health for this hotel."
+          hotelId={hotelId}
+        />
         <Button asChild type="button">
           <Link href={`/${hotelId}/ai/settings`}>
             <Settings />
@@ -41,12 +43,12 @@ export function AiDashboardPage({ hotelId }: { hotelId: string }) {
 
       <section className="grid gap-4 md:grid-cols-3">
         <div className="rounded-md border border-slate-200 bg-white p-4">
-          <Bot className="mb-3 size-5 text-[#0F3D91]" />
+          <Bot className="mb-3 size-5 text-[var(--primary)]" />
           <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Provider</p>
           <p className="mt-2 text-2xl font-semibold">{titleCase(settings.data?.provider)}</p>
         </div>
         <div className="rounded-md border border-slate-200 bg-white p-4">
-          <Zap className="mb-3 size-5 text-[#0F3D91]" />
+          <Zap className="mb-3 size-5 text-[var(--primary)]" />
           <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Status</p>
           <div className="mt-2">
             <Badge variant={settings.data?.status === "connected" ? "green" : "amber"}>
@@ -101,7 +103,7 @@ export function AiDashboardPage({ hotelId }: { hotelId: string }) {
       <section className="grid gap-4 rounded-md border border-slate-200 bg-white p-4">
         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
           <div className="flex items-center gap-2">
-            <Bug className="size-4 text-[#0F3D91]" />
+            <Bug className="size-4 text-[var(--primary)]" />
             <h3 className="text-base font-semibold">AI Debugger</h3>
           </div>
           <Badge variant={debugLogs.error ? "rose" : "blue"}>{debugLogs.data?.length ?? 0} runs</Badge>

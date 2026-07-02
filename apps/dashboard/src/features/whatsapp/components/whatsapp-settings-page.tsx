@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Loader2, MessageCircle, Save } from "lucide-react";
 import { toast } from "sonner";
 
+import { PageBreadcrumbs } from "@/components/layout/page-breadcrumbs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
@@ -71,10 +72,12 @@ export function WhatsAppSettingsPage({ hotelId }: { hotelId: string }) {
   return (
     <div className="grid gap-5">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-        <div>
-          <h2 className="text-xl font-semibold">WhatsApp Settings</h2>
-          <p className="text-sm text-slate-500">Meta business account and webhook connection.</p>
-        </div>
+        <PageBreadcrumbs
+          current="WhatsApp Settings"
+          description="Meta business account and webhook connection."
+          hotelId={hotelId}
+          items={[{ label: "WhatsApp", href: `/${hotelId}/whatsapp` }]}
+        />
         <Button asChild type="button" variant="secondary">
           <Link href={`/${hotelId}/whatsapp`}>Inbox</Link>
         </Button>
@@ -83,7 +86,7 @@ export function WhatsAppSettingsPage({ hotelId }: { hotelId: string }) {
       <section className="grid gap-4 rounded-md border border-slate-200 bg-white p-4">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="flex size-11 items-center justify-center rounded-md bg-[#0F3D91]/10 text-[#0F3D91]">
+            <span className="flex size-11 items-center justify-center rounded-md bg-[var(--primary-soft)] text-[var(--primary)]">
               <MessageCircle className="size-6" />
             </span>
             <div>

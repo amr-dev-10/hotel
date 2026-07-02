@@ -192,9 +192,9 @@ function PlatformUsersContent() {
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_14rem_12rem]">
           <label className="relative block">
             <span className="sr-only">Search users</span>
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <Input
-              className="pl-9"
+              className="pr-9"
               placeholder="Search users, email, role, or hotel"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
@@ -250,7 +250,7 @@ function PlatformUsersContent() {
                         </div>
                       </td>
                       <td className="px-4 py-3 align-middle">
-                        <Link className="font-medium hover:text-[#0F3D91]" href={`/platform/hotels/${user.hotel_id}`}>
+                        <Link className="font-medium hover:text-[var(--primary)]" href={`/platform/hotels/${user.hotel_id}`}>
                           {hotelById.get(user.hotel_id) ?? "Unknown hotel"}
                         </Link>
                       </td>
@@ -356,7 +356,7 @@ function PlatformUsersContent() {
                 <label className="flex items-center gap-2 text-sm font-medium">
                   <input
                     checked={form.is_active}
-                    className="size-4 accent-[#0F3D91]"
+                    className="size-4 accent-[var(--primary)]"
                     type="checkbox"
                     onChange={(event) => setForm((current) => ({ ...current, is_active: event.target.checked }))}
                   />
@@ -365,7 +365,7 @@ function PlatformUsersContent() {
                 <label className="flex items-center gap-2 text-sm font-medium">
                   <input
                     checked={form.is_on_duty}
-                    className="size-4 accent-[#0F3D91]"
+                    className="size-4 accent-[var(--primary)]"
                     type="checkbox"
                     onChange={(event) => setForm((current) => ({ ...current, is_on_duty: event.target.checked }))}
                   />
