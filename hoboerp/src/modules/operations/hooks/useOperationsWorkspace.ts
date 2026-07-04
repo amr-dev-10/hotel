@@ -1,6 +1,7 @@
 import {useCallback, useMemo, useState} from 'react';
 import {Alert} from 'react-native';
 
+import {formatErrorDetails} from '../../../services/api';
 import type {ApiEnvelope} from '../../../types/api';
 import type {ArcadiaRecord, Session} from '../../../types/domain';
 import {moveOrderToStatus} from '../../food/services/order.service';
@@ -66,8 +67,7 @@ export function useOperationsWorkspace(
           [resource]: {
             ...current[resource],
             loading: false,
-            error:
-              error instanceof Error ? error.message : 'Unable to load data.',
+            error: formatErrorDetails(error, 'Unable to load data.'),
           },
         }));
       }
@@ -123,7 +123,7 @@ export function useOperationsWorkspace(
       } catch (error) {
         Alert.alert(
           'Ticket action failed',
-          error instanceof Error ? error.message : 'Unable to update ticket.',
+          formatErrorDetails(error, 'Unable to update ticket.'),
         );
       } finally {
         setActionLoading(null);
@@ -154,7 +154,7 @@ export function useOperationsWorkspace(
       } catch (error) {
         Alert.alert(
           'Order update failed',
-          error instanceof Error ? error.message : 'Unable to update order.',
+          formatErrorDetails(error, 'Unable to update order.'),
         );
       } finally {
         setActionLoading(null);

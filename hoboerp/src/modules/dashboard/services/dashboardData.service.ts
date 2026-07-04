@@ -18,6 +18,7 @@ export function buildAppData(
     tickets: ticketsSource.slice(0, 12).map(toTicketView),
     escalations: resources.escalations.items,
     notifications: resources.notifications.items,
+    guests: resources.guests.items,
     rooms,
     orders: resources.orders.items,
     staff: resources.staff.items,
@@ -54,6 +55,9 @@ export function isScreenLoading(
   if (screen === 'notifications') {
     return resources.notifications.loading;
   }
+  if (screen === 'guests') {
+    return resources.guests.loading;
+  }
   if (screen === 'room') {
     return resources.rooms.loading;
   }
@@ -73,6 +77,49 @@ export function isScreenLoading(
     return resources.whatsapp.loading;
   }
   return Object.values(resources).some(resource => resource.loading);
+}
+
+export function screenResourceError(
+  screen: string,
+  resources: Record<ResourceKey, ResourceState>,
+) {
+  if (screen === 'dashboard') {
+    const failed = Object.entries(resources)
+      .filter(([, resource]) => resource.error)
+      .map(([key, resource]) => `${key}: ${resource.error}`);
+    return failed.length ? failed.join('\n') : null;
+  }
+  if (screen === 'reservations') {
+    return resources.reservations.error;
+  }
+  if (screen === 'tickets') {
+    return resources.tickets.error;
+  }
+  if (screen === 'escalations') {
+    return resources.escalations.error;
+  }
+  if (screen === 'notifications') {
+    return resources.notifications.error;
+  }
+  if (screen === 'guests') {
+    return resources.guests.error;
+  }
+  if (screen === 'room') {
+    return resources.rooms.error;
+  }
+  if (screen === 'food' || screen === 'kitchen') {
+    return resources.orders.error;
+  }
+  if (screen === 'staff') {
+    return resources.staff.error;
+  }
+  if (screen === 'housekeeping') {
+    return resources.housekeeping.error;
+  }
+  if (screen === 'whatsapp') {
+    return resources.whatsapp.error;
+  }
+  return null;
 }
 
 function toReservationView(item: ArcadiaRecord): ReservationView {

@@ -33,9 +33,9 @@ export function filterRecordsByStatus(records: ArcadiaRecord[], filter: string) 
     return records;
   }
 
-  const normalizedFilter = filter.toLowerCase();
+  const normalizedFilter = normalizeStatus(filter);
   return records.filter(record =>
-    recordStatus(record).toLowerCase().includes(normalizedFilter),
+    normalizeStatus(recordStatus(record)).includes(normalizedFilter),
   );
 }
 
@@ -47,16 +47,31 @@ export function filterByStatus<T extends {status: string}>(
     return items;
   }
 
-  const normalizedFilter = filter.toLowerCase();
+  const normalizedFilter = normalizeStatus(filter);
   return items.filter(item =>
-    item.status.toLowerCase().includes(normalizedFilter),
+    normalizeStatus(item.status).includes(normalizedFilter),
   );
 }
 
 export function countRecordsByStatus(records: ArcadiaRecord[], status: string) {
   return records.filter(record =>
-    recordStatus(record).toLowerCase().includes(status),
+    normalizeStatus(recordStatus(record)).includes(normalizeStatus(status)),
   ).length;
+}
+
+export function isRecordTruthy(record: ArcadiaRecord, keys: string[]) {
+  return keys.some(key => {
+    const value = record[key];
+    if (typeof value === 'boolean') {
+      return value;
+    }
+    if (typeof value === 'number') {
+      return value > 0;
+    }
+    return ['true', '1', 'yes', 'linked'].includes(
+      String(value ?? '').toLowerCase(),
+    );
+  });
 }
 
 export function formatAmount(value: string) {
@@ -66,4 +81,8 @@ export function formatAmount(value: string) {
 
   const number = Number(value);
   return Number.isNaN(number) ? value : `₹${number.toFixed(2)}`;
+}
+
+function normalizeStatus(value: string) {
+  return value.toLowerCase().replaceAll('_', ' ').trim();
 }

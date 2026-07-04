@@ -124,7 +124,12 @@ export function statusTone(
   value: string,
 ): 'green' | 'blue' | 'orange' | 'red' | 'gray' {
   const normalized = normalize(value);
-  if (normalized.includes('complete') || normalized.includes('checked in')) {
+  if (
+    normalized.includes('complete') ||
+    normalized.includes('checked in') ||
+    normalized.includes('on duty') ||
+    normalized === 'active'
+  ) {
     return 'green';
   }
   if (normalized.includes('late')) {
@@ -142,6 +147,8 @@ export function statusTone(
   }
   if (
     normalized.includes('cancel') ||
+    normalized.includes('off duty') ||
+    normalized.includes('inactive') ||
     normalized.includes('out') ||
     normalized.includes('closed')
   ) {
@@ -154,13 +161,18 @@ export function priorityTone(
   value: string,
 ): 'green' | 'blue' | 'orange' | 'red' | 'gray' {
   const normalized = normalize(value);
-  if (normalized.includes('high') || normalized.includes('p1')) {
+  if (
+    normalized.includes('critical') ||
+    normalized.includes('urgent') ||
+    normalized.includes('high') ||
+    ['4', '5', 'p1'].includes(normalized)
+  ) {
     return 'red';
   }
-  if (normalized.includes('medium') || normalized.includes('p2')) {
+  if (normalized.includes('medium') || normalized.includes('elevated') || ['2', '3', 'p2'].includes(normalized)) {
     return 'orange';
   }
-  if (normalized.includes('low') || normalized.includes('p3')) {
+  if (normalized.includes('low') || ['1', 'p3'].includes(normalized)) {
     return 'green';
   }
   return 'blue';

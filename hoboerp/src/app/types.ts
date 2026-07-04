@@ -13,6 +13,7 @@ export type ScreenKey =
   | 'tickets'
   | 'escalations'
   | 'notifications'
+  | 'guests'
   | 'housekeeping'
   | 'food'
   | 'kitchen'
@@ -25,11 +26,13 @@ export type PopupKey =
   | 'ticketForm'
   | 'ticketDetail'
   | 'reservationDetail'
+  | 'reservationForm'
   | 'checkIn'
   | 'checkOut'
   | 'whatsappChat'
   | 'profileOption'
   | 'staffProfile'
+  | 'guestDetail'
   | 'roomForm'
   | null;
 

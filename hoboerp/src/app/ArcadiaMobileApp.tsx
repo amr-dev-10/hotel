@@ -34,9 +34,11 @@ import type {PopupKey, ScreenAction, ScreenKey} from './types';
 import {
   buildAppData,
   isScreenLoading,
+  screenResourceError,
   type ReservationView,
   type TicketView,
 } from '../modules/dashboard';
+import type {ResourceKey} from '../modules/operations/types';
 import {login as loginApi, me as meApi} from '../modules/auth/api/auth.api';
 import {LoginScreen} from '../modules/auth/screens/LoginScreen';
 import {useOperationsWorkspace} from '../modules/operations/hooks/useOperationsWorkspace';
@@ -77,6 +79,10 @@ function App(): React.JSX.Element {
     useState<ReservationView | null>(null);
   const [selectedTicket, setSelectedTicket] = useState<TicketView | null>(null);
   const [selectedRoom, setSelectedRoom] = useState<ArcadiaRecord | null>(null);
+  const [selectedStaff, setSelectedStaff] = useState<ArcadiaRecord | null>(null);
+  const [selectedGuest, setSelectedGuest] = useState<ArcadiaRecord | null>(null);
+  const [selectedConversation, setSelectedConversation] =
+    useState<ArcadiaRecord | null>(null);
   const [selectedLabel, setSelectedLabel] = useState('');
 
   const request = useCallback(
@@ -178,7 +184,20 @@ function App(): React.JSX.Element {
 
   const openTicketForm = useCallback(() => {
     setSelectedTicket(null);
+    setSelectedReservation(null);
+    setSelectedConversation(null);
+    setSelectedGuest(null);
     setPopup('ticketForm');
+  }, []);
+
+  const openContextTicketForm = useCallback(() => {
+    setSelectedTicket(null);
+    setPopup('ticketForm');
+  }, []);
+
+  const openReservationForm = useCallback(() => {
+    setSelectedReservation(null);
+    setPopup('reservationForm');
   }, []);
 
   const openTicketDetail = useCallback((ticket: TicketView) => {
@@ -188,6 +207,8 @@ function App(): React.JSX.Element {
 
   const openReservationDetail = useCallback((reservation: ReservationView) => {
     setSelectedReservation(reservation);
+    setSelectedGuest(null);
+    setSelectedConversation(null);
     setPopup('reservationDetail');
   }, []);
 
@@ -201,15 +222,32 @@ function App(): React.JSX.Element {
     setPopup('profileOption');
   }, []);
 
-  const openStaffProfile = useCallback((label: string) => {
-    setSelectedLabel(label);
+  const openGuestDetail = useCallback((guest: ArcadiaRecord) => {
+    setSelectedGuest(guest);
+    setSelectedReservation(null);
+    setSelectedConversation(null);
+    setPopup('guestDetail');
+  }, []);
+
+  const openStaffProfile = useCallback((staff: ArcadiaRecord) => {
+    setSelectedStaff(staff);
     setPopup('staffProfile');
   }, []);
 
-  const openWhatsAppChat = useCallback((label: string) => {
-    setSelectedLabel(label);
+  const openWhatsAppChat = useCallback((conversation: ArcadiaRecord) => {
+    setSelectedConversation(conversation);
+    setSelectedGuest(null);
+    setSelectedReservation(null);
+    setSelectedLabel('');
     setPopup('whatsappChat');
   }, []);
+
+  const refreshResource = useCallback(
+    (resource: ResourceKey) => {
+      loadResource(resource);
+    },
+    [loadResource],
+  );
 
   const refreshActiveData = useCallback(() => {
     if (screen === 'reservations') {
@@ -223,6 +261,9 @@ function App(): React.JSX.Element {
     }
     if (screen === 'notifications') {
       loadResource('notifications');
+    }
+    if (screen === 'guests') {
+      loadResource('guests');
     }
     if (screen === 'room') {
       loadResource('rooms');
@@ -245,6 +286,10 @@ function App(): React.JSX.Element {
   }, [loadResource, screen]);
 
   const appData = useMemo(() => buildAppData(resources), [resources]);
+  const activeError = useMemo(
+    () => screenResourceError(screen, resources),
+    [resources, screen],
+  );
 
   if (sessionRestoring) {
     return (
@@ -289,6 +334,7 @@ function App(): React.JSX.Element {
           <ErrorBoundary key={screen}>
             <ScreenContent
               data={appData}
+              error={activeError}
               loading={isScreenLoading(screen, resources)}
               screen={screen}
               user={session.user}
@@ -297,7 +343,9 @@ function App(): React.JSX.Element {
               onMenu={() => setDrawerOpen(true)}
               onNavigate={openScreen}
               onOpenProfileOption={openProfileOption}
+              onOpenGuest={openGuestDetail}
               onOpenReservation={openReservationDetail}
+              onOpenReservationForm={openReservationForm}
               onOpenRoomForm={openRoomForm}
               onOpenStaffProfile={openStaffProfile}
               onOpenTicket={openTicketDetail}
@@ -338,11 +386,17 @@ function App(): React.JSX.Element {
           selectedLabel={selectedLabel}
           ticket={selectedTicket}
           data={appData}
+          guest={selectedGuest}
           user={session.user}
+          conversation={selectedConversation}
+          request={request}
+          staff={selectedStaff}
           onCheckIn={() => setPopup('checkIn')}
           onCheckOut={() => setPopup('checkOut')}
           onClose={closePopup}
-          onCreateTicket={openTicketForm}
+          onCreateTicket={openContextTicketForm}
+          onOpenWhatsAppConversation={openWhatsAppChat}
+          onRefreshResource={refreshResource}
           onReservationBack={() => setPopup('reservationDetail')}
         />
       </View>

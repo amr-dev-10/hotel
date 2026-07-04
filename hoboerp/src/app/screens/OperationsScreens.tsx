@@ -6,6 +6,7 @@ import {
   ChipRow,
   DepartmentRow,
   EmptyState,
+  ErrorNotice,
   MetricTile,
   OverviewStat,
   ProfileOption,
@@ -43,11 +44,11 @@ import {
   Wrench,
 } from '../icons';
 import {
-  countRecordsByStatus,
   filterByStatus,
   filterRecordsByStatus,
   firstRecordValue,
   formatAmount,
+  isRecordTruthy,
 } from '../dataUtils';
 import {blue, styles} from '../styles';
 import type {ScreenAction, ScreenKey} from '../types';
@@ -57,6 +58,7 @@ import type {ArcadiaRecord, UserProfile} from '../../types/domain';
 
 export function ScreenContent({
   data,
+  error,
   loading,
   screen,
   user,
@@ -65,7 +67,9 @@ export function ScreenContent({
   onMenu,
   onNavigate,
   onOpenProfileOption,
+  onOpenGuest,
   onOpenReservation,
+  onOpenReservationForm,
   onOpenRoomForm,
   onOpenStaffProfile,
   onOpenTicket,
@@ -74,6 +78,7 @@ export function ScreenContent({
   onRefresh,
 }: {
   data: AppData;
+  error: string | null;
   loading: boolean;
   screen: ScreenKey;
   user: UserProfile;
@@ -82,18 +87,21 @@ export function ScreenContent({
   onMenu: () => void;
   onNavigate: ScreenAction;
   onOpenProfileOption: (label: string) => void;
+  onOpenGuest: (guest: ArcadiaRecord) => void;
   onOpenReservation: (reservation: ReservationView) => void;
+  onOpenReservationForm: () => void;
   onOpenRoomForm: (room: ArcadiaRecord | null) => void;
-  onOpenStaffProfile: (label: string) => void;
+  onOpenStaffProfile: (staff: ArcadiaRecord) => void;
   onOpenTicket: (ticket: TicketView) => void;
   onOpenTicketForm: () => void;
-  onOpenWhatsAppChat: (label: string) => void;
+  onOpenWhatsAppChat: (conversation: ArcadiaRecord) => void;
   onRefresh: () => void;
 }) {
   if (screen === 'dashboard') {
     return (
       <DashboardScreen
         data={data}
+        error={error}
         loading={loading}
         onMenu={onMenu}
         onNavigate={onNavigate}
@@ -105,10 +113,25 @@ export function ScreenContent({
     return (
       <ReservationsScreen
         reservations={data.reservations}
+        error={error}
         loading={loading}
         onBack={onBack}
         onMenu={onMenu}
         onOpenReservation={onOpenReservation}
+        onOpenReservationForm={onOpenReservationForm}
+        onRefresh={onRefresh}
+      />
+    );
+  }
+  if (screen === 'guests') {
+    return (
+      <GuestsScreen
+        error={error}
+        guests={data.guests}
+        loading={loading}
+        onBack={onBack}
+        onMenu={onMenu}
+        onOpenGuest={onOpenGuest}
         onRefresh={onRefresh}
       />
     );
@@ -116,6 +139,7 @@ export function ScreenContent({
   if (screen === 'room') {
     return (
       <RoomScreen
+        error={error}
         rooms={data.rooms}
         onBack={onBack}
         onMenu={onMenu}
@@ -128,6 +152,7 @@ export function ScreenContent({
     return (
       <TicketsScreen
         loading={loading}
+        error={error}
         tickets={data.tickets}
         onBack={onBack}
         onCreateTicket={onOpenTicketForm}
@@ -141,6 +166,7 @@ export function ScreenContent({
     return (
       <EscalationsScreen
         escalations={data.escalations}
+        error={error}
         loading={loading}
         onBack={onBack}
         onMenu={onMenu}
@@ -152,6 +178,7 @@ export function ScreenContent({
     return (
       <NotificationsScreen
         loading={loading}
+        error={error}
         notifications={data.notifications}
         onBack={onBack}
         onMenu={onMenu}
@@ -163,6 +190,7 @@ export function ScreenContent({
     return (
       <HousekeepingScreen
         loading={loading}
+        error={error}
         tasks={data.housekeeping}
         onBack={onBack}
         onMenu={onMenu}
@@ -174,6 +202,7 @@ export function ScreenContent({
     return (
       <FoodScreen
         loading={loading}
+        error={error}
         orders={data.orders}
         onBack={onBack}
         onMenu={onMenu}
@@ -185,6 +214,7 @@ export function ScreenContent({
     return (
       <KitchenScreen
         loading={loading}
+        error={error}
         orders={data.orders}
         onBack={onBack}
         onMenu={onMenu}
@@ -196,6 +226,7 @@ export function ScreenContent({
     return (
       <WhatsAppScreen
         conversations={data.whatsapp}
+        error={error}
         loading={loading}
         onBack={onBack}
         onMenu={onMenu}
@@ -211,6 +242,7 @@ export function ScreenContent({
     return (
       <StaffScreen
         loading={loading}
+        error={error}
         staff={data.staff}
         onBack={onBack}
         onMenu={onMenu}
@@ -233,12 +265,14 @@ export function ScreenContent({
 
 function DashboardScreen({
   data,
+  error,
   loading,
   onMenu,
   onNavigate,
   onRefresh,
 }: {
   data: AppData;
+  error: string | null;
   loading: boolean;
   onMenu: () => void;
   onNavigate: ScreenAction;
@@ -250,6 +284,7 @@ function DashboardScreen({
       contentContainerStyle={styles.screenContent}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}>
       <TopAppBar title="Dashboard" leftIcon={Menu} onLeftPress={onMenu} rightIcon={Bell} />
+      <ErrorNotice message={error} onRetry={onRefresh} />
       <View style={styles.overviewCard}>
         <View style={styles.rowBetween}>
           <View>
@@ -317,18 +352,22 @@ function DashboardScreen({
 }
 
 function ReservationsScreen({
+  error,
   reservations,
   loading,
   onBack,
   onMenu,
   onOpenReservation,
+  onOpenReservationForm,
   onRefresh,
 }: {
+  error: string | null;
   reservations: ReservationView[];
   loading: boolean;
   onBack: () => void;
   onMenu: () => void;
   onOpenReservation: (reservation: ReservationView) => void;
+  onOpenReservationForm: () => void;
   onRefresh: () => void;
 }) {
   const [filter, setFilter] = useState('All');
@@ -351,8 +390,11 @@ function ReservationsScreen({
             leftIcon={ChevronLeft}
             onLeftPress={onBack}
             rightIcon={Menu}
+            secondaryRightIcon={Plus}
             onRightPress={onMenu}
+            onSecondaryRightPress={onOpenReservationForm}
           />
+          <ErrorNotice message={error} onRetry={onRefresh} />
           <SearchBox placeholder="Search by Guest, Room No, Booking ID..." />
           <ChipRow
             labels={['All', 'Today', 'Upcoming', 'Checked In', 'Checked Out']}
@@ -369,13 +411,89 @@ function ReservationsScreen({
   );
 }
 
+function GuestsScreen({
+  error,
+  guests,
+  loading,
+  onBack,
+  onMenu,
+  onOpenGuest,
+  onRefresh,
+}: {
+  error: string | null;
+  guests: ArcadiaRecord[];
+  loading: boolean;
+  onBack: () => void;
+  onMenu: () => void;
+  onOpenGuest: (guest: ArcadiaRecord) => void;
+  onRefresh: () => void;
+}) {
+  const [filter, setFilter] = useState('All');
+  const filteredGuests = useMemo(() => filterRecordsByStatus(guests, filter), [filter, guests]);
+
+  return (
+    <FlatList
+      style={styles.screen}
+      contentContainerStyle={styles.screenContent}
+      data={filteredGuests}
+      keyExtractor={(item, index) =>
+        `${firstRecordValue(item, ['id', 'phone', 'whatsapp_phone', 'name'])}-${index}`
+      }
+      refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}
+      ListHeaderComponent={
+        <View>
+          <TopAppBar
+            title="Guests"
+            leftIcon={ChevronLeft}
+            onLeftPress={onBack}
+            rightIcon={Menu}
+            onRightPress={onMenu}
+          />
+          <ErrorNotice message={error} onRetry={onRefresh} />
+          <SearchBox placeholder="Search guest, phone, email..." />
+          <ChipRow
+            labels={['All', 'Pre Arrival', 'Checked In', 'Checked Out']}
+            activeLabel={filter}
+            onSelect={setFilter}
+          />
+        </View>
+      }
+      ListEmptyComponent={<EmptyState label="No guests returned from API." />}
+      renderItem={({item}) => {
+        const name = firstRecordValue(item, ['name', 'guest_name', 'email']);
+        const status = firstRecordValue(item, ['status']) || 'Guest';
+        const phone = firstRecordValue(item, ['whatsapp_phone', 'phone', 'email']);
+        const hasChat = isRecordTruthy(item, ['has_whatsapp_conversation']);
+        return (
+          <Pressable style={styles.staffCard} onPress={() => onOpenGuest(item)}>
+            <Avatar label={(name || 'G').charAt(0)} size={42} />
+            <View style={styles.staffText}>
+              <Text style={styles.cardTitle}>{name || 'Unknown guest'}</Text>
+              <Text style={styles.caption}>{phone || 'No contact saved'}</Text>
+              <Text style={styles.captionTiny}>
+                Reservations {firstRecordValue(item, ['reservation_count']) || '0'}
+              </Text>
+            </View>
+            <View style={styles.chatMeta}>
+              <StatusBadge label={status} tone={statusTone(status)} />
+              {hasChat ? <Text style={styles.captionTiny}>WhatsApp linked</Text> : null}
+            </View>
+          </Pressable>
+        );
+      }}
+    />
+  );
+}
+
 function RoomScreen({
+  error,
   rooms,
   onBack,
   onMenu,
   onNavigate,
   onOpenRoomForm,
 }: {
+  error: string | null;
   rooms: ArcadiaRecord[];
   onBack: () => void;
   onMenu: () => void;
@@ -421,6 +539,7 @@ function RoomScreen({
             onRightPress={onMenu}
             onSecondaryRightPress={() => onOpenRoomForm(null)}
           />
+          <ErrorNotice message={error} />
           <SearchBox placeholder="Search room, type, floor..." />
           <ChipRow labels={floors} activeLabel={floor} onSelect={setFloor} />
         </View>
@@ -459,6 +578,7 @@ function RoomScreen({
 }
 
 function TicketsScreen({
+  error,
   loading,
   tickets,
   onBack,
@@ -467,6 +587,7 @@ function TicketsScreen({
   onOpenTicket,
   onRefresh,
 }: {
+  error: string | null;
   loading: boolean;
   tickets: TicketView[];
   onBack: () => void;
@@ -499,6 +620,7 @@ function TicketsScreen({
             onRightPress={onMenu}
             onSecondaryRightPress={onCreateTicket}
           />
+          <ErrorNotice message={error} onRetry={onRefresh} />
           <ChipRow
             labels={['All', 'Open', 'In Progress', 'Closed']}
             activeLabel={filter}
@@ -515,12 +637,14 @@ function TicketsScreen({
 }
 
 function EscalationsScreen({
+  error,
   escalations,
   loading,
   onBack,
   onMenu,
   onRefresh,
 }: {
+  error: string | null;
   escalations: ArcadiaRecord[];
   loading: boolean;
   onBack: () => void;
@@ -551,6 +675,7 @@ function EscalationsScreen({
             rightIcon={Menu}
             onRightPress={onMenu}
           />
+          <ErrorNotice message={error} onRetry={onRefresh} />
           <SearchBox placeholder="Search escalation, owner, ticket..." />
           <ChipRow
             labels={['All', 'Open', 'Acknowledged', 'Resolved', 'Breached']}
@@ -590,12 +715,14 @@ function EscalationsScreen({
 }
 
 function NotificationsScreen({
+  error,
   loading,
   notifications,
   onBack,
   onMenu,
   onRefresh,
 }: {
+  error: string | null;
   loading: boolean;
   notifications: ArcadiaRecord[];
   onBack: () => void;
@@ -632,6 +759,7 @@ function NotificationsScreen({
             rightIcon={Menu}
             onRightPress={onMenu}
           />
+          <ErrorNotice message={error} onRetry={onRefresh} />
           <SearchBox placeholder="Search notifications..." />
           <ChipRow
             labels={['All', 'Unread', 'Read', 'Resolved']}
@@ -669,12 +797,14 @@ function NotificationsScreen({
 }
 
 function HousekeepingScreen({
+  error,
   loading,
   tasks,
   onBack,
   onMenu,
   onRefresh,
 }: {
+  error: string | null;
   loading: boolean;
   tasks: ArcadiaRecord[];
   onBack: () => void;
@@ -696,6 +826,7 @@ function HousekeepingScreen({
         rightIcon={Menu}
         onRightPress={onMenu}
       />
+      <ErrorNotice message={error} onRetry={onRefresh} />
       <View style={styles.tabs}>
         <View style={[styles.tabItem, styles.activeTabItem]}>
           <Text style={[styles.tabText, styles.activeTabText]}>Tasks</Text>
@@ -741,12 +872,14 @@ function HousekeepingScreen({
 }
 
 function FoodScreen({
+  error,
   loading,
   orders,
   onBack,
   onMenu,
   onRefresh,
 }: {
+  error: string | null;
   loading: boolean;
   orders: ArcadiaRecord[];
   onBack: () => void;
@@ -772,6 +905,7 @@ function FoodScreen({
           rightIcon={Menu}
           onRightPress={onMenu}
         />
+        <ErrorNotice message={error} onRetry={onRefresh} />
         <SearchBox placeholder="Search order, guest, room..." />
         <ChipRow
           labels={['Orders', 'Menu', 'Taxes']}
@@ -830,12 +964,14 @@ function FoodScreen({
 }
 
 function KitchenScreen({
+  error,
   loading,
   orders,
   onBack,
   onMenu,
   onRefresh,
 }: {
+  error: string | null;
   loading: boolean;
   orders: ArcadiaRecord[];
   onBack: () => void;
@@ -866,6 +1002,7 @@ function KitchenScreen({
             rightIcon={Menu}
             onRightPress={onMenu}
           />
+          <ErrorNotice message={error} onRetry={onRefresh} />
           <ChipRow
             labels={['Received', 'Preparing', 'Ready', 'Delivered', 'Cancelled']}
             activeLabel={filter}
@@ -917,6 +1054,7 @@ function KitchenScreen({
 
 function WhatsAppScreen({
   conversations,
+  error,
   loading,
   onBack,
   onMenu,
@@ -924,10 +1062,11 @@ function WhatsAppScreen({
   onRefresh,
 }: {
   conversations: ArcadiaRecord[];
+  error: string | null;
   loading: boolean;
   onBack: () => void;
   onMenu: () => void;
-  onOpenChat: (label: string) => void;
+  onOpenChat: (conversation: ArcadiaRecord) => void;
   onRefresh: () => void;
 }) {
   const [filter, setFilter] = useState('All');
@@ -948,6 +1087,7 @@ function WhatsAppScreen({
         rightIcon={Menu}
         onRightPress={onMenu}
       />
+      <ErrorNotice message={error} onRetry={onRefresh} />
       <SearchBox placeholder="Search conversations..." />
       <ChipRow
         labels={['All', 'Open', 'Pending', 'Resolved']}
@@ -967,7 +1107,7 @@ function WhatsAppScreen({
           <Pressable
             key={`${name}-${index}`}
             style={styles.chatRow}
-            onPress={() => onOpenChat(name)}>
+            onPress={() => onOpenChat(conversation)}>
             <View style={styles.whatsappIcon}>
               <MessageCircle color="#FFFFFF" size={18} strokeWidth={2} />
             </View>
@@ -998,6 +1138,7 @@ function WhatsAppScreen({
 }
 
 function StaffScreen({
+  error,
   loading,
   staff,
   onBack,
@@ -1005,15 +1146,37 @@ function StaffScreen({
   onOpenStaffProfile,
   onRefresh,
 }: {
+  error: string | null;
   loading: boolean;
   staff: ArcadiaRecord[];
   onBack: () => void;
   onMenu: () => void;
-  onOpenStaffProfile: (label: string) => void;
+  onOpenStaffProfile: (staff: ArcadiaRecord) => void;
   onRefresh: () => void;
 }) {
   const [filter, setFilter] = useState('All');
-  const filteredStaff = useMemo(() => filterRecordsByStatus(staff, filter), [filter, staff]);
+  const filteredStaff = useMemo(() => {
+    if (filter === 'All') {
+      return staff;
+    }
+    if (filter === 'On Duty') {
+      return staff.filter(item => isRecordTruthy(item, ['is_on_duty']));
+    }
+    if (filter === 'Off Duty') {
+      return staff.filter(
+        item =>
+          isRecordTruthy(item, ['is_active']) &&
+          !isRecordTruthy(item, ['is_on_duty']),
+      );
+    }
+    if (filter === 'Active') {
+      return staff.filter(item => isRecordTruthy(item, ['is_active']));
+    }
+    if (filter === 'Inactive') {
+      return staff.filter(item => !isRecordTruthy(item, ['is_active']));
+    }
+    return filterRecordsByStatus(staff, filter);
+  }, [filter, staff]);
 
   return (
     <ScrollView
@@ -1027,13 +1190,27 @@ function StaffScreen({
         rightIcon={Menu}
         onRightPress={onMenu}
       />
+      <ErrorNotice message={error} onRetry={onRefresh} />
       <View style={styles.staffSummaryGrid}>
-        <MetricTile label="On Duty" value={countRecordsByStatus(staff, 'checked in')} tone="green" />
-        <MetricTile label="On Break" value={countRecordsByStatus(staff, 'break')} tone="orange" />
-        <MetricTile label="Late" value={countRecordsByStatus(staff, 'late')} tone="red" />
+        <MetricTile label="Total" value={staff.length} tone="blue" />
+        <MetricTile
+          label="On Duty"
+          value={staff.filter(item => isRecordTruthy(item, ['is_on_duty'])).length}
+          tone="green"
+        />
+        <MetricTile
+          label="Active"
+          value={staff.filter(item => isRecordTruthy(item, ['is_active'])).length}
+          tone="orange"
+        />
+        <MetricTile
+          label="Inactive"
+          value={staff.filter(item => !isRecordTruthy(item, ['is_active'])).length}
+          tone="red"
+        />
       </View>
       <ChipRow
-        labels={['All', 'Checked In', 'On Break', 'Late', 'Checked Out']}
+        labels={['All', 'On Duty', 'Off Duty', 'Active', 'Inactive']}
         activeLabel={filter}
         onSelect={setFilter}
       />
@@ -1041,12 +1218,14 @@ function StaffScreen({
       <View style={styles.cardStack}>
         {filteredStaff.map((member, index) => {
           const name = firstRecordValue(member, ['name', 'full_name', 'email']);
-          const status = firstRecordValue(member, ['attendance_status', 'status']);
+          const onDuty = isRecordTruthy(member, ['is_on_duty']);
+          const active = isRecordTruthy(member, ['is_active']);
+          const status = onDuty ? 'On Duty' : active ? 'Off Duty' : 'Inactive';
           return (
           <Pressable
             key={`${name}-${index}`}
             style={styles.staffCard}
-            onPress={() => onOpenStaffProfile(name)}>
+            onPress={() => onOpenStaffProfile(member)}>
             <Avatar label={name.charAt(0)} size={42} />
             <View style={styles.staffText}>
               <Text style={styles.cardTitle}>{name}</Text>
@@ -1065,9 +1244,9 @@ function StaffScreen({
         <EmptyState label="No staff records returned from API." />
       ) : null}
       <View style={styles.actionGrid}>
-        <RoomAction icon={User} label="Check In" onPress={() => onOpenStaffProfile('Check In')} />
-        <RoomAction icon={LogOut} label="Check Out" onPress={() => onOpenStaffProfile('Check Out')} />
-        <RoomAction icon={CalendarDays} label="Shift Plan" onPress={() => onOpenStaffProfile('Shift Plan')} />
+        <RoomAction icon={User} label="Directory" onPress={onRefresh} />
+        <RoomAction icon={LogOut} label="Duty Status" onPress={onRefresh} />
+        <RoomAction icon={CalendarDays} label="Shift Plan" onPress={onRefresh} />
       </View>
     </ScrollView>
   );

@@ -1048,6 +1048,9 @@ export const styles = StyleSheet.create({
   secondaryActionButton: {
     backgroundColor: '#EFF6FF',
   },
+  disabledActionButton: {
+    opacity: 0.58,
+  },
   popupActionText: {
     color: '#FFFFFF',
     fontSize: 13,
@@ -1058,6 +1061,7 @@ export const styles = StyleSheet.create({
     color: blue,
   },
   formField: {
+    flex: 1,
     marginBottom: 12,
   },
   formLabel: {
@@ -1128,6 +1132,77 @@ export const styles = StyleSheet.create({
     fontSize: 12,
     padding: 12,
   },
+  selectedLookupRow: {
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    borderColor: '#BFDBFE',
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  optionWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  optionPill: {
+    backgroundColor: '#F1F5F9',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  activeOptionPill: {
+    backgroundColor: blue,
+  },
+  optionPillText: {
+    color: textColor,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  activeOptionPillText: {
+    color: '#FFFFFF',
+  },
+  dualFieldRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  formErrorBox: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FCA5A5',
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 12,
+    padding: 12,
+  },
+  formErrorTitle: {
+    color: '#991B1B',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  formErrorText: {
+    color: '#7F1D1D',
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 4,
+  },
+  contextBanner: {
+    backgroundColor: '#F8FAFC',
+    borderColor: border,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 12,
+    padding: 12,
+  },
+  contextBannerText: {
+    color: textColor,
+    fontSize: 12,
+    fontWeight: '800',
+    marginTop: 4,
+  },
   stageTrack: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1167,6 +1242,12 @@ export const styles = StyleSheet.create({
   chatTranscript: {
     gap: 10,
   },
+  loadingRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
+    paddingVertical: 12,
+  },
   chatMessageGuest: {
     alignSelf: 'flex-start',
     backgroundColor: '#F1F5F9',
@@ -1182,6 +1263,32 @@ export const styles = StyleSheet.create({
     color: '#FFFFFF',
     maxWidth: '82%',
     padding: 12,
+  },
+  popupComposer: {
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderColor: border,
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 14,
+    paddingHorizontal: 12,
+  },
+  popupComposerInput: {
+    color: textColor,
+    flex: 1,
+    fontSize: 13,
+    minHeight: 46,
+    padding: 0,
+  },
+  popupSendButton: {
+    alignItems: 'center',
+    backgroundColor: '#DBEAFE',
+    borderRadius: 16,
+    height: 32,
+    justifyContent: 'center',
+    width: 32,
   },
   staffPopupHeader: {
     alignItems: 'center',
@@ -1257,6 +1364,45 @@ export const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     textAlign: 'center',
+  },
+  errorNotice: {
+    alignItems: 'flex-start',
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FCA5A5',
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 12,
+    marginTop: 8,
+    padding: 12,
+  },
+  errorNoticeTextBlock: {
+    flex: 1,
+  },
+  errorNoticeTitle: {
+    color: '#991B1B',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  errorNoticeMessage: {
+    color: '#7F1D1D',
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 4,
+  },
+  errorRetryButton: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#FCA5A5',
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  errorRetryText: {
+    color: '#991B1B',
+    fontSize: 11,
+    fontWeight: '900',
   },
   avatar: {
     alignItems: 'center',

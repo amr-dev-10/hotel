@@ -4,6 +4,7 @@ export type ResourceKey =
   | 'tickets'
   | 'escalations'
   | 'notifications'
+  | 'guests'
   | 'reservations'
   | 'rooms'
   | 'orders'

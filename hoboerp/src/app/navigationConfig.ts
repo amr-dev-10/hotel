@@ -24,7 +24,7 @@ export function buildSideNavItems(icons: {
     {key: 'staff', label: 'Staff Portal', icon: icons.Users},
     {key: 'tickets', label: 'Tickets', icon: icons.Ticket},
     {key: 'escalations', label: 'Escalations', icon: icons.Wrench},
-    {key: 'room', label: 'Guests', icon: icons.Users},
+    {key: 'guests', label: 'Guests', icon: icons.Users},
     {key: 'reservations', label: 'Reservations', icon: icons.CalendarDays},
     {key: 'room', label: 'Rooms', icon: icons.Hotel},
     {key: 'food', label: 'F&B', icon: icons.Utensils},

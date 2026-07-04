@@ -26,6 +26,7 @@ export type AppData = {
   tickets: TicketView[];
   escalations: Record<string, unknown>[];
   notifications: Record<string, unknown>[];
+  guests: Record<string, unknown>[];
   rooms: Record<string, unknown>[];
   orders: Record<string, unknown>[];
   staff: Record<string, unknown>[];

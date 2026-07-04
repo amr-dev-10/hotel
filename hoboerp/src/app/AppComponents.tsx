@@ -264,6 +264,32 @@ export function EmptyState({label}: {label: string}) {
   );
 }
 
+export function ErrorNotice({
+  message,
+  onRetry,
+}: {
+  message: string | null;
+  onRetry?: () => void;
+}) {
+  if (!message) {
+    return null;
+  }
+
+  return (
+    <View style={styles.errorNotice}>
+      <View style={styles.errorNoticeTextBlock}>
+        <Text style={styles.errorNoticeTitle}>Unable to load latest data</Text>
+        <Text style={styles.errorNoticeMessage}>{message}</Text>
+      </View>
+      {onRetry ? (
+        <Pressable style={styles.errorRetryButton} onPress={onRetry}>
+          <Text style={styles.errorRetryText}>Retry</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
 export function SectionTitle({
   title,
   action,
@@ -368,5 +394,4 @@ function toneColor(tone: 'blue' | 'green' | 'orange' | 'red') {
     red: '#DC2626',
   }[tone];
 }
-
 
