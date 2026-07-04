@@ -1,12 +1,14 @@
-import {useMemo, useState} from 'react';
-import {FlatList, Pressable, RefreshControl, ScrollView, Text, TextInput, View} from 'react-native';
+import {useEffect, useMemo, useState} from 'react';
+import {ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, Text, TextInput, View} from 'react-native';
 
 import {
+  ActionMenu,
   Avatar,
   ChipRow,
   DepartmentRow,
   EmptyState,
   ErrorNotice,
+  LoadingProcessCard,
   MetricTile,
   OverviewStat,
   ProfileOption,
@@ -28,7 +30,6 @@ import {
 import type {AppDialogRequest} from '../AppDialog';
 import {
   Bell,
-  Bot,
   CalendarDays,
   ChevronLeft,
   ClipboardCheck,
@@ -54,13 +55,14 @@ import {
   filterByStatus,
   filterRecordsByStatus,
   firstRecordValue,
+  filterRecordsBySearch,
   formatAmount,
   isRecordTruthy,
 } from '../dataUtils';
 import {blue, styles} from '../styles';
 import type {ScreenAction, ScreenKey} from '../types';
 import type {AppData, ReservationView, TicketView} from '../../modules/dashboard';
-import type {ResourceKey} from '../../modules/operations/types';
+import type {ActionHandler, ResourceKey} from '../../modules/operations/types';
 import {statusTone} from '../../modules/operations/utils';
 import type {ApiEnvelope} from '../../types/api';
 import type {ArcadiaRecord, UserProfile} from '../../types/domain';
@@ -70,11 +72,57 @@ type RequestFn = <T>(
   options?: RequestInit,
 ) => Promise<ApiEnvelope<T>>;
 
+const PAGE_SIZE = 12;
+
+function useScrollPagination<T>(items: T[], pageSize = PAGE_SIZE) {
+  const [visibleCount, setVisibleCount] = useState(pageSize);
+
+  useEffect(() => {
+    setVisibleCount(pageSize);
+  }, [items, pageSize]);
+
+  const visibleItems = useMemo(
+    () => items.slice(0, visibleCount),
+    [items, visibleCount],
+  );
+  const hasMore = visibleCount < items.length;
+  const loadMore = () => {
+    if (hasMore) {
+      setVisibleCount(current => Math.min(current + pageSize, items.length));
+    }
+  };
+
+  return {hasMore, loadMore, visibleItems};
+}
+
+function ListFooter({hasMore, loading}: {hasMore: boolean; loading?: boolean}) {
+  return (
+    <View style={styles.listFooter}>
+      {loading ? <ActivityIndicator color={blue} size="small" /> : null}
+      <Text style={styles.listFooterText}>
+        {loading ? 'Loading records...' : hasMore ? 'Scroll for more' : 'All records loaded'}
+      </Text>
+    </View>
+  );
+}
+
+function handleScrollLoadMore(loadMore: () => void) {
+  return ({nativeEvent}: {nativeEvent: {contentOffset: {y: number}; contentSize: {height: number}; layoutMeasurement: {height: number}}}) => {
+    const distanceFromBottom =
+      nativeEvent.contentSize.height -
+      (nativeEvent.contentOffset.y + nativeEvent.layoutMeasurement.height);
+    if (distanceFromBottom < 72) {
+      loadMore();
+    }
+  };
+}
+
 export function ScreenContent({
   data,
   error,
   hotelName,
   loading,
+  loadingProcesses,
   request,
   screen,
   selectedConversation,
@@ -96,6 +144,8 @@ export function ScreenContent({
   onOpenContextTicketForm,
   onOpenTicketForm,
   onOpenWhatsAppChat,
+  onOpenNotifications,
+  onQuickRecordAction,
   onRefresh,
   onRefreshResource,
   onShowDialog,
@@ -104,6 +154,7 @@ export function ScreenContent({
   error: string | null;
   hotelName: string;
   loading: boolean;
+  loadingProcesses: string[];
   request: RequestFn;
   screen: ScreenKey;
   selectedConversation: ArcadiaRecord | null;
@@ -125,6 +176,8 @@ export function ScreenContent({
   onOpenContextTicketForm: () => void;
   onOpenTicketForm: () => void;
   onOpenWhatsAppChat: (conversation: ArcadiaRecord) => void;
+  onOpenNotifications: () => void;
+  onQuickRecordAction: ActionHandler;
   onRefresh: () => void;
   onRefreshResource: (resource: ResourceKey) => void;
   onShowDialog: (dialog: AppDialogRequest) => void;
@@ -143,6 +196,7 @@ export function ScreenContent({
         onBack={onBack}
         onMenu={onMenu}
         onRefresh={onRefresh}
+        onOpenNotifications={onOpenNotifications}
         onRefreshResource={onRefreshResource}
         onShowDialog={onShowDialog}
       />
@@ -160,6 +214,7 @@ export function ScreenContent({
         onBack={onBack}
         onMenu={onMenu}
         onOpenWhatsAppConversation={onOpenWhatsAppChat}
+        onOpenNotifications={onOpenNotifications}
         onRefresh={onRefresh}
         onRefreshResource={onRefreshResource}
         onShowDialog={onShowDialog}
@@ -179,6 +234,7 @@ export function ScreenContent({
         onCreateTicket={onOpenContextTicketForm}
         onMenu={onMenu}
         onOpenWhatsAppConversation={onOpenWhatsAppChat}
+        onOpenNotifications={onOpenNotifications}
         onRefresh={onRefresh}
         onRefreshResource={onRefreshResource}
         onShowDialog={onShowDialog}
@@ -198,6 +254,7 @@ export function ScreenContent({
         onCreateTicket={onOpenContextTicketForm}
         onMenu={onMenu}
         onOpenWhatsAppConversation={onOpenWhatsAppChat}
+        onOpenNotifications={onOpenNotifications}
         onRefresh={onRefresh}
         onRefreshResource={onRefreshResource}
         onShowDialog={onShowDialog}
@@ -216,6 +273,7 @@ export function ScreenContent({
         onBack={onBack}
         onCreateTicket={onOpenContextTicketForm}
         onMenu={onMenu}
+        onOpenNotifications={onOpenNotifications}
         onRefresh={onRefresh}
         onRefreshResource={onRefreshResource}
         onShowDialog={onShowDialog}
@@ -228,8 +286,10 @@ export function ScreenContent({
         data={data}
         error={error}
         loading={loading}
+        loadingProcesses={loadingProcesses}
         onMenu={onMenu}
         onNavigate={onNavigate}
+        onOpenNotifications={onOpenNotifications}
         onOpenTicketForm={onOpenTicketForm}
         onRefresh={onRefresh}
       />
@@ -241,10 +301,13 @@ export function ScreenContent({
         reservations={data.reservations}
         error={error}
         loading={loading}
+        loadingProcesses={loadingProcesses}
         onBack={onBack}
         onMenu={onMenu}
         onOpenReservation={onOpenReservation}
         onOpenReservationForm={onOpenReservationForm}
+        onOpenNotifications={onOpenNotifications}
+        onQuickRecordAction={onQuickRecordAction}
         onRefresh={onRefresh}
       />
     );
@@ -255,9 +318,12 @@ export function ScreenContent({
         error={error}
         guests={data.guests}
         loading={loading}
+        loadingProcesses={loadingProcesses}
         onBack={onBack}
         onMenu={onMenu}
         onOpenGuest={onOpenGuest}
+        onOpenNotifications={onOpenNotifications}
+        onQuickRecordAction={onQuickRecordAction}
         onRefresh={onRefresh}
       />
     );
@@ -266,11 +332,16 @@ export function ScreenContent({
     return (
       <RoomScreen
         error={error}
+        loading={loading}
+        loadingProcesses={loadingProcesses}
         rooms={data.rooms}
         onBack={onBack}
         onMenu={onMenu}
         onNavigate={onNavigate}
+        onOpenNotifications={onOpenNotifications}
         onOpenRoomForm={onOpenRoomForm}
+        onQuickRecordAction={onQuickRecordAction}
+        onRefresh={onRefresh}
       />
     );
   }
@@ -278,11 +349,14 @@ export function ScreenContent({
     return (
       <TicketsScreen
         loading={loading}
+        loadingProcesses={loadingProcesses}
         error={error}
         tickets={data.tickets}
         onBack={onBack}
         onCreateTicket={onOpenTicketForm}
         onOpenTicket={onOpenTicket}
+        onOpenNotifications={onOpenNotifications}
+        onQuickRecordAction={onQuickRecordAction}
         onRefresh={onRefresh}
       />
     );
@@ -293,8 +367,11 @@ export function ScreenContent({
         escalations={data.escalations}
         error={error}
         loading={loading}
+        loadingProcesses={loadingProcesses}
         onBack={onBack}
         onMenu={onMenu}
+        onOpenNotifications={onOpenNotifications}
+        onQuickRecordAction={onQuickRecordAction}
         onRefresh={onRefresh}
       />
     );
@@ -304,9 +381,12 @@ export function ScreenContent({
       <NotificationsScreen
         loading={loading}
         error={error}
+        loadingProcesses={loadingProcesses}
         notifications={data.notifications}
         onBack={onBack}
         onMenu={onMenu}
+        onOpenNotifications={onOpenNotifications}
+        onQuickRecordAction={onQuickRecordAction}
         onRefresh={onRefresh}
       />
     );
@@ -316,9 +396,12 @@ export function ScreenContent({
       <HousekeepingScreen
         loading={loading}
         error={error}
+        loadingProcesses={loadingProcesses}
         tasks={data.housekeeping}
         onBack={onBack}
         onMenu={onMenu}
+        onOpenNotifications={onOpenNotifications}
+        onQuickRecordAction={onQuickRecordAction}
         onRefresh={onRefresh}
       />
     );
@@ -328,9 +411,12 @@ export function ScreenContent({
       <FoodScreen
         loading={loading}
         error={error}
+        loadingProcesses={loadingProcesses}
         orders={data.orders}
         onBack={onBack}
         onMenu={onMenu}
+        onOpenNotifications={onOpenNotifications}
+        onQuickRecordAction={onQuickRecordAction}
         onRefresh={onRefresh}
       />
     );
@@ -340,9 +426,12 @@ export function ScreenContent({
       <KitchenScreen
         loading={loading}
         error={error}
+        loadingProcesses={loadingProcesses}
         orders={data.orders}
         onBack={onBack}
         onMenu={onMenu}
+        onOpenNotifications={onOpenNotifications}
+        onQuickRecordAction={onQuickRecordAction}
         onRefresh={onRefresh}
       />
     );
@@ -353,24 +442,28 @@ export function ScreenContent({
         conversations={data.whatsapp}
         error={error}
         loading={loading}
+        loadingProcesses={loadingProcesses}
         onBack={onBack}
         onMenu={onMenu}
         onOpenChat={onOpenWhatsAppChat}
+        onOpenNotifications={onOpenNotifications}
         onRefresh={onRefresh}
       />
     );
   }
   if (screen === 'assistant') {
-    return <AssistantScreen data={data} onBack={onBack} onMenu={onMenu} />;
+    return <AssistantScreen data={data} onBack={onBack} onMenu={onMenu} onOpenNotifications={onOpenNotifications} />;
   }
   if (screen === 'staff') {
     return (
       <StaffScreen
         loading={loading}
         error={error}
+        loadingProcesses={loadingProcesses}
         staff={data.staff}
         onBack={onBack}
         onMenu={onMenu}
+        onOpenNotifications={onOpenNotifications}
         onOpenStaffProfile={onOpenStaffProfile}
         onRefresh={onRefresh}
       />
@@ -383,6 +476,7 @@ export function ScreenContent({
       onBack={onBack}
       onLogout={onLogout}
       onMenu={onMenu}
+      onOpenNotifications={onOpenNotifications}
       onNavigate={onNavigate}
       onOpenProfileOption={onOpenProfileOption}
     />
@@ -393,16 +487,20 @@ function DashboardScreen({
   data,
   error,
   loading,
+  loadingProcesses,
   onMenu,
   onNavigate,
+  onOpenNotifications,
   onOpenTicketForm,
   onRefresh,
 }: {
   data: AppData;
   error: string | null;
   loading: boolean;
+  loadingProcesses: string[];
   onMenu: () => void;
   onNavigate: ScreenAction;
+  onOpenNotifications: () => void;
   onOpenTicketForm: () => void;
   onRefresh: () => void;
 }) {
@@ -416,7 +514,12 @@ function DashboardScreen({
         leftIcon={Menu}
         onLeftPress={onMenu}
         rightIcon={Bell}
-        onRightPress={() => onNavigate('notifications')}
+        onRightPress={onOpenNotifications}
+      />
+      <LoadingProcessCard
+        active={loading}
+        label="Loading dashboard data"
+        processes={loadingProcesses}
       />
       <ErrorNotice message={error} onRetry={onRefresh} />
       <View style={styles.overviewCard}>
@@ -477,10 +580,16 @@ function DashboardScreen({
       </View>
 
       <View style={styles.quickGrid}>
+        <View style={styles.quickMenuHeader}>
+          <Text style={styles.quickMenuTitle}>Quick Actions</Text>
+          <Pressable style={styles.quickMenuAddButton} onPress={onOpenTicketForm}>
+            <Plus color="#FFFFFF" size={18} strokeWidth={2.4} />
+          </Pressable>
+        </View>
         <QuickAction icon={Ticket} label="Create Ticket" onPress={onOpenTicketForm} />
         <QuickAction icon={CalendarDays} label="Reservation" onPress={() => onNavigate('reservations')} />
-        <QuickAction icon={QrCode} label="Scan QR" onPress={() => onNavigate('housekeeping')} />
-        <QuickAction icon={Bot} label="Ask AI" onPress={() => onNavigate('assistant')} />
+        <QuickAction icon={Users} label="Guest" onPress={() => onNavigate('guests')} />
+        <QuickAction icon={Utensils} label="Kitchen" onPress={() => onNavigate('kitchen')} />
       </View>
     </ScrollView>
   );
@@ -490,34 +599,45 @@ function ReservationsScreen({
   error,
   reservations,
   loading,
+  loadingProcesses,
   onBack,
   onMenu,
+  onOpenNotifications,
   onOpenReservation,
   onOpenReservationForm,
+  onQuickRecordAction,
   onRefresh,
 }: {
   error: string | null;
   reservations: ReservationView[];
   loading: boolean;
+  loadingProcesses: string[];
   onBack: () => void;
   onMenu: () => void;
+  onOpenNotifications: () => void;
   onOpenReservation: (reservation: ReservationView) => void;
   onOpenReservationForm: () => void;
+  onQuickRecordAction: ActionHandler;
   onRefresh: () => void;
 }) {
   const [filter, setFilter] = useState('All');
+  const [query, setQuery] = useState('');
   const filteredReservations = useMemo(
-    () => filterByStatus(reservations, filter),
-    [filter, reservations],
+    () => filterRecordsBySearch(filterByStatus(reservations, filter), query),
+    [filter, query, reservations],
   );
+  const {hasMore, loadMore, visibleItems} = useScrollPagination(filteredReservations);
 
   return (
     <FlatList
       style={styles.screen}
       contentContainerStyle={styles.screenContent}
-      data={filteredReservations}
+      data={visibleItems}
       keyExtractor={(item, index) => `${item.bookingId}-${index}`}
+      onEndReached={loadMore}
+      onEndReachedThreshold={0.35}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}
+      ListFooterComponent={<ListFooter hasMore={hasMore} loading={loading} />}
       ListHeaderComponent={
         <View>
           <TopAppBar
@@ -525,12 +645,23 @@ function ReservationsScreen({
             leftIcon={ChevronLeft}
             onLeftPress={onBack}
             rightIcon={Menu}
+            notificationIcon={Bell}
             secondaryRightIcon={Plus}
             onRightPress={onMenu}
+            onNotificationPress={onOpenNotifications}
             onSecondaryRightPress={onOpenReservationForm}
           />
+          <LoadingProcessCard
+            active={loading}
+            label="Loading reservations"
+            processes={loadingProcesses}
+          />
           <ErrorNotice message={error} onRetry={onRefresh} />
-          <SearchBox placeholder="Search by Guest, Room No, Booking ID..." />
+          <SearchBox
+            placeholder="Search by guest, room, booking ID..."
+            value={query}
+            onChangeText={setQuery}
+          />
           <ChipRow
             labels={['All', 'Today', 'Upcoming', 'Checked In', 'Checked Out']}
             activeLabel={filter}
@@ -538,9 +669,20 @@ function ReservationsScreen({
           />
         </View>
       }
-      ListEmptyComponent={<EmptyState label="No reservations returned from API." />}
+      ListEmptyComponent={
+        loading ? null : <EmptyState label="No reservations returned from API." />
+      }
       renderItem={({item}) => (
-        <ReservationCard reservation={item} onPress={() => onOpenReservation(item)} />
+        <ReservationCard
+          reservation={item}
+          onPress={() => onOpenReservation(item)}
+          actions={[
+            {label: 'Open Detail', onPress: () => onOpenReservation(item)},
+            {label: 'Check In', onPress: () => onQuickRecordAction('reservations', {...item.raw, id: item.id}, 'check-in')},
+            {label: 'Check Out', onPress: () => onQuickRecordAction('reservations', {...item.raw, id: item.id}, 'check-out')},
+            {label: 'Cancel Reservation', tone: 'danger', onPress: () => onQuickRecordAction('reservations', {...item.raw, id: item.id}, 'cancel')},
+          ]}
+        />
       )}
     />
   );
@@ -550,31 +692,45 @@ function GuestsScreen({
   error,
   guests,
   loading,
+  loadingProcesses,
   onBack,
   onMenu,
   onOpenGuest,
+  onOpenNotifications,
+  onQuickRecordAction,
   onRefresh,
 }: {
   error: string | null;
   guests: ArcadiaRecord[];
   loading: boolean;
+  loadingProcesses: string[];
   onBack: () => void;
   onMenu: () => void;
   onOpenGuest: (guest: ArcadiaRecord) => void;
+  onOpenNotifications: () => void;
+  onQuickRecordAction: ActionHandler;
   onRefresh: () => void;
 }) {
   const [filter, setFilter] = useState('All');
-  const filteredGuests = useMemo(() => filterRecordsByStatus(guests, filter), [filter, guests]);
+  const [query, setQuery] = useState('');
+  const filteredGuests = useMemo(
+    () => filterRecordsBySearch(filterRecordsByStatus(guests, filter), query),
+    [filter, guests, query],
+  );
+  const {hasMore, loadMore, visibleItems} = useScrollPagination(filteredGuests);
 
   return (
     <FlatList
       style={styles.screen}
       contentContainerStyle={styles.screenContent}
-      data={filteredGuests}
+      data={visibleItems}
       keyExtractor={(item, index) =>
         `${firstRecordValue(item, ['id', 'phone', 'whatsapp_phone', 'name'])}-${index}`
       }
+      onEndReached={loadMore}
+      onEndReachedThreshold={0.35}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}
+      ListFooterComponent={<ListFooter hasMore={hasMore} loading={loading} />}
       ListHeaderComponent={
         <View>
           <TopAppBar
@@ -582,10 +738,21 @@ function GuestsScreen({
             leftIcon={ChevronLeft}
             onLeftPress={onBack}
             rightIcon={Menu}
+            notificationIcon={Bell}
             onRightPress={onMenu}
+            onNotificationPress={onOpenNotifications}
+          />
+          <LoadingProcessCard
+            active={loading}
+            label="Loading guests"
+            processes={loadingProcesses}
           />
           <ErrorNotice message={error} onRetry={onRefresh} />
-          <SearchBox placeholder="Search guest, phone, email..." />
+          <SearchBox
+            placeholder="Search guest, phone, email..."
+            value={query}
+            onChangeText={setQuery}
+          />
           <ChipRow
             labels={['All', 'Pre Arrival', 'Checked In', 'Checked Out']}
             activeLabel={filter}
@@ -593,7 +760,7 @@ function GuestsScreen({
           />
         </View>
       }
-      ListEmptyComponent={<EmptyState label="No guests returned from API." />}
+      ListEmptyComponent={loading ? null : <EmptyState label="No guests returned from API." />}
       renderItem={({item}) => {
         const name = firstRecordValue(item, ['name', 'guest_name', 'email']);
         const status = firstRecordValue(item, ['status']) || 'Guest';
@@ -612,6 +779,13 @@ function GuestsScreen({
             <View style={styles.chatMeta}>
               <StatusBadge label={status} tone={statusTone(status)} />
               {hasChat ? <Text style={styles.captionTiny}>WhatsApp linked</Text> : null}
+              <ActionMenu
+                items={[
+                  {label: 'Open Guest', onPress: () => onOpenGuest(item)},
+                  {label: 'Create Ticket', onPress: () => onQuickRecordAction('guests', item, 'create-ticket')},
+                  {label: 'Delete Guest', tone: 'danger', onPress: () => onQuickRecordAction('guests', item, 'delete')},
+                ]}
+              />
             </View>
           </Pressable>
         );
@@ -622,19 +796,30 @@ function GuestsScreen({
 
 function RoomScreen({
   error,
+  loading,
+  loadingProcesses,
   rooms,
   onBack,
   onMenu,
   onNavigate,
+  onOpenNotifications,
   onOpenRoomForm,
+  onQuickRecordAction,
+  onRefresh,
 }: {
   error: string | null;
+  loading: boolean;
+  loadingProcesses: string[];
   rooms: ArcadiaRecord[];
   onBack: () => void;
   onMenu: () => void;
   onNavigate: ScreenAction;
+  onOpenNotifications: () => void;
   onOpenRoomForm: (room: ArcadiaRecord | null) => void;
+  onQuickRecordAction: ActionHandler;
+  onRefresh: () => void;
 }) {
+  const [query, setQuery] = useState('');
   const floors = useMemo(() => {
     const uniqueFloors = Array.from(
       new Set(
@@ -647,22 +832,28 @@ function RoomScreen({
   }, [rooms]);
   const [floor, setFloor] = useState('All');
   const filteredRooms = useMemo(() => {
-    if (floor === 'All') {
-      return rooms;
-    }
-    return rooms.filter(
-      room => firstRecordValue(room, ['floor', 'floor_number']) === floor,
-    );
-  }, [floor, rooms]);
+    const floorFiltered =
+      floor === 'All'
+        ? rooms
+        : rooms.filter(
+            room => firstRecordValue(room, ['floor', 'floor_number']) === floor,
+          );
+    return filterRecordsBySearch(floorFiltered, query);
+  }, [floor, query, rooms]);
+  const {hasMore, loadMore, visibleItems} = useScrollPagination(filteredRooms);
 
   return (
     <FlatList
       style={styles.screen}
       contentContainerStyle={styles.screenContent}
-      data={filteredRooms}
+      data={visibleItems}
       keyExtractor={(item, index) =>
         `${firstRecordValue(item, ['id', 'room_number', 'number'])}-${index}`
       }
+      onEndReached={loadMore}
+      onEndReachedThreshold={0.35}
+      refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}
+      ListFooterComponent={<ListFooter hasMore={hasMore} loading={loading} />}
       ListHeaderComponent={
         <View>
           <TopAppBar
@@ -670,16 +861,27 @@ function RoomScreen({
             leftIcon={ChevronLeft}
             onLeftPress={onBack}
             rightIcon={Menu}
+            notificationIcon={Bell}
             secondaryRightIcon={Plus}
             onRightPress={onMenu}
+            onNotificationPress={onOpenNotifications}
             onSecondaryRightPress={() => onOpenRoomForm(null)}
           />
-          <ErrorNotice message={error} />
-          <SearchBox placeholder="Search room, type, floor..." />
+          <LoadingProcessCard
+            active={loading}
+            label="Loading rooms"
+            processes={loadingProcesses}
+          />
+          <ErrorNotice message={error} onRetry={onRefresh} />
+          <SearchBox
+            placeholder="Search room, type, floor..."
+            value={query}
+            onChangeText={setQuery}
+          />
           <ChipRow labels={floors} activeLabel={floor} onSelect={setFloor} />
         </View>
       }
-      ListEmptyComponent={<EmptyState label="No rooms returned from API." />}
+      ListEmptyComponent={loading ? null : <EmptyState label="No rooms returned from API." />}
       renderItem={({item}) => {
         const roomNumber = firstRecordValue(item, ['room_number', 'name', 'number']);
         const status = firstRecordValue(item, ['status']);
@@ -701,6 +903,14 @@ function RoomScreen({
             </View>
             <View style={styles.roomListActions}>
               <StatusBadge label={status || 'No Status'} tone={statusTone(status)} />
+              <ActionMenu
+                items={[
+                  {label: 'Edit Room', onPress: () => onOpenRoomForm(item)},
+                  {label: 'Create Ticket', onPress: () => onNavigate('tickets')},
+                  {label: 'Mark Maintenance', onPress: () => onQuickRecordAction('rooms', item, 'maintenance')},
+                  {label: 'Delete Room', tone: 'danger', onPress: () => onQuickRecordAction('rooms', item, 'delete')},
+                ]}
+              />
               <Pressable style={styles.addMiniButton} onPress={() => onNavigate('tickets')}>
                 <Ticket color={blue} size={16} strokeWidth={2.2} />
               </Pressable>
@@ -715,34 +925,45 @@ function RoomScreen({
 function TicketsScreen({
   error,
   loading,
+  loadingProcesses,
   tickets,
   onBack,
   onCreateTicket,
   onOpenTicket,
+  onOpenNotifications,
+  onQuickRecordAction,
   onRefresh,
 }: {
   error: string | null;
   loading: boolean;
+  loadingProcesses: string[];
   tickets: TicketView[];
   onBack: () => void;
   onCreateTicket: () => void;
   onOpenTicket: (ticket: TicketView) => void;
+  onOpenNotifications: () => void;
+  onQuickRecordAction: ActionHandler;
   onRefresh: () => void;
 }) {
   const [filter, setFilter] = useState('All');
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [query, setQuery] = useState('');
   const filteredTickets = useMemo(
-    () => filterByStatus(tickets, filter),
-    [filter, tickets],
+    () => filterRecordsBySearch(filterByStatus(tickets, filter), query),
+    [filter, query, tickets],
   );
+  const {hasMore, loadMore, visibleItems} = useScrollPagination(filteredTickets);
 
   return (
     <FlatList
       style={styles.screen}
       contentContainerStyle={styles.screenContent}
-      data={filteredTickets}
+      data={visibleItems}
       keyExtractor={(item, index) => `${item.code}-${index}`}
+      onEndReached={loadMore}
+      onEndReachedThreshold={0.35}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}
+      ListFooterComponent={<ListFooter hasMore={hasMore} loading={loading} />}
       ListHeaderComponent={
         <View>
           <TopAppBar
@@ -750,11 +971,23 @@ function TicketsScreen({
             leftIcon={ChevronLeft}
             onLeftPress={onBack}
             rightIcon={Filter}
+            notificationIcon={Bell}
             secondaryRightIcon={Plus}
             onRightPress={() => setFiltersOpen(current => !current)}
+            onNotificationPress={onOpenNotifications}
             onSecondaryRightPress={onCreateTicket}
           />
+          <LoadingProcessCard
+            active={loading}
+            label="Loading tickets"
+            processes={loadingProcesses}
+          />
           <ErrorNotice message={error} onRetry={onRefresh} />
+          <SearchBox
+            placeholder="Search ticket, guest, room..."
+            value={query}
+            onChangeText={setQuery}
+          />
           {filtersOpen ? (
             <View style={styles.contextBanner}>
               <Text style={styles.formLabel}>Ticket Filters</Text>
@@ -767,9 +1000,27 @@ function TicketsScreen({
           ) : null}
         </View>
       }
-      ListEmptyComponent={<EmptyState label="No tickets returned from API." />}
+      ListEmptyComponent={loading ? null : <EmptyState label="No tickets returned from API." />}
       renderItem={({item}) => (
-        <TicketCard ticket={item} onPress={() => onOpenTicket(item)} />
+        <TicketCard
+          ticket={item}
+          onPress={() => onOpenTicket(item)}
+          actions={[
+            {label: 'Open Detail', onPress: () => onOpenTicket(item)},
+            {
+              label: 'Accept',
+              onPress: () => onQuickRecordAction('tickets', {...item.raw, id: item.id}, 'accept'),
+            },
+            {
+              label: 'Complete',
+              onPress: () => onQuickRecordAction('tickets', {...item.raw, id: item.id}, 'complete'),
+            },
+            {
+              label: 'Reopen',
+              onPress: () => onQuickRecordAction('tickets', {...item.raw, id: item.id}, 'reopen'),
+            },
+          ]}
+        />
       )}
     />
   );
@@ -779,32 +1030,43 @@ function EscalationsScreen({
   error,
   escalations,
   loading,
+  loadingProcesses,
   onBack,
   onMenu,
+  onOpenNotifications,
+  onQuickRecordAction,
   onRefresh,
 }: {
   error: string | null;
   escalations: ArcadiaRecord[];
   loading: boolean;
+  loadingProcesses: string[];
   onBack: () => void;
   onMenu: () => void;
+  onOpenNotifications: () => void;
+  onQuickRecordAction: ActionHandler;
   onRefresh: () => void;
 }) {
   const [filter, setFilter] = useState('All');
+  const [query, setQuery] = useState('');
   const filteredEscalations = useMemo(
-    () => filterRecordsByStatus(escalations, filter),
-    [escalations, filter],
+    () => filterRecordsBySearch(filterRecordsByStatus(escalations, filter), query),
+    [escalations, filter, query],
   );
+  const {hasMore, loadMore, visibleItems} = useScrollPagination(filteredEscalations);
 
   return (
     <FlatList
       style={styles.screen}
       contentContainerStyle={styles.screenContent}
-      data={filteredEscalations}
+      data={visibleItems}
       keyExtractor={(item, index) =>
         `${firstRecordValue(item, ['id', 'escalation_id', 'ticket_id'])}-${index}`
       }
+      onEndReached={loadMore}
+      onEndReachedThreshold={0.35}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}
+      ListFooterComponent={<ListFooter hasMore={hasMore} loading={loading} />}
       ListHeaderComponent={
         <View>
           <TopAppBar
@@ -812,10 +1074,21 @@ function EscalationsScreen({
             leftIcon={ChevronLeft}
             onLeftPress={onBack}
             rightIcon={Menu}
+            notificationIcon={Bell}
             onRightPress={onMenu}
+            onNotificationPress={onOpenNotifications}
+          />
+          <LoadingProcessCard
+            active={loading}
+            label="Loading escalations"
+            processes={loadingProcesses}
           />
           <ErrorNotice message={error} onRetry={onRefresh} />
-          <SearchBox placeholder="Search escalation, owner, ticket..." />
+          <SearchBox
+            placeholder="Search escalation, owner, ticket..."
+            value={query}
+            onChangeText={setQuery}
+          />
           <ChipRow
             labels={['All', 'Open', 'Acknowledged', 'Resolved', 'Breached']}
             activeLabel={filter}
@@ -823,7 +1096,9 @@ function EscalationsScreen({
           />
         </View>
       }
-      ListEmptyComponent={<EmptyState label="No escalations returned from API." />}
+      ListEmptyComponent={
+        loading ? null : <EmptyState label="No escalations returned from API." />
+      }
       renderItem={({item}) => {
         const status = firstRecordValue(item, ['status', 'stage']);
         const title =
@@ -835,7 +1110,16 @@ function EscalationsScreen({
               <Text style={styles.ticketCode}>
                 {firstRecordValue(item, ['escalation_code', 'code', 'id'])}
               </Text>
-              <StatusBadge label={status} tone={statusTone(status)} />
+              <View style={styles.ticketCardActions}>
+                <StatusBadge label={status} tone={statusTone(status)} />
+                <ActionMenu
+                  items={[
+                    {label: 'Acknowledge', onPress: () => onQuickRecordAction('escalations', item, 'acknowledge')},
+                    {label: 'Resolve', onPress: () => onQuickRecordAction('escalations', item, 'resolve')},
+                    {label: 'Delete Record', tone: 'danger', onPress: () => onQuickRecordAction('escalations', item, 'delete')},
+                  ]}
+                />
+              </View>
             </View>
             <Text style={styles.ticketTitle}>{title}</Text>
             <Text style={styles.cardSubtitle}>
@@ -856,39 +1140,51 @@ function EscalationsScreen({
 function NotificationsScreen({
   error,
   loading,
+  loadingProcesses,
   notifications,
   onBack,
   onMenu,
+  onOpenNotifications,
+  onQuickRecordAction,
   onRefresh,
 }: {
   error: string | null;
   loading: boolean;
+  loadingProcesses: string[];
   notifications: ArcadiaRecord[];
   onBack: () => void;
   onMenu: () => void;
+  onOpenNotifications: () => void;
+  onQuickRecordAction: ActionHandler;
   onRefresh: () => void;
 }) {
   const [filter, setFilter] = useState('All');
+  const [query, setQuery] = useState('');
   const filteredNotifications = useMemo(() => {
-    if (filter === 'Unread') {
-      return notifications.filter(item =>
-        ['false', '0', 'unread', ''].includes(
-          firstRecordValue(item, ['is_read', 'read', 'status']).toLowerCase(),
-        ),
-      );
-    }
-    return filterRecordsByStatus(notifications, filter);
-  }, [filter, notifications]);
+    const base =
+      filter === 'Unread'
+        ? notifications.filter(item =>
+            ['false', '0', 'unread', ''].includes(
+              firstRecordValue(item, ['is_read', 'read', 'status']).toLowerCase(),
+            ),
+          )
+        : filterRecordsByStatus(notifications, filter);
+    return filterRecordsBySearch(base, query);
+  }, [filter, notifications, query]);
+  const {hasMore, loadMore, visibleItems} = useScrollPagination(filteredNotifications);
 
   return (
     <FlatList
       style={styles.screen}
       contentContainerStyle={styles.screenContent}
-      data={filteredNotifications}
+      data={visibleItems}
       keyExtractor={(item, index) =>
         `${firstRecordValue(item, ['id', 'notification_id'])}-${index}`
       }
+      onEndReached={loadMore}
+      onEndReachedThreshold={0.35}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}
+      ListFooterComponent={<ListFooter hasMore={hasMore} loading={loading} />}
       ListHeaderComponent={
         <View>
           <TopAppBar
@@ -896,10 +1192,21 @@ function NotificationsScreen({
             leftIcon={ChevronLeft}
             onLeftPress={onBack}
             rightIcon={Menu}
+            notificationIcon={Bell}
             onRightPress={onMenu}
+            onNotificationPress={onOpenNotifications}
+          />
+          <LoadingProcessCard
+            active={loading}
+            label="Loading notifications"
+            processes={loadingProcesses}
           />
           <ErrorNotice message={error} onRetry={onRefresh} />
-          <SearchBox placeholder="Search notifications..." />
+          <SearchBox
+            placeholder="Search notifications..."
+            value={query}
+            onChangeText={setQuery}
+          />
           <ChipRow
             labels={['All', 'Unread', 'Read', 'Resolved']}
             activeLabel={filter}
@@ -907,12 +1214,14 @@ function NotificationsScreen({
           />
         </View>
       }
-      ListEmptyComponent={<EmptyState label="No notifications returned from API." />}
+      ListEmptyComponent={
+        loading ? null : <EmptyState label="No notifications returned from API." />
+      }
       renderItem={({item}) => {
         const status = firstRecordValue(item, ['status', 'read_status']);
         const title = firstRecordValue(item, ['title', 'subject', 'type']);
         return (
-          <View style={styles.chatRow}>
+          <View style={styles.notificationCard}>
             <View style={styles.whatsappIcon}>
               <Bell color="#FFFFFF" size={18} strokeWidth={2} />
             </View>
@@ -927,6 +1236,13 @@ function NotificationsScreen({
                 {firstRecordValue(item, ['created_at', 'updated_at'])}
               </Text>
               {status ? <StatusBadge label={status} tone={statusTone(status)} /> : null}
+              <ActionMenu
+                items={[
+                  {label: 'Mark Read', onPress: () => onQuickRecordAction('notifications', item, 'read')},
+                  {label: 'Archive', onPress: () => onQuickRecordAction('notifications', item, 'archive')},
+                  {label: 'Delete Notification', tone: 'danger', onPress: () => onQuickRecordAction('notifications', item, 'delete')},
+                ]}
+              />
             </View>
           </View>
         );
@@ -938,34 +1254,59 @@ function NotificationsScreen({
 function HousekeepingScreen({
   error,
   loading,
+  loadingProcesses,
   tasks,
   onBack,
   onMenu,
+  onOpenNotifications,
+  onQuickRecordAction,
   onRefresh,
 }: {
   error: string | null;
   loading: boolean;
+  loadingProcesses: string[];
   tasks: ArcadiaRecord[];
   onBack: () => void;
   onMenu: () => void;
+  onOpenNotifications: () => void;
+  onQuickRecordAction: ActionHandler;
   onRefresh: () => void;
 }) {
   const [filter, setFilter] = useState('All');
-  const filteredTasks = useMemo(() => filterRecordsByStatus(tasks, filter), [filter, tasks]);
+  const [query, setQuery] = useState('');
+  const filteredTasks = useMemo(
+    () => filterRecordsBySearch(filterRecordsByStatus(tasks, filter), query),
+    [filter, query, tasks],
+  );
+  const {hasMore, loadMore, visibleItems} = useScrollPagination(filteredTasks);
 
   return (
     <ScrollView
       style={styles.screen}
       contentContainerStyle={styles.screenContent}
+      onScroll={handleScrollLoadMore(loadMore)}
+      scrollEventThrottle={16}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}>
       <TopAppBar
         title="Housekeeping"
         leftIcon={ChevronLeft}
         onLeftPress={onBack}
-        rightIcon={Menu}
-        onRightPress={onMenu}
+      rightIcon={Menu}
+      notificationIcon={Bell}
+      onRightPress={onMenu}
+      onNotificationPress={onOpenNotifications}
+    />
+      <LoadingProcessCard
+        active={loading}
+        label="Loading housekeeping"
+        processes={loadingProcesses}
       />
       <ErrorNotice message={error} onRetry={onRefresh} />
+      <SearchBox
+        placeholder="Search room, task, status..."
+        value={query}
+        onChangeText={setQuery}
+      />
       <View style={styles.tabs}>
         <View style={[styles.tabItem, styles.activeTabItem]}>
           <Text style={[styles.tabText, styles.activeTabText]}>Tasks</Text>
@@ -981,12 +1322,12 @@ function HousekeepingScreen({
       />
       <SectionTitle title="Today's Tasks" badge={String(filteredTasks.length)} />
       <View style={styles.cardStack}>
-        {filteredTasks.map((task, index) => {
+        {visibleItems.map((task, index) => {
           const status = firstRecordValue(task, ['status', 'stage']);
           const room = firstRecordValue(task, ['room_number', 'room', 'room_name']);
           return (
           <View key={`${room}-${index}`} style={styles.taskCard}>
-            <View>
+            <View style={styles.staffText}>
               <Text style={styles.cardTitle}>{room}</Text>
               <Text style={styles.cardSubtitleStrong}>
                 {firstRecordValue(task, ['task_name', 'title', 'description'])}
@@ -996,16 +1337,24 @@ function HousekeepingScreen({
               </Text>
             </View>
             <StatusBadge label={status} tone={statusTone(status)} />
+            <ActionMenu
+              items={[
+                {label: 'Mark In Progress', onPress: () => onQuickRecordAction('housekeeping', task, 'in_progress')},
+                {label: 'Mark Completed', onPress: () => onQuickRecordAction('housekeeping', task, 'completed')},
+                {label: 'Delete Record', tone: 'danger', onPress: () => onQuickRecordAction('housekeeping', task, 'delete')},
+              ]}
+            />
           </View>
         );})}
       </View>
-      {filteredTasks.length === 0 ? (
+      {filteredTasks.length === 0 && !loading ? (
         <EmptyState label="No housekeeping tasks returned from API." />
       ) : null}
       <Pressable style={styles.fullPrimaryButton}>
         <QrCode color="#FFFFFF" size={18} strokeWidth={2} />
         <Text style={styles.fullPrimaryButtonText}>Scan Room QR</Text>
       </Pressable>
+      <ListFooter hasMore={hasMore} loading={loading} />
     </ScrollView>
   );
 }
@@ -1013,39 +1362,60 @@ function HousekeepingScreen({
 function FoodScreen({
   error,
   loading,
+  loadingProcesses,
   orders,
   onBack,
   onMenu,
+  onOpenNotifications,
+  onQuickRecordAction,
   onRefresh,
 }: {
   error: string | null;
   loading: boolean;
+  loadingProcesses: string[];
   orders: ArcadiaRecord[];
   onBack: () => void;
   onMenu: () => void;
+  onOpenNotifications: () => void;
+  onQuickRecordAction: ActionHandler;
   onRefresh: () => void;
 }) {
   const [filter, setFilter] = useState('All');
+  const [query, setQuery] = useState('');
   const [tab, setTab] = useState('Orders');
   const filteredOrders = useMemo(
-    () => filterRecordsByStatus(orders, filter),
-    [filter, orders],
+    () => filterRecordsBySearch(filterRecordsByStatus(orders, filter), query),
+    [filter, orders, query],
   );
+  const {hasMore, loadMore, visibleItems} = useScrollPagination(filteredOrders);
 
   return (
     <View style={styles.screen}>
       <ScrollView
         contentContainerStyle={styles.screenContentWithCart}
+        onScroll={handleScrollLoadMore(loadMore)}
+        scrollEventThrottle={16}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}>
         <TopAppBar
           title="F&B"
           leftIcon={ChevronLeft}
           onLeftPress={onBack}
           rightIcon={Menu}
+          notificationIcon={Bell}
           onRightPress={onMenu}
+          onNotificationPress={onOpenNotifications}
+        />
+        <LoadingProcessCard
+          active={loading}
+          label="Loading F&B orders"
+          processes={loadingProcesses}
         />
         <ErrorNotice message={error} onRetry={onRefresh} />
-        <SearchBox placeholder="Search order, guest, room..." />
+        <SearchBox
+          placeholder="Search order, guest, room..."
+          value={query}
+          onChangeText={setQuery}
+        />
         <ChipRow
           labels={['Orders', 'Menu', 'Taxes']}
           activeLabel={tab}
@@ -1058,7 +1428,7 @@ function FoodScreen({
         />
         <View style={styles.foodLayout}>
           <View style={styles.foodList}>
-            {tab === 'Orders' ? filteredOrders.map((order, index) => (
+            {tab === 'Orders' ? visibleItems.map((order, index) => (
               <View key={`${firstRecordValue(order, ['id', 'order_number'])}-${index}`} style={styles.foodCard}>
                 <View style={styles.foodImagePlaceholder}>
                   <Utensils color={blue} size={22} strokeWidth={2.2} />
@@ -1078,6 +1448,14 @@ function FoodScreen({
                   label={firstRecordValue(order, ['status'])}
                   tone={statusTone(firstRecordValue(order, ['status']))}
                 />
+                <ActionMenu
+                  items={[
+                    {label: 'Preparing', onPress: () => onQuickRecordAction('orders', order, 'preparing')},
+                    {label: 'Ready', onPress: () => onQuickRecordAction('orders', order, 'ready')},
+                    {label: 'Delivered', onPress: () => onQuickRecordAction('orders', order, 'delivered')},
+                    {label: 'Cancel Order', tone: 'danger', onPress: () => onQuickRecordAction('orders', order, 'cancelled')},
+                  ]}
+                />
               </View>
             )) : (
               <EmptyState
@@ -1088,11 +1466,12 @@ function FoodScreen({
                 }
               />
             )}
-            {tab === 'Orders' && filteredOrders.length === 0 ? (
+            {tab === 'Orders' && filteredOrders.length === 0 && !loading ? (
               <EmptyState label="No F&B orders returned from API." />
             ) : null}
           </View>
         </View>
+        {tab === 'Orders' ? <ListFooter hasMore={hasMore} loading={loading} /> : null}
       </ScrollView>
       <View style={styles.cartBar}>
         <Text style={styles.cartText}>Orders • {filteredOrders.length}</Text>
@@ -1105,33 +1484,44 @@ function FoodScreen({
 function KitchenScreen({
   error,
   loading,
+  loadingProcesses,
   orders,
   onBack,
   onMenu,
+  onOpenNotifications,
+  onQuickRecordAction,
   onRefresh,
 }: {
   error: string | null;
   loading: boolean;
+  loadingProcesses: string[];
   orders: ArcadiaRecord[];
   onBack: () => void;
   onMenu: () => void;
+  onOpenNotifications: () => void;
+  onQuickRecordAction: ActionHandler;
   onRefresh: () => void;
 }) {
   const [filter, setFilter] = useState('Received');
+  const [query, setQuery] = useState('');
   const filteredOrders = useMemo(
-    () => filterRecordsByStatus(orders, filter),
-    [filter, orders],
+    () => filterRecordsBySearch(filterRecordsByStatus(orders, filter), query),
+    [filter, orders, query],
   );
+  const {hasMore, loadMore, visibleItems} = useScrollPagination(filteredOrders);
 
   return (
     <FlatList
       style={styles.screen}
       contentContainerStyle={styles.screenContent}
-      data={filteredOrders}
+      data={visibleItems}
       keyExtractor={(item, index) =>
         `${firstRecordValue(item, ['id', 'order_number'])}-${index}`
       }
+      onEndReached={loadMore}
+      onEndReachedThreshold={0.35}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}
+      ListFooterComponent={<ListFooter hasMore={hasMore} loading={loading} />}
       ListHeaderComponent={
         <View>
           <TopAppBar
@@ -1139,9 +1529,21 @@ function KitchenScreen({
             leftIcon={ChevronLeft}
             onLeftPress={onBack}
             rightIcon={Menu}
+            notificationIcon={Bell}
             onRightPress={onMenu}
+            onNotificationPress={onOpenNotifications}
+          />
+          <LoadingProcessCard
+            active={loading}
+            label="Loading kitchen orders"
+            processes={loadingProcesses}
           />
           <ErrorNotice message={error} onRetry={onRefresh} />
+          <SearchBox
+            placeholder="Search order, guest, room..."
+            value={query}
+            onChangeText={setQuery}
+          />
           <ChipRow
             labels={['Received', 'Preparing', 'Ready', 'Delivered', 'Cancelled']}
             activeLabel={filter}
@@ -1149,7 +1551,9 @@ function KitchenScreen({
           />
         </View>
       }
-      ListEmptyComponent={<EmptyState label="No kitchen orders returned from API." />}
+      ListEmptyComponent={
+        loading ? null : <EmptyState label="No kitchen orders returned from API." />
+      }
       renderItem={({item}) => {
         const status = firstRecordValue(item, ['status']);
         return (
@@ -1158,7 +1562,17 @@ function KitchenScreen({
               <Text style={styles.ticketCode}>
                 {firstRecordValue(item, ['order_number', 'id'])}
               </Text>
-              <StatusBadge label={status} tone={statusTone(status)} />
+              <View style={styles.ticketCardActions}>
+                <StatusBadge label={status} tone={statusTone(status)} />
+                <ActionMenu
+                  items={[
+                    {label: 'Preparing', onPress: () => onQuickRecordAction('orders', item, 'preparing')},
+                    {label: 'Ready', onPress: () => onQuickRecordAction('orders', item, 'ready')},
+                    {label: 'Delivered', onPress: () => onQuickRecordAction('orders', item, 'delivered')},
+                    {label: 'Cancel Order', tone: 'danger', onPress: () => onQuickRecordAction('orders', item, 'cancelled')},
+                  ]}
+                />
+              </View>
             </View>
             <Text style={styles.ticketTitle}>
               Room {firstRecordValue(item, ['room_number', 'room'])}
@@ -1195,46 +1609,65 @@ function WhatsAppScreen({
   conversations,
   error,
   loading,
+  loadingProcesses,
   onBack,
   onMenu,
   onOpenChat,
+  onOpenNotifications,
   onRefresh,
 }: {
   conversations: ArcadiaRecord[];
   error: string | null;
   loading: boolean;
+  loadingProcesses: string[];
   onBack: () => void;
   onMenu: () => void;
   onOpenChat: (conversation: ArcadiaRecord) => void;
+  onOpenNotifications: () => void;
   onRefresh: () => void;
 }) {
   const [filter, setFilter] = useState('All');
+  const [query, setQuery] = useState('');
   const filteredConversations = useMemo(
-    () => filterRecordsByStatus(conversations, filter),
-    [conversations, filter],
+    () => filterRecordsBySearch(filterRecordsByStatus(conversations, filter), query),
+    [conversations, filter, query],
   );
+  const {hasMore, loadMore, visibleItems} = useScrollPagination(filteredConversations);
 
   return (
     <ScrollView
       style={styles.screen}
       contentContainerStyle={styles.screenContent}
+      onScroll={handleScrollLoadMore(loadMore)}
+      scrollEventThrottle={16}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}>
       <TopAppBar
         title="WhatsApp"
         leftIcon={ChevronLeft}
         onLeftPress={onBack}
-        rightIcon={Menu}
-        onRightPress={onMenu}
+      rightIcon={Menu}
+      notificationIcon={Bell}
+      onRightPress={onMenu}
+      onNotificationPress={onOpenNotifications}
+    />
+      <LoadingProcessCard
+        active={loading}
+        label="Loading WhatsApp conversations"
+        processes={loadingProcesses}
       />
       <ErrorNotice message={error} onRetry={onRefresh} />
-      <SearchBox placeholder="Search conversations..." />
+      <SearchBox
+        placeholder="Search conversations..."
+        value={query}
+        onChangeText={setQuery}
+      />
       <ChipRow
         labels={['All', 'Open', 'Pending', 'Resolved']}
         activeLabel={filter}
         onSelect={setFilter}
       />
       <View style={styles.cardStack}>
-        {filteredConversations.map((conversation, index) => {
+        {visibleItems.map((conversation, index) => {
           const name = firstRecordValue(conversation, [
             'guest_name',
             'contact_name',
@@ -1265,13 +1698,21 @@ function WhatsAppScreen({
                   <Text style={styles.unreadText}>{unread}</Text>
                 </View>
               ) : null}
+              <ActionMenu
+                items={[
+                  {label: 'Open Chat', onPress: () => onOpenChat(conversation)},
+                  {label: 'Mark Resolved', onPress: () => onOpenChat(conversation)},
+                  {label: 'Create Ticket', onPress: () => onOpenChat(conversation)},
+                ]}
+              />
             </View>
           </Pressable>
         );})}
       </View>
-      {filteredConversations.length === 0 ? (
+      {filteredConversations.length === 0 && !loading ? (
         <EmptyState label="No WhatsApp conversations returned from API." />
       ) : null}
+      <ListFooter hasMore={hasMore} loading={loading} />
     </ScrollView>
   );
 }
@@ -1279,57 +1720,74 @@ function WhatsAppScreen({
 function StaffScreen({
   error,
   loading,
+  loadingProcesses,
   staff,
   onBack,
   onMenu,
+  onOpenNotifications,
   onOpenStaffProfile,
   onRefresh,
 }: {
   error: string | null;
   loading: boolean;
+  loadingProcesses: string[];
   staff: ArcadiaRecord[];
   onBack: () => void;
   onMenu: () => void;
+  onOpenNotifications: () => void;
   onOpenStaffProfile: (staff: ArcadiaRecord) => void;
   onRefresh: () => void;
 }) {
   const [filter, setFilter] = useState('All');
+  const [query, setQuery] = useState('');
   const filteredStaff = useMemo(() => {
-    if (filter === 'All') {
-      return staff;
-    }
+    let filtered = staff;
     if (filter === 'On Duty') {
-      return staff.filter(item => isRecordTruthy(item, ['is_on_duty']));
-    }
-    if (filter === 'Off Duty') {
-      return staff.filter(
+      filtered = staff.filter(item => isRecordTruthy(item, ['is_on_duty']));
+    } else if (filter === 'Off Duty') {
+      filtered = staff.filter(
         item =>
           isRecordTruthy(item, ['is_active']) &&
           !isRecordTruthy(item, ['is_on_duty']),
       );
+    } else if (filter === 'Active') {
+      filtered = staff.filter(item => isRecordTruthy(item, ['is_active']));
+    } else if (filter === 'Inactive') {
+      filtered = staff.filter(item => !isRecordTruthy(item, ['is_active']));
+    } else if (filter !== 'All') {
+      filtered = filterRecordsByStatus(staff, filter);
     }
-    if (filter === 'Active') {
-      return staff.filter(item => isRecordTruthy(item, ['is_active']));
-    }
-    if (filter === 'Inactive') {
-      return staff.filter(item => !isRecordTruthy(item, ['is_active']));
-    }
-    return filterRecordsByStatus(staff, filter);
-  }, [filter, staff]);
+    return filterRecordsBySearch(filtered, query);
+  }, [filter, query, staff]);
+  const {hasMore, loadMore, visibleItems} = useScrollPagination(filteredStaff);
 
   return (
     <ScrollView
       style={styles.screen}
       contentContainerStyle={styles.screenContent}
+      onScroll={handleScrollLoadMore(loadMore)}
+      scrollEventThrottle={16}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}>
       <TopAppBar
         title="Staff Portal"
         leftIcon={ChevronLeft}
         onLeftPress={onBack}
-        rightIcon={Menu}
-        onRightPress={onMenu}
+      rightIcon={Menu}
+      notificationIcon={Bell}
+      onRightPress={onMenu}
+      onNotificationPress={onOpenNotifications}
+    />
+      <LoadingProcessCard
+        active={loading}
+        label="Loading staff"
+        processes={loadingProcesses}
       />
       <ErrorNotice message={error} onRetry={onRefresh} />
+      <SearchBox
+        placeholder="Search staff, role, department..."
+        value={query}
+        onChangeText={setQuery}
+      />
       <View style={styles.staffSummaryGrid}>
         <MetricTile label="Total" value={staff.length} tone="blue" />
         <MetricTile
@@ -1355,7 +1813,7 @@ function StaffScreen({
       />
       <SectionTitle title="Today's Attendance" />
       <View style={styles.cardStack}>
-        {filteredStaff.map((member, index) => {
+        {visibleItems.map((member, index) => {
           const name = firstRecordValue(member, ['name', 'full_name', 'email']);
           const onDuty = isRecordTruthy(member, ['is_on_duty']);
           const active = isRecordTruthy(member, ['is_active']);
@@ -1375,13 +1833,23 @@ function StaffScreen({
                 Last punch: {firstRecordValue(member, ['last_punch_at', 'check_in_time'])}
               </Text>
             </View>
-            <StatusBadge label={status} tone={statusTone(status)} />
+            <View style={styles.ticketCardActions}>
+              <StatusBadge label={status} tone={statusTone(status)} />
+              <ActionMenu
+                items={[
+                  {label: 'Open Profile', onPress: () => onOpenStaffProfile(member)},
+                  {label: 'Assign Task', onPress: () => onOpenStaffProfile(member)},
+                  {label: 'Deactivate', tone: 'danger', onPress: () => onOpenStaffProfile(member)},
+                ]}
+              />
+            </View>
           </Pressable>
         );})}
       </View>
-      {filteredStaff.length === 0 ? (
+      {filteredStaff.length === 0 && !loading ? (
         <EmptyState label="No staff records returned from API." />
       ) : null}
+      <ListFooter hasMore={hasMore} loading={loading} />
     </ScrollView>
   );
 }
@@ -1390,10 +1858,12 @@ function AssistantScreen({
   data,
   onBack,
   onMenu,
+  onOpenNotifications,
 }: {
   data: AppData;
   onBack: () => void;
   onMenu: () => void;
+  onOpenNotifications: () => void;
 }) {
   return (
     <View style={styles.screen}>
@@ -1403,7 +1873,9 @@ function AssistantScreen({
           leftIcon={ChevronLeft}
           onLeftPress={onBack}
           rightIcon={Menu}
+          notificationIcon={Bell}
           onRightPress={onMenu}
+          onNotificationPress={onOpenNotifications}
         />
         <View style={styles.userBubble}>
           <Text style={styles.userBubbleText}>Show me today's occupancy and pending tickets</Text>
@@ -1440,6 +1912,7 @@ function ProfileScreen({
   onBack,
   onLogout,
   onMenu,
+  onOpenNotifications,
   onNavigate,
   onOpenProfileOption,
 }: {
@@ -1448,6 +1921,7 @@ function ProfileScreen({
   onBack: () => void;
   onLogout: () => void;
   onMenu: () => void;
+  onOpenNotifications: () => void;
   onNavigate: ScreenAction;
   onOpenProfileOption: (label: string) => void;
 }) {
@@ -1466,7 +1940,9 @@ function ProfileScreen({
         leftIcon={ChevronLeft}
         onLeftPress={onBack}
         rightIcon={Menu}
+        notificationIcon={Bell}
         onRightPress={onMenu}
+        onNotificationPress={onOpenNotifications}
       />
       <View style={styles.profileHeader}>
         <Avatar label="A" size={58} />

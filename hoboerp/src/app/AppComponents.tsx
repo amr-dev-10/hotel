@@ -1,30 +1,68 @@
-import {Pressable, ScrollView, Text, TextInput, View} from 'react-native';
+import {useRef, useState} from 'react';
+import type {ReactNode} from 'react';
+import {
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 
-import {ChevronRight, Home, Phone, Plus, Search, User, Wrench} from './icons';
+import {
+  CalendarDays,
+  ChevronRight,
+  Home,
+  MoreHorizontal,
+  Phone,
+  Plus,
+  Search,
+  User,
+  Wrench,
+} from './icons';
 import {buildBottomTabs} from './navigationConfig';
 import {blue, muted, styles, textColor} from './styles';
 import type {IconComponent, ScreenAction, ScreenKey} from './types';
 import type {ReservationView, TicketView} from '../modules/dashboard';
+import {canOpenScreen, canUseAction} from '../permissions/navigationGuard';
 import {priorityTone, statusTone} from '../modules/operations/utils';
 
-const bottomTabs = buildBottomTabs({Home, Plus, Search, User, Wrench});
+const bottomTabs = buildBottomTabs({Home, Plus, Search: CalendarDays, User, Wrench});
+
+export type ActionMenuItem = {
+  label: string;
+  onPress: () => void;
+  tone?: 'danger' | 'default';
+};
 
 export function TopAppBar({
   title,
   leftIcon: LeftIcon,
   rightIcon: RightIcon,
   secondaryRightIcon: SecondaryRightIcon,
+  tertiaryRightIcon: TertiaryRightIcon,
+  notificationIcon: NotificationIcon,
+  rightAccessory,
   onLeftPress,
   onRightPress,
   onSecondaryRightPress,
+  onTertiaryRightPress,
+  onNotificationPress,
 }: {
   title: string;
   leftIcon: IconComponent;
   rightIcon?: IconComponent;
   secondaryRightIcon?: IconComponent;
+  tertiaryRightIcon?: IconComponent;
+  notificationIcon?: IconComponent;
+  rightAccessory?: ReactNode;
   onLeftPress?: () => void;
   onRightPress?: () => void;
   onSecondaryRightPress?: () => void;
+  onTertiaryRightPress?: () => void;
+  onNotificationPress?: () => void;
 }) {
   return (
     <View style={styles.topAppBar}>
@@ -38,11 +76,22 @@ export function TopAppBar({
             <RightIcon color={textColor} size={21} strokeWidth={2.2} />
           </Pressable>
         ) : null}
+        {NotificationIcon ? (
+          <Pressable style={styles.iconButton} onPress={onNotificationPress}>
+            <NotificationIcon color={textColor} size={21} strokeWidth={2.2} />
+          </Pressable>
+        ) : null}
         {SecondaryRightIcon ? (
           <Pressable style={styles.iconButton} onPress={onSecondaryRightPress}>
             <SecondaryRightIcon color={textColor} size={21} strokeWidth={2.2} />
           </Pressable>
         ) : null}
+        {TertiaryRightIcon ? (
+          <Pressable style={styles.iconButton} onPress={onTertiaryRightPress}>
+            <TertiaryRightIcon color={textColor} size={21} strokeWidth={2.2} />
+          </Pressable>
+        ) : null}
+        {rightAccessory}
       </View>
     </View>
   );
@@ -52,14 +101,22 @@ export function BottomNav({
   activeScreen,
   onCreate,
   onNavigate,
+  permissions,
 }: {
   activeScreen: ScreenKey;
   onCreate: () => void;
   onNavigate: ScreenAction;
+  permissions?: string[];
 }) {
+  const visibleTabs = bottomTabs.filter(tab =>
+    tab.key === 'assistant'
+      ? canUseAction(permissions, 'createTicket')
+      : canOpenScreen(permissions, tab.key),
+  );
+
   return (
     <View style={styles.bottomNav}>
-      {bottomTabs.map(tab => {
+      {visibleTabs.map(tab => {
         const active = tab.key === activeScreen;
         const Icon = tab.icon;
         const isFab = tab.key === 'assistant';
@@ -76,7 +133,9 @@ export function BottomNav({
               />
             </View>
             {tab.label ? (
-              <Text style={[styles.bottomNavText, active && styles.activeBottomNavText]}>
+              <Text
+                numberOfLines={1}
+                style={[styles.bottomNavText, active && styles.activeBottomNavText]}>
                 {tab.label}
               </Text>
             ) : null}
@@ -154,9 +213,11 @@ export function DepartmentRow({
 }
 
 export function ReservationCard({
+  actions,
   reservation,
   onPress,
 }: {
+  actions?: ActionMenuItem[];
   reservation: ReservationView;
   onPress: () => void;
 }) {
@@ -175,6 +236,7 @@ export function ReservationCard({
         </View>
         <View style={styles.reservationSide}>
           <StatusBadge label={reservation.status} tone={statusTone(reservation.status)} />
+          {actions ? <ActionMenu items={actions} /> : null}
           <Pressable style={styles.callButton}>
             <Phone color={blue} size={17} strokeWidth={2.2} />
           </Pressable>
@@ -184,14 +246,25 @@ export function ReservationCard({
   );
 }
 
-export function TicketCard({ticket, onPress}: {ticket: TicketView; onPress: () => void}) {
+export function TicketCard({
+  actions,
+  ticket,
+  onPress,
+}: {
+  actions?: ActionMenuItem[];
+  ticket: TicketView;
+  onPress: () => void;
+}) {
   return (
     <Pressable style={styles.ticketCard} onPress={onPress}>
       <View style={styles.rowBetween}>
         <Text style={styles.ticketCode}>{ticket.code}</Text>
-        <View style={styles.ticketBadgeRow}>
-          <StatusBadge label={ticket.priority} tone={priorityTone(ticket.priority)} />
-          <StatusBadge label={ticket.status} tone={statusTone(ticket.status)} />
+        <View style={styles.ticketCardActions}>
+          <View style={styles.ticketBadgeRow}>
+            <StatusBadge label={ticket.priority} tone={priorityTone(ticket.priority)} />
+            <StatusBadge label={ticket.status} tone={statusTone(ticket.status)} />
+          </View>
+          {actions ? <ActionMenu items={actions} /> : null}
         </View>
       </View>
       <Text style={styles.ticketTitle}>{ticket.title}</Text>
@@ -215,7 +288,15 @@ export function StatusBadge({
   );
 }
 
-export function SearchBox({placeholder}: {placeholder: string}) {
+export function SearchBox({
+  placeholder,
+  value,
+  onChangeText,
+}: {
+  placeholder: string;
+  value?: string;
+  onChangeText?: (value: string) => void;
+}) {
   return (
     <View style={styles.searchBox}>
       <Search color={muted} size={17} strokeWidth={2} />
@@ -223,7 +304,97 @@ export function SearchBox({placeholder}: {placeholder: string}) {
         placeholder={placeholder}
         placeholderTextColor="#64748B"
         style={styles.searchInput}
+        value={value}
+        onChangeText={onChangeText}
       />
+    </View>
+  );
+}
+
+export function ActionMenu({
+  items,
+}: {
+  items: ActionMenuItem[];
+}) {
+  const [open, setOpen] = useState(false);
+  const [anchor, setAnchor] = useState({height: 0, width: 0, x: 0, y: 0});
+  const buttonRef = useRef<View>(null);
+  const window = useWindowDimensions();
+  const menuWidth = 190;
+  const estimatedHeight = Math.min(280, items.length * 40 + 14);
+  const panelLeft = Math.max(
+    12,
+    Math.min(anchor.x + anchor.width - menuWidth, window.width - menuWidth - 12),
+  );
+  const panelTop = Math.max(
+    12,
+    Math.min(anchor.y + anchor.height + 6, window.height - estimatedHeight - 12),
+  );
+
+  if (!items.length) {
+    return null;
+  }
+
+  function toggleMenu() {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+
+    buttonRef.current?.measureInWindow((x, y, width, height) => {
+      setAnchor({height, width, x, y});
+      setOpen(true);
+    });
+  }
+
+  return (
+    <View style={styles.actionMenuContainer}>
+      <Pressable
+        ref={buttonRef}
+        style={styles.actionMenuButton}
+        onPress={toggleMenu}>
+        <MoreHorizontal color={textColor} size={18} strokeWidth={2.2} />
+      </Pressable>
+      <Modal
+        animationType="fade"
+        transparent
+        visible={open}
+        onRequestClose={() => setOpen(false)}>
+        <View style={styles.actionMenuOverlay}>
+          <Pressable
+            style={styles.actionMenuBackdrop}
+            onPress={() => setOpen(false)}
+          />
+          <View
+            style={[
+              styles.actionMenuPanel,
+              {
+                left: panelLeft,
+                maxHeight: Math.max(160, window.height - panelTop - 12),
+                top: panelTop,
+                width: menuWidth,
+              },
+            ]}>
+          {items.map(item => (
+            <Pressable
+              key={item.label}
+              style={styles.actionMenuItem}
+              onPress={() => {
+                setOpen(false);
+                item.onPress();
+              }}>
+              <Text
+                style={[
+                  styles.actionMenuText,
+                  item.tone === 'danger' && styles.actionMenuDangerText,
+                ]}>
+                {item.label}
+              </Text>
+            </Pressable>
+          ))}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -292,6 +463,48 @@ export function ErrorNotice({
   );
 }
 
+export function LoadingProcessCard({
+  active = true,
+  label = 'Loading latest data',
+  processes = [],
+}: {
+  active?: boolean;
+  label?: string;
+  processes?: string[];
+}) {
+  const visibleProcesses = Array.from(
+    new Set(processes.map(process => process.trim()).filter(Boolean)),
+  );
+  const displayProcesses = visibleProcesses.length ? visibleProcesses : [label];
+
+  if (!active && visibleProcesses.length === 0) {
+    return null;
+  }
+
+  return (
+    <View style={styles.loadingProcessCard}>
+      <View style={styles.loadingProcessTitleRow}>
+        <ActivityIndicator color={blue} size="small" />
+        <View style={styles.loadingProcessTextBlock}>
+          <Text style={styles.loadingProcessTitle}>
+            {displayProcesses.length > 1 ? 'Loading processes' : displayProcesses[0]}
+          </Text>
+          <Text style={styles.loadingProcessSubtitle}>Please wait while this finishes.</Text>
+        </View>
+      </View>
+      {displayProcesses.length > 1 ? (
+        <View style={styles.loadingProcessList}>
+          {displayProcesses.map(process => (
+            <View key={process} style={styles.loadingProcessPill}>
+              <Text style={styles.loadingProcessPillText}>{process}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 export function SectionTitle({
   title,
   action,
@@ -325,7 +538,9 @@ export function QuickAction({
 }) {
   return (
     <Pressable style={styles.quickAction} onPress={onPress}>
-      <Icon color={blue} size={20} strokeWidth={2.2} />
+      <View style={styles.quickActionIcon}>
+        <Icon color={textColor} size={18} strokeWidth={2.1} />
+      </View>
       <Text style={styles.quickActionText}>{label}</Text>
     </Pressable>
   );

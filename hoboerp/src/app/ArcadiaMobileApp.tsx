@@ -40,15 +40,27 @@ import {
   type ReservationView,
   type TicketView,
 } from '../modules/dashboard';
+import {resourceLabels} from '../modules/operations/constants';
 import type {ResourceKey} from '../modules/operations/types';
 import {login as loginApi, me as meApi} from '../modules/auth/api/auth.api';
 import {LoginScreen} from '../modules/auth/screens/LoginScreen';
 import {useOperationsWorkspace} from '../modules/operations/hooks/useOperationsWorkspace';
+import {DispatchModal} from '../modules/ticket/components/DispatchModal';
+import {
+  canOpenScreen,
+  canUseAction,
+  filterNavItemsForUser,
+  requiredPermissionLabel,
+} from '../permissions/navigationGuard';
 import {apiRequest} from '../services/api';
+import {
+  SESSION_STORAGE_KEY,
+  useAuthStore,
+} from '../store/authStore';
+import {useNotificationStore} from '../store/notificationStore';
 import type {ApiEnvelope} from '../types/api';
-import type {ArcadiaRecord, Session} from '../types/domain';
-
-const SESSION_STORAGE_KEY = 'hoboerp.session.v1';
+import type {ArcadiaRecord, LoginData, Session} from '../types/domain';
+import {useMobileWebSocket} from '../websocket';
 
 
 const sideNavItems = buildSideNavItems({
@@ -90,6 +102,37 @@ function App(): React.JSX.Element {
     useState<ArcadiaRecord | null>(null);
   const [selectedLabel, setSelectedLabel] = useState('');
   const lastBackPressRef = useRef(0);
+  const clearAuthStore = useAuthStore(state => state.logout);
+  const setAuthHotelName = useAuthStore(state => state.setHotelName);
+  const setAuthSession = useAuthStore(state => state.setSession);
+  const clearNotifications = useNotificationStore(state => state.clear);
+
+  const handleTokenRefresh = useCallback(
+    async (login: LoginData) => {
+      const token = login.access_token;
+      const refreshToken = login.refresh_token;
+
+      if (!token || !refreshToken) {
+        throw new Error('Session refresh succeeded but no token was returned.');
+      }
+
+      const profile = await meApi(token);
+
+      if (!profile.data?.hotel_id) {
+        throw new Error('This account is missing hotel context.');
+      }
+
+      const nextSession = {
+        accessToken: token,
+        refreshToken,
+        user: profile.data,
+      };
+      setSession(nextSession);
+      setAuthSession(nextSession);
+      await AsyncStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(nextSession));
+    },
+    [setAuthSession],
+  );
 
   const request = useCallback(
     async <T,>(
@@ -97,23 +140,37 @@ function App(): React.JSX.Element {
       options: RequestInit = {},
       token = session?.accessToken,
     ): Promise<ApiEnvelope<T>> => {
-      return apiRequest<T>(path, {...options, token});
+      return apiRequest<T>(path, {
+        ...options,
+        onTokenRefresh: handleTokenRefresh,
+        refreshToken: session?.refreshToken,
+        token,
+      });
     },
-    [session?.accessToken],
+    [handleTokenRefresh, session?.accessToken, session?.refreshToken],
   );
-  const {loadAllResources, loadResource, resetWorkspace, resources} =
-    useOperationsWorkspace(request, session, setAppDialog);
+  const {
+    actionLoading,
+    handleAction,
+    loadAllResources,
+    loadResource,
+    resetWorkspace,
+    resources,
+  } = useOperationsWorkspace(request, session, setAppDialog);
 
   const loadHotelProfile = useCallback(async (token: string, hotelId: string) => {
     try {
       const hotel = await apiRequest<ArcadiaRecord>(`/api/v1/hotels/${hotelId}`, {
         token,
       });
-      setHotelName(String(hotel.data?.name ?? hotelId));
+      const nextHotelName = String(hotel.data?.name ?? hotelId);
+      setHotelName(nextHotelName);
+      setAuthHotelName(nextHotelName);
     } catch {
       setHotelName(hotelId);
+      setAuthHotelName(hotelId);
     }
-  }, []);
+  }, [setAuthHotelName]);
 
   useEffect(() => {
     let mounted = true;
@@ -128,11 +185,13 @@ function App(): React.JSX.Element {
         const nextSession = JSON.parse(stored) as Session;
         if (!nextSession.accessToken || !nextSession.user?.hotel_id) {
           await AsyncStorage.removeItem(SESSION_STORAGE_KEY);
+          clearAuthStore();
           return;
         }
 
         if (mounted) {
           setSession(nextSession);
+          setAuthSession(nextSession);
           await Promise.all([
             loadAllResources(nextSession.accessToken, nextSession.user.hotel_id),
             loadHotelProfile(nextSession.accessToken, nextSession.user.hotel_id),
@@ -140,6 +199,7 @@ function App(): React.JSX.Element {
         }
       } catch {
         await AsyncStorage.removeItem(SESSION_STORAGE_KEY);
+        clearAuthStore();
       } finally {
         if (mounted) {
           setSessionRestoring(false);
@@ -152,7 +212,7 @@ function App(): React.JSX.Element {
     return () => {
       mounted = false;
     };
-  }, [loadAllResources, loadHotelProfile]);
+  }, [clearAuthStore, loadAllResources, loadHotelProfile, setAuthSession]);
 
   const handleLogin = useCallback(async () => {
     setAuthLoading(true);
@@ -175,6 +235,7 @@ function App(): React.JSX.Element {
 
       const nextSession = {accessToken: token, refreshToken, user: profile.data};
       setSession(nextSession);
+      setAuthSession(nextSession);
       await AsyncStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(nextSession));
       await Promise.all([
         loadAllResources(token, profile.data.hotel_id),
@@ -185,34 +246,88 @@ function App(): React.JSX.Element {
     } finally {
       setAuthLoading(false);
     }
-  }, [email, loadAllResources, loadHotelProfile, password]);
+  }, [email, loadAllResources, loadHotelProfile, password, setAuthSession]);
 
   const handleLogout = useCallback(() => {
     setSession(null);
+    clearAuthStore();
+    clearNotifications();
     AsyncStorage.removeItem(SESSION_STORAGE_KEY);
     resetWorkspace();
     setScreen('dashboard');
     setScreenStack([]);
     setHotelName('');
+    setAuthHotelName(null);
     setDrawerOpen(false);
-  }, [resetWorkspace]);
+  }, [clearAuthStore, clearNotifications, resetWorkspace, setAuthHotelName]);
+
+  const permissions = session?.user.permissions;
+
+  const showAccessDenied = useCallback(
+    (title: string, message: string) => {
+      setAppDialog({
+        message,
+        title,
+        tone: 'error',
+      });
+    },
+    [],
+  );
+
+  const ensureScreenAllowed = useCallback(
+    (nextScreen: ScreenKey) => {
+      if (canOpenScreen(permissions, nextScreen)) {
+        return true;
+      }
+
+      showAccessDenied(
+        'Access restricted',
+        `Your role needs ${requiredPermissionLabel(nextScreen)} to open this screen.`,
+      );
+      return false;
+    },
+    [permissions, showAccessDenied],
+  );
+
+  const ensureActionAllowed = useCallback(
+    (action: Parameters<typeof canUseAction>[1], label: string) => {
+      if (canUseAction(permissions, action)) {
+        return true;
+      }
+
+      showAccessDenied(
+        'Action restricted',
+        `Your role does not include permission to ${label}.`,
+      );
+      return false;
+    },
+    [permissions, showAccessDenied],
+  );
 
   const openScreen = useCallback<ScreenAction>(nextScreen => {
+    if (!ensureScreenAllowed(nextScreen)) {
+      return;
+    }
+
     setScreen(nextScreen);
     if (!isDetailScreen(nextScreen)) {
       setScreenStack([]);
     }
     setDrawerOpen(false);
-  }, []);
+  }, [ensureScreenAllowed]);
 
   const openDetailScreen = useCallback(
     (nextScreen: ScreenKey) => {
+      if (!ensureScreenAllowed(nextScreen)) {
+        return;
+      }
+
       setScreenStack(current => [...current, screen]);
       setScreen(nextScreen);
       setDrawerOpen(false);
       setPopup(null);
     },
-    [screen],
+    [ensureScreenAllowed, screen],
   );
 
   const handleScreenBack = useCallback(() => {
@@ -225,6 +340,20 @@ function App(): React.JSX.Element {
     }
     openScreen('dashboard');
   }, [openScreen, screen, screenStack]);
+
+  useEffect(() => {
+    if (!session || canOpenScreen(permissions, screen)) {
+      return;
+    }
+
+    setScreen('dashboard');
+    setScreenStack([]);
+    setPopup(null);
+    showAccessDenied(
+      'Access restricted',
+      `Your role needs ${requiredPermissionLabel(screen)} to keep this screen open.`,
+    );
+  }, [permissions, screen, session, showAccessDenied]);
 
   const closePopup = useCallback(() => {
     setPopup(null);
@@ -259,22 +388,34 @@ function App(): React.JSX.Element {
   }, [closePopup, drawerOpen, handleScreenBack, popup, screen]);
 
   const openTicketForm = useCallback(() => {
+    if (!ensureActionAllowed('createTicket', 'create tickets')) {
+      return;
+    }
+
     setSelectedTicket(null);
     setSelectedReservation(null);
     setSelectedConversation(null);
     setSelectedGuest(null);
     openDetailScreen('ticketForm');
-  }, [openDetailScreen]);
+  }, [ensureActionAllowed, openDetailScreen]);
 
   const openContextTicketForm = useCallback(() => {
+    if (!ensureActionAllowed('createTicket', 'create tickets')) {
+      return;
+    }
+
     setSelectedTicket(null);
     openDetailScreen('ticketForm');
-  }, [openDetailScreen]);
+  }, [ensureActionAllowed, openDetailScreen]);
 
   const openReservationForm = useCallback(() => {
+    if (!ensureActionAllowed('createReservation', 'create reservations')) {
+      return;
+    }
+
     setSelectedReservation(null);
     setPopup('reservationForm');
-  }, []);
+  }, [ensureActionAllowed]);
 
   const openTicketDetail = useCallback((ticket: TicketView) => {
     setSelectedTicket(ticket);
@@ -292,9 +433,17 @@ function App(): React.JSX.Element {
   }, [openDetailScreen]);
 
   const openRoomForm = useCallback((room: ArcadiaRecord | null) => {
+    const action: Parameters<typeof canUseAction>[1] = room
+      ? 'updateRoom'
+      : 'createRoom';
+    const label = room ? 'update rooms' : 'create rooms';
+    if (!ensureActionAllowed(action, label)) {
+      return;
+    }
+
     setSelectedRoom(room);
     setPopup('roomForm');
-  }, []);
+  }, [ensureActionAllowed]);
 
   const openProfileOption = useCallback((label: string) => {
     setSelectedLabel(label);
@@ -309,9 +458,13 @@ function App(): React.JSX.Element {
   }, [openDetailScreen]);
 
   const openStaffProfile = useCallback((staff: ArcadiaRecord) => {
+    if (!ensureActionAllowed('viewStaffProfile', 'view staff profiles')) {
+      return;
+    }
+
     setSelectedStaff(staff);
     setPopup('staffProfile');
-  }, []);
+  }, [ensureActionAllowed]);
 
   const openWhatsAppChat = useCallback((conversation: ArcadiaRecord) => {
     setSelectedConversation(conversation);
@@ -368,7 +521,22 @@ function App(): React.JSX.Element {
     }
   }, [loadResource, screen]);
 
+  useMobileWebSocket({
+    hotelId: session?.user.hotel_id,
+    onRefreshResource: refreshResource,
+    onShowDialog: setAppDialog,
+    token: session?.accessToken,
+  });
+
   const appData = useMemo(() => buildAppData(resources), [resources]);
+  const loadingProcesses = useMemo(() => {
+    const resourceProcesses = (Object.keys(resourceLabels) as ResourceKey[])
+      .filter(resource => resources[resource].loading)
+      .map(resource => `Loading ${resourceLabels[resource]}`);
+    const actionProcess = formatActionLoading(actionLoading);
+
+    return actionProcess ? [...resourceProcesses, actionProcess] : resourceProcesses;
+  }, [actionLoading, resources]);
   const activeError = useMemo(
     () => screenResourceError(screen, resources),
     [resources, screen],
@@ -411,6 +579,7 @@ function App(): React.JSX.Element {
             activeScreen={screen}
             hotelName={hotelName || session.user.hotel_id}
             onNavigate={openScreen}
+            permissions={permissions}
           />
         ) : null}
         <View style={styles.phoneSurface}>
@@ -419,6 +588,7 @@ function App(): React.JSX.Element {
               data={appData}
               error={activeError}
               loading={isScreenLoading(screen, resources)}
+              loadingProcesses={loadingProcesses}
               request={request}
               screen={screen}
               selectedConversation={selectedConversation}
@@ -441,6 +611,8 @@ function App(): React.JSX.Element {
               onOpenContextTicketForm={openContextTicketForm}
               onOpenTicketForm={openTicketForm}
               onOpenWhatsAppChat={openWhatsAppChat}
+              onOpenNotifications={() => openScreen('notifications')}
+              onQuickRecordAction={handleAction}
               onRefresh={refreshActiveData}
               onRefreshResource={refreshResource}
               onShowDialog={setAppDialog}
@@ -450,6 +622,7 @@ function App(): React.JSX.Element {
             activeScreen={screen}
             onCreate={openTicketForm}
             onNavigate={openScreen}
+            permissions={permissions}
           />
         </View>
         {!wideLayout ? (
@@ -466,6 +639,7 @@ function App(): React.JSX.Element {
                   activeScreen={screen}
                   hotelName={hotelName || session.user.hotel_id}
                   onNavigate={openScreen}
+                  permissions={permissions}
                 />
               </Pressable>
             </Pressable>
@@ -494,6 +668,12 @@ function App(): React.JSX.Element {
           onShowDialog={setAppDialog}
         />
         <AppDialog dialog={appDialog} onClose={() => setAppDialog(null)} />
+        <DispatchModal
+          hotelId={session.user.hotel_id}
+          onRefreshResource={refreshResource}
+          onShowDialog={setAppDialog}
+          token={session.accessToken}
+        />
       </View>
     </SafeAreaView>
   );
@@ -503,11 +683,15 @@ function SideDrawer({
   activeScreen,
   hotelName,
   onNavigate,
+  permissions,
 }: {
   activeScreen: ScreenKey;
   hotelName: string;
   onNavigate: ScreenAction;
+  permissions?: string[];
 }) {
+  const visibleItems = filterNavItemsForUser(sideNavItems, permissions);
+
   return (
     <View style={styles.sideDrawer}>
       <View style={styles.drawerBrand}>
@@ -520,7 +704,7 @@ function SideDrawer({
         </View>
       </View>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.drawerNav}>
-        {sideNavItems.map(item => {
+        {visibleItems.map(item => {
           const active = item.key === activeScreen;
           const Icon = item.icon;
           return (
@@ -569,6 +753,41 @@ function fallbackScreen(screen: ScreenKey): ScreenKey {
     return 'whatsapp';
   }
   return 'dashboard';
+}
+
+function formatActionLoading(actionLoading: string | null) {
+  if (!actionLoading) {
+    return null;
+  }
+
+  const [resource, , action] = actionLoading.split(':');
+  const actionLabels: Record<string, string> = {
+    accept: 'Accepting',
+    complete: 'Completing',
+    reopen: 'Reopening',
+    preparing: 'Moving to preparing',
+    ready: 'Marking ready',
+    delivered: 'Marking delivered',
+    cancelled: 'Cancelling',
+  };
+  const actionLabel = actionLabels[action] ?? `Running ${action.replace(/[-_]/g, ' ')}`;
+
+  return `${actionLabel} ${singularResourceName(resource as ResourceKey)}`;
+}
+
+function singularResourceName(resource: ResourceKey) {
+  if (resource === 'orders') {
+    return 'order';
+  }
+  if (resource === 'housekeeping') {
+    return 'task';
+  }
+  if (resource === 'whatsapp') {
+    return 'conversation';
+  }
+
+  const label = resourceLabels[resource] ?? 'record';
+  return label.endsWith('s') ? label.slice(0, -1).toLowerCase() : label.toLowerCase();
 }
 
 export default App;

@@ -197,7 +197,15 @@ export function useOperationsWorkspace(
           title: 'Update order',
           tone: 'info',
         });
+        return;
       }
+
+      showDialog?.({
+        message:
+          'This quick action is visible for workflow planning, but the backend endpoint for this record type is not wired yet.',
+        title: 'Action not available',
+        tone: 'info',
+      });
     },
     [runOrderAction, runTicketAction, showDialog],
   );

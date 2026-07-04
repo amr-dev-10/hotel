@@ -1,3 +1,3 @@
-import ArcadiaMobileApp from './src/app/ArcadiaMobileApp';
+import RootNavigator from './src/navigation/RootNavigator';
 
-export default ArcadiaMobileApp;
+export default RootNavigator;

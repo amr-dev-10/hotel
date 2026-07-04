@@ -1,7 +1,11 @@
 import {API_BASE_URL} from '../../config/api';
 import type {ApiEnvelope} from '../../types/api';
+import type {LoginData} from '../../types/domain';
+import {refreshAccessToken} from '../session';
 
 type RequestOptions = RequestInit & {
+  onTokenRefresh?: (login: LoginData) => Promise<void> | void;
+  refreshToken?: string | null;
   token?: string;
 };
 
@@ -37,8 +41,52 @@ export async function apiRequest<T>(
   path: string,
   options: RequestOptions = {},
 ): Promise<ApiEnvelope<T>> {
-  const {token, headers, ...requestOptions} = options;
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const {
+    onTokenRefresh,
+    refreshToken,
+    token,
+    headers,
+    ...requestOptions
+  } = options;
+  let response = await sendRequest(path, requestOptions, headers, token);
+  const payload = (await parseJsonResponse(response)) as ApiEnvelope<T>;
+
+  if (
+    response.status === 401 &&
+    refreshToken &&
+    !path.includes('/api/v1/auth/refresh')
+  ) {
+    const refreshed = await refreshAccessToken(refreshToken);
+    await onTokenRefresh?.(refreshed);
+    response = await sendRequest(
+      path,
+      requestOptions,
+      headers,
+      refreshed.access_token,
+    );
+    const retryPayload = (await parseJsonResponse(response)) as ApiEnvelope<T>;
+
+    if (response.ok && retryPayload.success !== false) {
+      return retryPayload;
+    }
+
+    throw requestError(response, retryPayload);
+  }
+
+  if (!response.ok || payload.success === false) {
+    throw requestError(response, payload);
+  }
+
+  return payload;
+}
+
+function sendRequest(
+  path: string,
+  requestOptions: RequestInit,
+  headers: RequestInit['headers'],
+  token?: string,
+) {
+  return fetch(`${API_BASE_URL}${path}`, {
     ...requestOptions,
     headers: {
       Accept: 'application/json',
@@ -47,25 +95,26 @@ export async function apiRequest<T>(
       ...(headers ?? {}),
     },
   });
-  const payload = (await parseJsonResponse(response)) as ApiEnvelope<T>;
+}
 
-  if (!response.ok || payload.success === false) {
-    const fallback =
-      response.status === 401 ? 'Session expired. Sign in again.' : 'Request failed.';
-    const detail =
-      typeof payload.detail === 'object' && !Array.isArray(payload.detail)
-        ? payload.detail
-        : undefined;
-    throw new ApiRequestError({
-      detail: payload.detail,
-      hint: detail?.hint ? String(detail.hint) : undefined,
-      message: detail?.message ? String(detail.message) : payload.message ?? detailMessage(payload.detail) ?? fallback,
-      payload,
-      status: response.status,
-    });
-  }
+function requestError<T>(response: Response, payload: ApiEnvelope<T>) {
+  const fallback =
+    response.status === 401 ? 'Session expired. Sign in again.' : 'Request failed.';
+  const detail =
+    typeof payload.detail === 'object' && !Array.isArray(payload.detail)
+      ? payload.detail
+      : undefined;
 
-  return payload;
+  return new ApiRequestError({
+    detail: payload.detail,
+    hint: detail?.hint ? String(detail.hint) : undefined,
+    message:
+      detail?.message
+        ? String(detail.message)
+        : payload.message ?? detailMessage(payload.detail) ?? fallback,
+    payload,
+    status: response.status,
+  });
 }
 
 export function formatErrorDetails(error: unknown, fallback = 'Request failed.') {

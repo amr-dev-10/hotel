@@ -44,7 +44,7 @@ export function buildBottomTabs(icons: {
 }): AppNavItem[] {
   return [
     {key: 'dashboard', label: 'Home', icon: icons.Home},
-    {key: 'reservations', label: 'Search', icon: icons.Search},
+    {key: 'reservations', label: 'Reservations', icon: icons.Search},
     {key: 'assistant', label: '', icon: icons.Plus},
     {key: 'escalations', label: 'Escalations', icon: icons.Wrench},
     {key: 'profile', label: 'Profile', icon: icons.User},

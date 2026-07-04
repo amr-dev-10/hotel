@@ -11,15 +11,18 @@ import {
 } from 'react-native';
 
 import {
+  ActionMenu,
+  type ActionMenuItem,
   Avatar,
   EmptyState,
   ErrorNotice,
   InfoLine,
+  LoadingProcessCard,
   StatusBadge,
   TopAppBar,
 } from '../AppComponents';
 import {appErrorDialog, type AppDialogRequest} from '../AppDialog';
-import {ChevronLeft, Menu, MessageCircle, Send} from '../icons';
+import {Bell, ChevronLeft, Menu, MessageCircle, Send} from '../icons';
 import {firstRecordValue, isRecordTruthy} from '../dataUtils';
 import {blue, styles} from '../styles';
 import type {AppData, ReservationView, TicketView} from '../../modules/dashboard';
@@ -42,6 +45,7 @@ type DetailBaseProps = {
   request: RequestFn;
   onBack: () => void;
   onMenu: () => void;
+  onOpenNotifications?: () => void;
   onRefresh: () => void;
   onRefreshResource: (resource: ResourceKey) => void;
   onShowDialog: (dialog: AppDialogRequest) => void;
@@ -56,6 +60,7 @@ export function TicketDetailScreen({
   ticket,
   onBack,
   onMenu,
+  onOpenNotifications,
   onOpenWhatsAppConversation,
   onRefresh,
   onRefreshResource,
@@ -239,14 +244,32 @@ export function TicketDetailScreen({
 
   if (!ticket) {
     return (
-      <DetailFrame error={error} loading={loading} title="Ticket Detail" onBack={onBack} onMenu={onMenu} onRefresh={onRefresh}>
+      <DetailFrame error={error} loading={loading} title="Ticket Detail" onBack={onBack} onMenu={onMenu} onOpenNotifications={onOpenNotifications} onRefresh={onRefresh}>
         <EmptyState label="No ticket selected." />
       </DetailFrame>
     );
   }
 
   return (
-    <DetailFrame error={error} loading={loading || detailLoading} title="Ticket Detail" onBack={onBack} onMenu={onMenu} onRefresh={loadDetail}>
+    <DetailFrame
+      actions={[
+        {label: 'Accept Ticket', onPress: () => runTicketPost('accept')},
+        {label: 'Start Work', onPress: () => saveStage('in_progress')},
+        {label: 'Complete Ticket', onPress: () => runTicketPost('complete')},
+        {label: 'Approve Ticket', onPress: () => runTicketPost('approve')},
+        {label: 'Reopen Ticket', onPress: () => runTicketPost('reopen')},
+        ...(conversationId
+          ? [{label: 'Open WhatsApp', onPress: openWhatsApp}]
+          : []),
+      ]}
+      error={error}
+      loading={loading || detailLoading || Boolean(submitting)}
+      loadingLabel={actionProcessLabel('ticket', submitting, 'Loading ticket detail')}
+      title="Ticket Detail"
+      onBack={onBack}
+      onMenu={onMenu}
+      onOpenNotifications={onOpenNotifications}
+      onRefresh={loadDetail}>
       <InlineError message={inlineError} />
       <View style={styles.popupBadgeRow}>
         <StatusBadge label={firstRecordValue(record, ['priority']) || 'Priority'} tone={priorityTone(firstRecordValue(record, ['priority']))} />
@@ -259,10 +282,10 @@ export function TicketDetailScreen({
       <DetailSection title="Ticket Summary">
         <InfoLine label="Ticket" value={firstRecordValue(record, ['ticket_code', 'code', 'id'])} />
         <InfoLine label="Type" value={firstRecordValue(record, ['type']) || 'Ticket'} />
-        <InfoLine label="Guest" value={firstRecordValue(record, ['guest_name', 'guest_id']) || 'Unassigned'} />
-        <InfoLine label="Room" value={firstRecordValue(record, ['room_number', 'room_id']) || 'Unassigned'} />
-        <InfoLine label="Reservation" value={firstRecordValue(record, ['reservation_no', 'reservation_id']) || 'None'} />
-        <InfoLine label="Assignee" value={firstRecordValue(record, ['assigned_to_name', 'assigned_to']) || 'Unassigned'} />
+        <InfoLine label="Guest" value={firstRecordValue(record, ['guest_name', 'guest_full_name']) || 'Unassigned'} />
+        <InfoLine label="Room" value={firstRecordValue(record, ['room_number', 'room_name']) || 'Unassigned'} />
+        <InfoLine label="Reservation" value={firstRecordValue(record, ['reservation_no', 'booking_id']) || 'None'} />
+        <InfoLine label="Assignee" value={firstRecordValue(record, ['assigned_to_name', 'assignee_name']) || 'Unassigned'} />
         <InfoLine label="SLA Due" value={compactDate(firstRecordValue(record, ['sla_due_at'])) || 'Not set'} />
         <InfoLine label="Created" value={compactDate(firstRecordValue(record, ['created_at']))} />
       </DetailSection>
@@ -335,6 +358,7 @@ export function TicketFormScreen({
   selectedReservation,
   onBack,
   onMenu,
+  onOpenNotifications,
   onRefresh,
   onRefreshResource,
   onShowDialog,
@@ -468,8 +492,35 @@ export function TicketFormScreen({
     }
   }
 
+  function resetForm() {
+    setDescription('');
+    setDepartmentKey('housekeeping');
+    setTicketType('Ticket');
+    setPriority('2');
+    setTaskCategory('');
+    setSelectedRoom(null);
+    setSelectedStaff(null);
+    setGuestRecord(selectedGuest);
+    setReservationRecord(contextReservation);
+    setConversationRecord(selectedConversation);
+    setInlineError(null);
+  }
+
   return (
-    <DetailFrame error={error} loading={loading} title="Create Ticket" onBack={onBack} onMenu={onMenu} onRefresh={onRefresh}>
+    <DetailFrame
+      actions={[
+        {label: submitting ? 'Creating...' : 'Create Ticket', onPress: submitTicket},
+        {label: 'Clear Form', onPress: resetForm},
+        {label: 'Cancel', onPress: onBack},
+      ]}
+      error={error}
+      loading={loading || submitting}
+      loadingLabel={submitting ? 'Creating ticket' : 'Loading ticket form data'}
+      title="Create Ticket"
+      onBack={onBack}
+      onMenu={onMenu}
+      onOpenNotifications={onOpenNotifications}
+      onRefresh={onRefresh}>
       <InlineError message={inlineError} />
       <DetailSection title="Issue">
         <EditableField
@@ -524,7 +575,7 @@ export function TicketFormScreen({
           onSelect={setGuestRecord}
         />
         <Many2OneField
-          displayKeys={['reservation_no', 'booking_id', 'id', 'guest_name', 'room_number']}
+          displayKeys={['guest_name', 'reservation_no', 'booking_id', 'room_number']}
           label="Reservation"
           placeholder="Search reservation"
           records={reservationRecords}
@@ -532,7 +583,7 @@ export function TicketFormScreen({
           onSelect={setReservationRecord}
         />
         <Many2OneField
-          displayKeys={['phone', 'guest_name', 'contact_name', 'id']}
+          displayKeys={['guest_name', 'contact_name', 'phone', 'whatsapp_phone']}
           label="WhatsApp Conversation"
           placeholder="Search WhatsApp conversation"
           records={data.whatsapp}
@@ -587,6 +638,7 @@ export function ReservationDetailScreen({
   onBack,
   onCreateTicket,
   onMenu,
+  onOpenNotifications,
   onOpenWhatsAppConversation,
   onRefresh,
   onRefreshResource,
@@ -734,14 +786,22 @@ export function ReservationDetailScreen({
 
   if (!reservation) {
     return (
-      <DetailFrame error={error} loading={loading} title="Reservation Detail" onBack={onBack} onMenu={onMenu} onRefresh={onRefresh}>
+      <DetailFrame error={error} loading={loading} title="Reservation Detail" onBack={onBack} onMenu={onMenu} onOpenNotifications={onOpenNotifications} onRefresh={onRefresh}>
         <EmptyState label="No reservation selected." />
       </DetailFrame>
     );
   }
 
   return (
-    <DetailFrame error={error} loading={loading || detailLoading} title="Reservation Detail" onBack={onBack} onMenu={onMenu} onRefresh={loadDetail}>
+    <DetailFrame
+      error={error}
+      loading={loading || detailLoading || Boolean(submitting)}
+      loadingLabel={actionProcessLabel('reservation', submitting, 'Loading reservation detail')}
+      title="Reservation Detail"
+      onBack={onBack}
+      onMenu={onMenu}
+      onOpenNotifications={onOpenNotifications}
+      onRefresh={loadDetail}>
       <InlineError message={inlineError} />
       <View style={styles.popupBadgeRow}>
         <StatusBadge label={firstRecordValue(record, ['status']) || 'Status'} tone={statusTone(firstRecordValue(record, ['status']))} />
@@ -788,6 +848,7 @@ export function GuestDetailScreen({
   onBack,
   onCreateTicket,
   onMenu,
+  onOpenNotifications,
   onOpenWhatsAppConversation,
   onRefresh,
   onRefreshResource,
@@ -904,14 +965,22 @@ export function GuestDetailScreen({
 
   if (!guest) {
     return (
-      <DetailFrame error={error} loading={loading} title="Guest Detail" onBack={onBack} onMenu={onMenu} onRefresh={onRefresh}>
+      <DetailFrame error={error} loading={loading} title="Guest Detail" onBack={onBack} onMenu={onMenu} onOpenNotifications={onOpenNotifications} onRefresh={onRefresh}>
         <EmptyState label="No guest selected." />
       </DetailFrame>
     );
   }
 
   return (
-    <DetailFrame error={error} loading={loading || detailLoading} title="Guest Detail" onBack={onBack} onMenu={onMenu} onRefresh={loadDetail}>
+    <DetailFrame
+      error={error}
+      loading={loading || detailLoading || Boolean(submitting)}
+      loadingLabel={actionProcessLabel('guest', submitting, 'Loading guest detail')}
+      title="Guest Detail"
+      onBack={onBack}
+      onMenu={onMenu}
+      onOpenNotifications={onOpenNotifications}
+      onRefresh={loadDetail}>
       <InlineError message={inlineError} />
       <View style={styles.staffPopupHeader}>
         <Avatar label={name.charAt(0)} size={52} />
@@ -967,6 +1036,7 @@ export function WhatsAppConversationScreen({
   onBack,
   onCreateTicket,
   onMenu,
+  onOpenNotifications,
   onRefresh,
   onRefreshResource,
   onShowDialog,
@@ -1073,7 +1143,7 @@ export function WhatsAppConversationScreen({
 
   if (!conversationId) {
     return (
-      <DetailFrame error={error} loading={loading} title="WhatsApp Chat" onBack={onBack} onMenu={onMenu} onRefresh={onRefresh}>
+      <DetailFrame error={error} loading={loading} title="WhatsApp Chat" onBack={onBack} onMenu={onMenu} onOpenNotifications={onOpenNotifications} onRefresh={onRefresh}>
         <EmptyState label="No WhatsApp conversation selected." />
       </DetailFrame>
     );
@@ -1087,7 +1157,15 @@ export function WhatsAppConversationScreen({
   ];
 
   return (
-    <DetailFrame error={error} loading={loading || detailLoading} title="WhatsApp Chat" onBack={onBack} onMenu={onMenu} onRefresh={loadMessages}>
+    <DetailFrame
+      error={error}
+      loading={loading || detailLoading || Boolean(submitting)}
+      loadingLabel={actionProcessLabel('conversation', submitting, 'Loading WhatsApp chat')}
+      title="WhatsApp Chat"
+      onBack={onBack}
+      onMenu={onMenu}
+      onOpenNotifications={onOpenNotifications}
+      onRefresh={loadMessages}>
       <InlineError message={inlineError} />
       <View style={styles.popupBadgeRow}>
         <StatusBadge label={status} tone={statusTone(status)} />
@@ -1099,15 +1177,18 @@ export function WhatsAppConversationScreen({
 
       <DetailSection title="Conversation">
         <InfoLine label="Phone" value={firstRecordValue(record, ['phone', 'whatsapp_phone']) || 'No phone'} />
-        <InfoLine label="Guest" value={firstRecordValue(record, ['guest_name', 'guest_id']) || 'Unlinked'} />
-        <InfoLine label="Reservation" value={firstRecordValue(record, ['reservation_no', 'reservation_id']) || 'None'} />
+        <InfoLine label="Guest" value={firstRecordValue(record, ['guest_name', 'contact_name', 'name']) || 'Unlinked'} />
+        <InfoLine label="Reservation" value={firstRecordValue(record, ['reservation_no', 'booking_id']) || 'None'} />
         <InfoLine label="Unread" value={firstRecordValue(record, ['unread_count', 'unread']) || '0'} />
         <InfoLine label="Last Message" value={compactDate(firstRecordValue(record, ['last_message_at', 'updated_at'])) || 'No messages'} />
       </DetailSection>
 
       <DetailSection title="Messages">
         <ScrollView
+          keyboardShouldPersistTaps="handled"
           nestedScrollEnabled
+          persistentScrollbar
+          showsVerticalScrollIndicator
           style={styles.chatTranscriptScroll}
           contentContainerStyle={styles.chatTranscript}>
           {detailLoading ? (
@@ -1184,20 +1265,26 @@ export function WhatsAppConversationScreen({
 }
 
 function DetailFrame({
+  actions,
   children,
   error,
   loading,
+  loadingLabel,
   title,
   onBack,
   onMenu,
+  onOpenNotifications,
   onRefresh,
 }: {
+  actions?: ActionMenuItem[];
   children: ReactNode;
   error: string | null;
   loading: boolean;
+  loadingLabel?: string;
   title: string;
   onBack: () => void;
   onMenu: () => void;
+  onOpenNotifications?: () => void;
   onRefresh: () => void;
 }) {
   return (
@@ -1210,7 +1297,14 @@ function DetailFrame({
         leftIcon={ChevronLeft}
         onLeftPress={onBack}
         rightIcon={Menu}
+        notificationIcon={Bell}
         onRightPress={onMenu}
+        onNotificationPress={onOpenNotifications}
+        rightAccessory={actions ? <ActionMenu items={actions} /> : undefined}
+      />
+      <LoadingProcessCard
+        active={loading}
+        label={loadingLabel ?? `Loading ${title.toLowerCase()}`}
       />
       <ErrorNotice message={error} onRetry={onRefresh} />
       {children}
@@ -1475,7 +1569,12 @@ function RecordFields({
   title: string;
 }) {
   const entries = Object.entries(record)
-    .filter(([, value]) => value !== undefined && value !== null && text(value).trim() !== '')
+    .filter(([key, value]) => {
+      if (key === 'id' || key.endsWith('_id')) {
+        return false;
+      }
+      return value !== undefined && value !== null && text(value).trim() !== '';
+    })
     .sort(([left], [right]) => left.localeCompare(right));
 
   if (!entries.length) {
@@ -1555,6 +1654,23 @@ function formatValue(value: unknown) {
     return value ? 'Yes' : 'No';
   }
   return text(value);
+}
+
+function actionProcessLabel(subject: string, action: string | null, fallback: string) {
+  if (!action) {
+    return fallback;
+  }
+
+  const labels: Record<string, string> = {
+    'check-in': 'Completing check in',
+    'check-out': 'Completing check out',
+    note: `Saving ${subject} note`,
+    send: 'Sending WhatsApp message',
+    stage: `Updating ${subject} stage`,
+    whatsapp: 'Opening WhatsApp conversation',
+  };
+
+  return labels[action] ?? `${titleCase(action)} ${subject}`;
 }
 
 function titleCase(value: string) {

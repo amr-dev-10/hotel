@@ -1,5 +1,5 @@
 export const featureFlags = {
   enableStagingPrefill: true,
-  enableRealtimeSockets: false,
+  enableRealtimeSockets: true,
   enableOfflineQueue: false,
 };

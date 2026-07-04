@@ -53,6 +53,16 @@ export function filterByStatus<T extends {status: string}>(
   );
 }
 
+export function filterRecordsBySearch<T>(items: T[], query: string) {
+  const needle = query.trim().toLowerCase();
+
+  if (!needle) {
+    return items;
+  }
+
+  return items.filter(item => searchBlob(item).includes(needle));
+}
+
 export function countRecordsByStatus(records: ArcadiaRecord[], status: string) {
   return records.filter(record =>
     normalizeStatus(recordStatus(record)).includes(normalizeStatus(status)),
@@ -85,4 +95,24 @@ export function formatAmount(value: string) {
 
 function normalizeStatus(value: string) {
   return value.toLowerCase().replaceAll('_', ' ').trim();
+}
+
+function searchBlob(value: unknown): string {
+  if (value === null || value === undefined) {
+    return '';
+  }
+
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return String(value).toLowerCase();
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(searchBlob).join(' ');
+  }
+
+  if (typeof value === 'object') {
+    return Object.values(value as Record<string, unknown>).map(searchBlob).join(' ');
+  }
+
+  return '';
 }
