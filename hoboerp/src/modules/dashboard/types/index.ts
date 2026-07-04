@@ -1,3 +1,5 @@
+import type {ArcadiaRecord} from '../../../types/domain';
+
 export type ReservationView = {
   id: string;
   guestName: string;
@@ -7,6 +9,7 @@ export type ReservationView = {
   adults: number;
   children: number;
   status: string;
+  raw: ArcadiaRecord;
 };
 
 export type TicketView = {
@@ -19,6 +22,7 @@ export type TicketView = {
   createdAt: string;
   priority: string;
   status: string;
+  raw: ArcadiaRecord;
 };
 
 export type AppData = {

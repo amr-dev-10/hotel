@@ -1,7 +1,6 @@
 import {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -11,6 +10,7 @@ import {
 } from 'react-native';
 
 import {Avatar, InfoLine, StatusBadge} from './AppComponents';
+import {appErrorDialog, type AppDialogRequest} from './AppDialog';
 import {Eye, Send, Ticket} from './icons';
 import {firstRecordValue, isRecordTruthy} from './dataUtils';
 import {blue, styles} from './styles';
@@ -31,6 +31,7 @@ export function CustomPopup({
   conversation,
   data,
   guest,
+  hotelName,
   popup,
   request,
   reservation,
@@ -46,10 +47,12 @@ export function CustomPopup({
   onOpenWhatsAppConversation,
   onRefreshResource,
   onReservationBack,
+  onShowDialog,
 }: {
   conversation: ArcadiaRecord | null;
   data: AppData;
   guest: ArcadiaRecord | null;
+  hotelName: string;
   popup: PopupKey;
   request: RequestFn;
   reservation: ReservationView | null;
@@ -65,6 +68,7 @@ export function CustomPopup({
   onOpenWhatsAppConversation: (conversation: ArcadiaRecord) => void;
   onRefreshResource: (resource: ResourceKey) => void;
   onReservationBack: () => void;
+  onShowDialog: (dialog: AppDialogRequest) => void;
 }) {
   const visible = popup !== null;
   const title = getPopupTitle(popup, selectedLabel, conversation, guest, staff);
@@ -79,8 +83,8 @@ export function CustomPopup({
   const handleError = useCallback((nextError: unknown, fallback: string) => {
     const details = formatErrorDetails(nextError, fallback);
     setError(details);
-    Alert.alert(fallback, details);
-  }, []);
+    onShowDialog(appErrorDialog(fallback, details));
+  }, [onShowDialog]);
 
   return (
     <Modal animationType="fade" transparent visible={visible} onRequestClose={onClose}>
@@ -105,6 +109,7 @@ export function CustomPopup({
                 onClose={onClose}
                 onError={handleError}
                 onRefreshResource={onRefreshResource}
+                onShowDialog={onShowDialog}
               />
             ) : null}
 
@@ -116,6 +121,7 @@ export function CustomPopup({
                 onClose={onClose}
                 onError={handleError}
                 onRefreshResource={onRefreshResource}
+                onShowDialog={onShowDialog}
               />
             ) : null}
 
@@ -127,6 +133,7 @@ export function CustomPopup({
                 onClose={onClose}
                 onError={handleError}
                 onRefreshResource={onRefreshResource}
+                onShowDialog={onShowDialog}
               />
             ) : null}
 
@@ -139,6 +146,7 @@ export function CustomPopup({
                 onClose={onClose}
                 onError={handleError}
                 onRefreshResource={onRefreshResource}
+                onShowDialog={onShowDialog}
               />
             ) : null}
 
@@ -162,6 +170,7 @@ export function CustomPopup({
                 onError={handleError}
                 onRefreshResource={onRefreshResource}
                 onReservationBack={onReservationBack}
+                onShowDialog={onShowDialog}
               />
             ) : null}
 
@@ -185,6 +194,7 @@ export function CustomPopup({
                 onError={handleError}
                 onRefreshResource={onRefreshResource}
                 onClose={onClose}
+                onShowDialog={onShowDialog}
               />
             ) : null}
 
@@ -212,7 +222,7 @@ export function CustomPopup({
                 ) : selectedLabel === 'App Settings' ? (
                   <>
                     <InfoLine label="Account" value={user.email} />
-                    <InfoLine label="Hotel" value={user.hotel_id} />
+                    <InfoLine label="Hotel" value={hotelName} />
                     <InfoLine label="Theme" value="System default" />
                     <InfoLine label="Notifications" value="Enabled" />
                     <PopupActionButton label="Done" onPress={onClose} />
@@ -221,7 +231,7 @@ export function CustomPopup({
                   <>
                     <InfoLine label="Name" value={user.name ?? user.email} />
                     <InfoLine label="Role" value={user.job_role ?? user.user_type ?? ''} />
-                    <InfoLine label="Hotel" value={user.hotel_id} />
+                    <InfoLine label="Hotel" value={hotelName} />
                     <Text style={styles.popupBodyText}>
                       {selectedLabel} is connected to the authenticated profile context.
                     </Text>
@@ -239,6 +249,7 @@ export function CustomPopup({
                 onClose={onClose}
                 onError={handleError}
                 onRefreshResource={onRefreshResource}
+                onShowDialog={onShowDialog}
               />
             ) : null}
           </ScrollView>
@@ -258,6 +269,7 @@ function TicketForm({
   onClose,
   onError,
   onRefreshResource,
+  onShowDialog,
 }: {
   conversation: ArcadiaRecord | null;
   data: AppData;
@@ -268,6 +280,7 @@ function TicketForm({
   onClose: () => void;
   onError: (error: unknown, fallback: string) => void;
   onRefreshResource: (resource: ResourceKey) => void;
+  onShowDialog: (dialog: AppDialogRequest) => void;
 }) {
   const [description, setDescription] = useState('');
   const [departmentKey, setDepartmentKey] = useState('housekeeping');
@@ -329,10 +342,11 @@ function TicketForm({
       if (conversationId) {
         onRefreshResource('whatsapp');
       }
-      Alert.alert(
-        'Ticket created',
-        firstRecordValue(result.data, ['ticket_code', 'code', 'id']) || 'Ticket created successfully.',
-      );
+      onShowDialog({
+        message: firstRecordValue(result.data, ['ticket_code', 'code', 'id']) || 'Ticket created successfully.',
+        title: 'Ticket created',
+        tone: 'success',
+      });
       onClose();
     } catch (error) {
       onError(error, 'Ticket create failed');
@@ -436,6 +450,7 @@ function ReservationForm({
   onClose,
   onError,
   onRefreshResource,
+  onShowDialog,
 }: {
   data: AppData;
   hotelId: string;
@@ -443,6 +458,7 @@ function ReservationForm({
   onClose: () => void;
   onError: (error: unknown, fallback: string) => void;
   onRefreshResource: (resource: ResourceKey) => void;
+  onShowDialog: (dialog: AppDialogRequest) => void;
 }) {
   const [guestName, setGuestName] = useState('');
   const [phone, setPhone] = useState('');
@@ -499,7 +515,11 @@ function ReservationForm({
       onRefreshResource('reservations');
       onRefreshResource('guests');
       onRefreshResource('rooms');
-      Alert.alert('Reservation created', 'Reservation saved successfully.');
+      onShowDialog({
+        message: 'Reservation saved successfully.',
+        title: 'Reservation created',
+        tone: 'success',
+      });
       onClose();
     } catch (error) {
       onError(error, 'Reservation create failed');
@@ -595,6 +615,7 @@ function RoomForm({
   onClose,
   onError,
   onRefreshResource,
+  onShowDialog,
 }: {
   hotelId: string;
   request: RequestFn;
@@ -602,6 +623,7 @@ function RoomForm({
   onClose: () => void;
   onError: (error: unknown, fallback: string) => void;
   onRefreshResource: (resource: ResourceKey) => void;
+  onShowDialog: (dialog: AppDialogRequest) => void;
 }) {
   const [roomNumber, setRoomNumber] = useState(firstRecordValue(room, ['room_number', 'name', 'number']));
   const [floor, setFloor] = useState(firstRecordValue(room, ['floor', 'floor_number']));
@@ -637,7 +659,11 @@ function RoomForm({
         },
       );
       onRefreshResource('rooms');
-      Alert.alert('Room saved', 'Room inventory updated.');
+      onShowDialog({
+        message: 'Room inventory updated.',
+        title: 'Room saved',
+        tone: 'success',
+      });
       onClose();
     } catch (error) {
       onError(error, 'Room save failed');
@@ -679,6 +705,7 @@ function TicketDetail({
   onClose,
   onError,
   onRefreshResource,
+  onShowDialog,
 }: {
   data: AppData;
   hotelId: string;
@@ -687,6 +714,7 @@ function TicketDetail({
   onClose: () => void;
   onError: (error: unknown, fallback: string) => void;
   onRefreshResource: (resource: ResourceKey) => void;
+  onShowDialog: (dialog: AppDialogRequest) => void;
 }) {
   const [stage, setStage] = useState(stageValue(ticket.status));
   const [selectedStaff, setSelectedStaff] = useState<ArcadiaRecord | null>(null);
@@ -700,7 +728,11 @@ function TicketDetail({
         {method: 'POST'},
       );
       onRefreshResource('tickets');
-      Alert.alert('Ticket updated', `Action ${action.replaceAll('_', ' ')} completed.`);
+      onShowDialog({
+        message: `Action ${action.replaceAll('_', ' ')} completed.`,
+        title: 'Ticket updated',
+        tone: 'success',
+      });
       onClose();
     } catch (error) {
       onError(error, 'Ticket action failed');
@@ -720,7 +752,11 @@ function TicketDetail({
         },
       );
       onRefreshResource('tickets');
-      Alert.alert('Ticket stage updated', stage.replaceAll('_', ' '));
+      onShowDialog({
+        message: stage.replaceAll('_', ' '),
+        title: 'Ticket stage updated',
+        tone: 'success',
+      });
       onClose();
     } catch (error) {
       onError(error, 'Ticket stage update failed');
@@ -745,7 +781,11 @@ function TicketDetail({
         },
       );
       onRefreshResource('tickets');
-      Alert.alert('Ticket assigned', firstRecordValue(selectedStaff, ['name', 'email']));
+      onShowDialog({
+        message: firstRecordValue(selectedStaff, ['name', 'email']),
+        title: 'Ticket assigned',
+        tone: 'success',
+      });
       onClose();
     } catch (error) {
       onError(error, 'Ticket assignment failed');
@@ -873,6 +913,7 @@ function ReservationLifecycle({
   onError,
   onRefreshResource,
   onReservationBack,
+  onShowDialog,
 }: {
   hotelId: string;
   mode: 'checkIn' | 'checkOut';
@@ -883,6 +924,7 @@ function ReservationLifecycle({
   onError: (error: unknown, fallback: string) => void;
   onRefreshResource: (resource: ResourceKey) => void;
   onReservationBack: () => void;
+  onShowDialog: (dialog: AppDialogRequest) => void;
 }) {
   const [submitting, setSubmitting] = useState(false);
   const isCheckIn = mode === 'checkIn';
@@ -901,10 +943,11 @@ function ReservationLifecycle({
       );
       onRefreshResource('reservations');
       onRefreshResource('rooms');
-      Alert.alert(
-        isCheckIn ? 'Check-in complete' : 'Check-out complete',
-        reservation.guestName,
-      );
+      onShowDialog({
+        message: reservation.guestName,
+        title: isCheckIn ? 'Check-in complete' : 'Check-out complete',
+        tone: 'success',
+      });
       onClose();
     } catch (error) {
       onError(error, isCheckIn ? 'Check-in failed' : 'Check-out failed');
@@ -1023,6 +1066,7 @@ function WhatsAppChat({
   onError,
   onRefreshResource,
   onClose,
+  onShowDialog,
 }: {
   conversation: ArcadiaRecord | null;
   hotelId: string;
@@ -1031,6 +1075,7 @@ function WhatsAppChat({
   onError: (error: unknown, fallback: string) => void;
   onRefreshResource: (resource: ResourceKey) => void;
   onClose: () => void;
+  onShowDialog: (dialog: AppDialogRequest) => void;
 }) {
   const conversationId = firstRecordValue(conversation, ['id', 'conversation_id']);
   const [messages, setMessages] = useState<ArcadiaRecord[]>([]);
@@ -1101,7 +1146,11 @@ function WhatsAppChat({
         },
       );
       onRefreshResource('whatsapp');
-      Alert.alert('Conversation resolved', 'WhatsApp conversation marked resolved.');
+      onShowDialog({
+        message: 'WhatsApp conversation marked resolved.',
+        title: 'Conversation resolved',
+        tone: 'success',
+      });
       onClose();
     } catch (error) {
       onError(error, 'WhatsApp resolve failed');
@@ -1177,6 +1226,7 @@ function StaffProfile({
   onClose,
   onError,
   onRefreshResource,
+  onShowDialog,
 }: {
   hotelId: string;
   request: RequestFn;
@@ -1184,6 +1234,7 @@ function StaffProfile({
   onClose: () => void;
   onError: (error: unknown, fallback: string) => void;
   onRefreshResource: (resource: ResourceKey) => void;
+  onShowDialog: (dialog: AppDialogRequest) => void;
 }) {
   const [submitting, setSubmitting] = useState(false);
   const staffId = firstRecordValue(staff, ['id', 'user_id']);
@@ -1206,7 +1257,11 @@ function StaffProfile({
         },
       );
       onRefreshResource('staff');
-      Alert.alert('Staff updated', successLabel);
+      onShowDialog({
+        message: successLabel,
+        title: 'Staff updated',
+        tone: 'success',
+      });
       onClose();
     } catch (error) {
       onError(error, 'Staff update failed');

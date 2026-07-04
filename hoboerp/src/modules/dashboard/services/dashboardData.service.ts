@@ -43,10 +43,10 @@ export function isScreenLoading(
   screen: string,
   resources: Record<ResourceKey, ResourceState>,
 ) {
-  if (screen === 'reservations') {
+  if (screen === 'reservations' || screen === 'reservationDetail') {
     return resources.reservations.loading;
   }
-  if (screen === 'tickets') {
+  if (screen === 'tickets' || screen === 'ticketDetail' || screen === 'ticketForm') {
     return resources.tickets.loading;
   }
   if (screen === 'escalations') {
@@ -55,7 +55,7 @@ export function isScreenLoading(
   if (screen === 'notifications') {
     return resources.notifications.loading;
   }
-  if (screen === 'guests') {
+  if (screen === 'guests' || screen === 'guestDetail') {
     return resources.guests.loading;
   }
   if (screen === 'room') {
@@ -73,7 +73,7 @@ export function isScreenLoading(
   if (screen === 'housekeeping') {
     return resources.housekeeping.loading;
   }
-  if (screen === 'whatsapp') {
+  if (screen === 'whatsapp' || screen === 'whatsappChat') {
     return resources.whatsapp.loading;
   }
   return Object.values(resources).some(resource => resource.loading);
@@ -89,10 +89,10 @@ export function screenResourceError(
       .map(([key, resource]) => `${key}: ${resource.error}`);
     return failed.length ? failed.join('\n') : null;
   }
-  if (screen === 'reservations') {
+  if (screen === 'reservations' || screen === 'reservationDetail') {
     return resources.reservations.error;
   }
-  if (screen === 'tickets') {
+  if (screen === 'tickets' || screen === 'ticketDetail' || screen === 'ticketForm') {
     return resources.tickets.error;
   }
   if (screen === 'escalations') {
@@ -101,7 +101,7 @@ export function screenResourceError(
   if (screen === 'notifications') {
     return resources.notifications.error;
   }
-  if (screen === 'guests') {
+  if (screen === 'guests' || screen === 'guestDetail') {
     return resources.guests.error;
   }
   if (screen === 'room') {
@@ -116,7 +116,7 @@ export function screenResourceError(
   if (screen === 'housekeeping') {
     return resources.housekeeping.error;
   }
-  if (screen === 'whatsapp') {
+  if (screen === 'whatsapp' || screen === 'whatsappChat') {
     return resources.whatsapp.error;
   }
   return null;
@@ -137,6 +137,7 @@ function toReservationView(item: ArcadiaRecord): ReservationView {
     adults: Number(valueOf(item, 'adults', 'adult_count')) || 0,
     children: Number(valueOf(item, 'children', 'child_count')) || 0,
     status: valueOf(item, 'status'),
+    raw: item,
   };
 }
 
@@ -152,6 +153,7 @@ function toTicketView(item: ArcadiaRecord): TicketView {
     createdAt: valueOf(item, 'created_at', 'created'),
     priority: valueOf(item, 'priority'),
     status: valueOf(item, 'stage', 'status'),
+    raw: item,
   };
 }
 

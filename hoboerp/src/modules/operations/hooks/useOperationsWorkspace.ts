@@ -1,5 +1,4 @@
 import {useCallback, useMemo, useState} from 'react';
-import {Alert} from 'react-native';
 
 import {formatErrorDetails} from '../../../services/api';
 import type {ApiEnvelope} from '../../../types/api';
@@ -20,9 +19,22 @@ type RequestFn = <T>(
   token?: string,
 ) => Promise<ApiEnvelope<T>>;
 
+type DialogRequest = {
+  title: string;
+  message: string;
+  details?: string;
+  tone?: 'error' | 'success' | 'info';
+  actions?: {
+    label: string;
+    onPress?: () => void;
+    tone?: 'primary' | 'secondary';
+  }[];
+};
+
 export function useOperationsWorkspace(
   request: RequestFn,
   session: Session | null,
+  showDialog?: (dialog: DialogRequest) => void,
 ) {
   const [activeResource, setActiveResource] = useState<ResourceKey>('tickets');
   const [resources, setResources] = useState(initialResources);
@@ -121,15 +133,13 @@ export function useOperationsWorkspace(
           replaceResourceItem('tickets', payload.data);
         }
       } catch (error) {
-        Alert.alert(
-          'Ticket action failed',
-          formatErrorDetails(error, 'Unable to update ticket.'),
-        );
+        const details = formatErrorDetails(error, 'Unable to update ticket.');
+        showDialog?.(errorDialog('Ticket action failed', details));
       } finally {
         setActionLoading(null);
       }
     },
-    [replaceResourceItem, session?.accessToken, session?.user.hotel_id],
+    [replaceResourceItem, session?.accessToken, session?.user.hotel_id, showDialog],
   );
 
   const runOrderAction = useCallback(
@@ -152,36 +162,44 @@ export function useOperationsWorkspace(
           replaceResourceItem('orders', payload.data);
         }
       } catch (error) {
-        Alert.alert(
-          'Order update failed',
-          formatErrorDetails(error, 'Unable to update order.'),
-        );
+        const details = formatErrorDetails(error, 'Unable to update order.');
+        showDialog?.(errorDialog('Order update failed', details));
       } finally {
         setActionLoading(null);
       }
     },
-    [replaceResourceItem, session?.accessToken, session?.user.hotel_id],
+    [replaceResourceItem, session?.accessToken, session?.user.hotel_id, showDialog],
   );
 
   const handleAction = useCallback<ActionHandler>(
     (resource, item, action) => {
       if (resource === 'tickets') {
         const label = action.replaceAll('_', ' ');
-        Alert.alert('Update ticket', `Confirm ${label}?`, [
-          {text: 'Cancel', style: 'cancel'},
-          {text: 'Confirm', onPress: () => runTicketAction(item, action)},
-        ]);
+        showDialog?.({
+          actions: [
+            {label: 'Cancel', tone: 'secondary'},
+            {label: 'Confirm', onPress: () => runTicketAction(item, action)},
+          ],
+          message: `Confirm ${label}?`,
+          title: 'Update ticket',
+          tone: 'info',
+        });
         return;
       }
 
       if (resource === 'orders') {
-        Alert.alert('Update order', `Move this order to ${action}?`, [
-          {text: 'Cancel', style: 'cancel'},
-          {text: 'Confirm', onPress: () => runOrderAction(item, action)},
-        ]);
+        showDialog?.({
+          actions: [
+            {label: 'Cancel', tone: 'secondary'},
+            {label: 'Confirm', onPress: () => runOrderAction(item, action)},
+          ],
+          message: `Move this order to ${action}?`,
+          title: 'Update order',
+          tone: 'info',
+        });
       }
     },
-    [runOrderAction, runTicketAction],
+    [runOrderAction, runTicketAction, showDialog],
   );
 
   const resetWorkspace = useCallback(() => {
@@ -212,5 +230,20 @@ export function useOperationsWorkspace(
     setActiveResource,
     setExpandedRecordId,
     setSearchQuery,
+  };
+}
+
+function errorDialog(title: string, details: string): DialogRequest {
+  const message =
+    details
+      .split('\n')
+      .map(line => line.trim())
+      .find(Boolean) || 'The action could not be completed.';
+
+  return {
+    details,
+    message,
+    title,
+    tone: 'error',
   };
 }

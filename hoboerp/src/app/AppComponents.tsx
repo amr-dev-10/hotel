@@ -1,13 +1,13 @@
 import {Pressable, ScrollView, Text, TextInput, View} from 'react-native';
 
-import {Bell, ChevronRight, Home, Phone, Plus, Search, User} from './icons';
+import {ChevronRight, Home, Phone, Plus, Search, User, Wrench} from './icons';
 import {buildBottomTabs} from './navigationConfig';
 import {blue, muted, styles, textColor} from './styles';
 import type {IconComponent, ScreenAction, ScreenKey} from './types';
 import type {ReservationView, TicketView} from '../modules/dashboard';
 import {priorityTone, statusTone} from '../modules/operations/utils';
 
-const bottomTabs = buildBottomTabs({Bell, Home, Plus, Search, User});
+const bottomTabs = buildBottomTabs({Home, Plus, Search, User, Wrench});
 
 export function TopAppBar({
   title,
@@ -128,26 +128,28 @@ export function MetricTile({
 
 export function DepartmentRow({
   icon: Icon,
+  onPress,
   title,
   tasks,
   tone,
   up,
 }: {
   icon: IconComponent;
+  onPress?: () => void;
   title: string;
   tasks: number;
   tone: 'blue' | 'green' | 'orange' | 'red';
   up?: boolean;
 }) {
   return (
-    <View style={styles.departmentRow}>
+    <Pressable style={styles.departmentRow} onPress={onPress}>
       <View style={[styles.departmentIcon, styles[`${tone}Tile`]]}>
         <Icon color={toneColor(tone)} size={18} strokeWidth={2.2} />
       </View>
       <Text style={styles.departmentName}>{title}</Text>
       <Text style={styles.departmentTasks}>{tasks} Open Tasks</Text>
       <Text style={[styles.trendIcon, up && styles.dangerText]}>⌃</Text>
-    </View>
+    </Pressable>
   );
 }
 
@@ -394,4 +396,3 @@ function toneColor(tone: 'blue' | 'green' | 'orange' | 'red') {
     red: '#DC2626',
   }[tone];
 }
-

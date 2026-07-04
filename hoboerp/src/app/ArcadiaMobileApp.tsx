@@ -1,5 +1,6 @@
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
+  BackHandler,
   Modal,
   Pressable,
   ScrollView,
@@ -11,6 +12,7 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {ErrorBoundary} from '../components/ErrorBoundary';
+import {AppDialog, type AppDialogRequest} from './AppDialog';
 import {CustomPopup} from './CustomPopup';
 import {ScreenContent} from './screens/OperationsScreens';
 import {
@@ -27,7 +29,7 @@ import {
   Users,
   Wrench,
 } from './icons';
-import {Avatar, BottomNav} from './AppComponents';
+import {BottomNav} from './AppComponents';
 import {buildSideNavItems} from './navigationConfig';
 import {styles} from './styles';
 import type {PopupKey, ScreenAction, ScreenKey} from './types';
@@ -44,7 +46,7 @@ import {LoginScreen} from '../modules/auth/screens/LoginScreen';
 import {useOperationsWorkspace} from '../modules/operations/hooks/useOperationsWorkspace';
 import {apiRequest} from '../services/api';
 import type {ApiEnvelope} from '../types/api';
-import type {ArcadiaRecord, Session, UserProfile} from '../types/domain';
+import type {ArcadiaRecord, Session} from '../types/domain';
 
 const SESSION_STORAGE_KEY = 'hoboerp.session.v1';
 
@@ -74,7 +76,10 @@ function App(): React.JSX.Element {
   const [authError, setAuthError] = useState<string | null>(null);
   const [sessionRestoring, setSessionRestoring] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [hotelName, setHotelName] = useState('');
+  const [screenStack, setScreenStack] = useState<ScreenKey[]>([]);
   const [popup, setPopup] = useState<PopupKey>(null);
+  const [appDialog, setAppDialog] = useState<AppDialogRequest | null>(null);
   const [selectedReservation, setSelectedReservation] =
     useState<ReservationView | null>(null);
   const [selectedTicket, setSelectedTicket] = useState<TicketView | null>(null);
@@ -84,6 +89,7 @@ function App(): React.JSX.Element {
   const [selectedConversation, setSelectedConversation] =
     useState<ArcadiaRecord | null>(null);
   const [selectedLabel, setSelectedLabel] = useState('');
+  const lastBackPressRef = useRef(0);
 
   const request = useCallback(
     async <T,>(
@@ -96,7 +102,18 @@ function App(): React.JSX.Element {
     [session?.accessToken],
   );
   const {loadAllResources, loadResource, resetWorkspace, resources} =
-    useOperationsWorkspace(request, session);
+    useOperationsWorkspace(request, session, setAppDialog);
+
+  const loadHotelProfile = useCallback(async (token: string, hotelId: string) => {
+    try {
+      const hotel = await apiRequest<ArcadiaRecord>(`/api/v1/hotels/${hotelId}`, {
+        token,
+      });
+      setHotelName(String(hotel.data?.name ?? hotelId));
+    } catch {
+      setHotelName(hotelId);
+    }
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -116,7 +133,10 @@ function App(): React.JSX.Element {
 
         if (mounted) {
           setSession(nextSession);
-          await loadAllResources(nextSession.accessToken, nextSession.user.hotel_id);
+          await Promise.all([
+            loadAllResources(nextSession.accessToken, nextSession.user.hotel_id),
+            loadHotelProfile(nextSession.accessToken, nextSession.user.hotel_id),
+          ]);
         }
       } catch {
         await AsyncStorage.removeItem(SESSION_STORAGE_KEY);
@@ -132,7 +152,7 @@ function App(): React.JSX.Element {
     return () => {
       mounted = false;
     };
-  }, [loadAllResources]);
+  }, [loadAllResources, loadHotelProfile]);
 
   const handleLogin = useCallback(async () => {
     setAuthLoading(true);
@@ -156,44 +176,100 @@ function App(): React.JSX.Element {
       const nextSession = {accessToken: token, refreshToken, user: profile.data};
       setSession(nextSession);
       await AsyncStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(nextSession));
-      await loadAllResources(token, profile.data.hotel_id);
+      await Promise.all([
+        loadAllResources(token, profile.data.hotel_id),
+        loadHotelProfile(token, profile.data.hotel_id),
+      ]);
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : 'Unable to sign in.');
     } finally {
       setAuthLoading(false);
     }
-  }, [email, loadAllResources, password]);
+  }, [email, loadAllResources, loadHotelProfile, password]);
 
   const handleLogout = useCallback(() => {
     setSession(null);
     AsyncStorage.removeItem(SESSION_STORAGE_KEY);
     resetWorkspace();
     setScreen('dashboard');
+    setScreenStack([]);
+    setHotelName('');
     setDrawerOpen(false);
   }, [resetWorkspace]);
 
   const openScreen = useCallback<ScreenAction>(nextScreen => {
     setScreen(nextScreen);
+    if (!isDetailScreen(nextScreen)) {
+      setScreenStack([]);
+    }
     setDrawerOpen(false);
   }, []);
+
+  const openDetailScreen = useCallback(
+    (nextScreen: ScreenKey) => {
+      setScreenStack(current => [...current, screen]);
+      setScreen(nextScreen);
+      setDrawerOpen(false);
+      setPopup(null);
+    },
+    [screen],
+  );
+
+  const handleScreenBack = useCallback(() => {
+    if (isDetailScreen(screen)) {
+      const previousScreen = screenStack[screenStack.length - 1] ?? fallbackScreen(screen);
+      setScreen(previousScreen);
+      setScreenStack(current => current.slice(0, -1));
+      setDrawerOpen(false);
+      return;
+    }
+    openScreen('dashboard');
+  }, [openScreen, screen, screenStack]);
 
   const closePopup = useCallback(() => {
     setPopup(null);
     setSelectedLabel('');
   }, []);
 
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (drawerOpen) {
+        setDrawerOpen(false);
+        return true;
+      }
+      if (popup) {
+        closePopup();
+        return true;
+      }
+      if (screen !== 'dashboard') {
+        handleScreenBack();
+        return true;
+      }
+
+      const now = Date.now();
+      if (now - lastBackPressRef.current < 1800) {
+        BackHandler.exitApp();
+        return true;
+      }
+      lastBackPressRef.current = now;
+      return true;
+    });
+
+    return () => subscription.remove();
+  }, [closePopup, drawerOpen, handleScreenBack, popup, screen]);
+
   const openTicketForm = useCallback(() => {
     setSelectedTicket(null);
     setSelectedReservation(null);
     setSelectedConversation(null);
     setSelectedGuest(null);
-    setPopup('ticketForm');
-  }, []);
+    openDetailScreen('ticketForm');
+  }, [openDetailScreen]);
 
   const openContextTicketForm = useCallback(() => {
     setSelectedTicket(null);
-    setPopup('ticketForm');
-  }, []);
+    openDetailScreen('ticketForm');
+  }, [openDetailScreen]);
 
   const openReservationForm = useCallback(() => {
     setSelectedReservation(null);
@@ -202,15 +278,18 @@ function App(): React.JSX.Element {
 
   const openTicketDetail = useCallback((ticket: TicketView) => {
     setSelectedTicket(ticket);
-    setPopup('ticketDetail');
-  }, []);
+    setSelectedReservation(null);
+    setSelectedGuest(null);
+    setSelectedConversation(null);
+    openDetailScreen('ticketDetail');
+  }, [openDetailScreen]);
 
   const openReservationDetail = useCallback((reservation: ReservationView) => {
     setSelectedReservation(reservation);
     setSelectedGuest(null);
     setSelectedConversation(null);
-    setPopup('reservationDetail');
-  }, []);
+    openDetailScreen('reservationDetail');
+  }, [openDetailScreen]);
 
   const openRoomForm = useCallback((room: ArcadiaRecord | null) => {
     setSelectedRoom(room);
@@ -226,8 +305,8 @@ function App(): React.JSX.Element {
     setSelectedGuest(guest);
     setSelectedReservation(null);
     setSelectedConversation(null);
-    setPopup('guestDetail');
-  }, []);
+    openDetailScreen('guestDetail');
+  }, [openDetailScreen]);
 
   const openStaffProfile = useCallback((staff: ArcadiaRecord) => {
     setSelectedStaff(staff);
@@ -236,11 +315,15 @@ function App(): React.JSX.Element {
 
   const openWhatsAppChat = useCallback((conversation: ArcadiaRecord) => {
     setSelectedConversation(conversation);
-    setSelectedGuest(null);
-    setSelectedReservation(null);
+    if (screen !== 'guestDetail') {
+      setSelectedGuest(null);
+    }
+    if (screen !== 'reservationDetail') {
+      setSelectedReservation(null);
+    }
     setSelectedLabel('');
-    setPopup('whatsappChat');
-  }, []);
+    openDetailScreen('whatsappChat');
+  }, [openDetailScreen, screen]);
 
   const refreshResource = useCallback(
     (resource: ResourceKey) => {
@@ -250,10 +333,10 @@ function App(): React.JSX.Element {
   );
 
   const refreshActiveData = useCallback(() => {
-    if (screen === 'reservations') {
+    if (screen === 'reservations' || screen === 'reservationDetail') {
       loadResource('reservations');
     }
-    if (screen === 'tickets') {
+    if (screen === 'tickets' || screen === 'ticketDetail' || screen === 'ticketForm') {
       loadResource('tickets');
     }
     if (screen === 'escalations') {
@@ -262,7 +345,7 @@ function App(): React.JSX.Element {
     if (screen === 'notifications') {
       loadResource('notifications');
     }
-    if (screen === 'guests') {
+    if (screen === 'guests' || screen === 'guestDetail') {
       loadResource('guests');
     }
     if (screen === 'room') {
@@ -280,7 +363,7 @@ function App(): React.JSX.Element {
     if (screen === 'housekeeping') {
       loadResource('housekeeping');
     }
-    if (screen === 'whatsapp') {
+    if (screen === 'whatsapp' || screen === 'whatsappChat') {
       loadResource('whatsapp');
     }
   }, [loadResource, screen]);
@@ -326,19 +409,25 @@ function App(): React.JSX.Element {
         {wideLayout ? (
           <SideDrawer
             activeScreen={screen}
-            user={session.user}
+            hotelName={hotelName || session.user.hotel_id}
             onNavigate={openScreen}
           />
         ) : null}
         <View style={styles.phoneSurface}>
-          <ErrorBoundary key={screen}>
+          <ErrorBoundary key={screen} onShowDialog={setAppDialog}>
             <ScreenContent
               data={appData}
               error={activeError}
               loading={isScreenLoading(screen, resources)}
+              request={request}
               screen={screen}
+              selectedConversation={selectedConversation}
+              selectedGuest={selectedGuest}
+              selectedReservation={selectedReservation}
+              selectedTicket={selectedTicket}
+              hotelName={hotelName || session.user.hotel_id}
               user={session.user}
-              onBack={() => openScreen('dashboard')}
+              onBack={handleScreenBack}
               onLogout={handleLogout}
               onMenu={() => setDrawerOpen(true)}
               onNavigate={openScreen}
@@ -349,9 +438,12 @@ function App(): React.JSX.Element {
               onOpenRoomForm={openRoomForm}
               onOpenStaffProfile={openStaffProfile}
               onOpenTicket={openTicketDetail}
+              onOpenContextTicketForm={openContextTicketForm}
               onOpenTicketForm={openTicketForm}
               onOpenWhatsAppChat={openWhatsAppChat}
               onRefresh={refreshActiveData}
+              onRefreshResource={refreshResource}
+              onShowDialog={setAppDialog}
             />
           </ErrorBoundary>
           <BottomNav
@@ -372,7 +464,7 @@ function App(): React.JSX.Element {
               <Pressable style={styles.drawerSheet}>
                 <SideDrawer
                   activeScreen={screen}
-                  user={session.user}
+                  hotelName={hotelName || session.user.hotel_id}
                   onNavigate={openScreen}
                 />
               </Pressable>
@@ -387,6 +479,7 @@ function App(): React.JSX.Element {
           ticket={selectedTicket}
           data={appData}
           guest={selectedGuest}
+          hotelName={hotelName || session.user.hotel_id}
           user={session.user}
           conversation={selectedConversation}
           request={request}
@@ -398,7 +491,9 @@ function App(): React.JSX.Element {
           onOpenWhatsAppConversation={openWhatsAppChat}
           onRefreshResource={refreshResource}
           onReservationBack={() => setPopup('reservationDetail')}
+          onShowDialog={setAppDialog}
         />
+        <AppDialog dialog={appDialog} onClose={() => setAppDialog(null)} />
       </View>
     </SafeAreaView>
   );
@@ -406,11 +501,11 @@ function App(): React.JSX.Element {
 
 function SideDrawer({
   activeScreen,
-  user,
+  hotelName,
   onNavigate,
 }: {
   activeScreen: ScreenKey;
-  user: UserProfile;
+  hotelName: string;
   onNavigate: ScreenAction;
 }) {
   return (
@@ -422,13 +517,6 @@ function SideDrawer({
         <View>
           <Text style={styles.drawerBrandTitle}>Arcadia Hotel</Text>
           <Text style={styles.drawerBrandSub}>Management</Text>
-        </View>
-      </View>
-      <View style={styles.drawerUser}>
-        <Avatar label="A" size={46} />
-        <View>
-          <Text style={styles.drawerUserName}>{user.name ?? user.email}</Text>
-          <Text style={styles.drawerUserRole}>{user.job_role ?? user.user_type ?? 'User'}</Text>
         </View>
       </View>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.drawerNav}>
@@ -452,12 +540,35 @@ function SideDrawer({
         </View>
         <View style={styles.drawerHotelText}>
           <Text style={styles.drawerHotelLabel}>Current Hotel</Text>
-          <Text style={styles.drawerHotelName}>{user.hotel_id}</Text>
+          <Text style={styles.drawerHotelName}>{hotelName}</Text>
         </View>
         <ChevronRight color="#FFFFFF" size={16} strokeWidth={2} />
       </View>
     </View>
   );
+}
+
+function isDetailScreen(screen: ScreenKey) {
+  return ['ticketForm', 'ticketDetail', 'reservationDetail', 'guestDetail', 'whatsappChat'].includes(screen);
+}
+
+function fallbackScreen(screen: ScreenKey): ScreenKey {
+  if (screen === 'ticketForm') {
+    return 'tickets';
+  }
+  if (screen === 'ticketDetail') {
+    return 'tickets';
+  }
+  if (screen === 'reservationDetail') {
+    return 'reservations';
+  }
+  if (screen === 'guestDetail') {
+    return 'guests';
+  }
+  if (screen === 'whatsappChat') {
+    return 'whatsapp';
+  }
+  return 'dashboard';
 }
 
 export default App;

@@ -12,13 +12,20 @@ import {
   ProfileOption,
   QuickAction,
   ReservationCard,
-  RoomAction,
   SearchBox,
   SectionTitle,
   StatusBadge,
   TicketCard,
   TopAppBar,
 } from '../AppComponents';
+import {
+  GuestDetailScreen,
+  ReservationDetailScreen,
+  TicketFormScreen,
+  TicketDetailScreen,
+  WhatsAppConversationScreen,
+} from './DetailScreens';
+import type {AppDialogRequest} from '../AppDialog';
 import {
   Bell,
   Bot,
@@ -53,14 +60,27 @@ import {
 import {blue, styles} from '../styles';
 import type {ScreenAction, ScreenKey} from '../types';
 import type {AppData, ReservationView, TicketView} from '../../modules/dashboard';
+import type {ResourceKey} from '../../modules/operations/types';
 import {statusTone} from '../../modules/operations/utils';
+import type {ApiEnvelope} from '../../types/api';
 import type {ArcadiaRecord, UserProfile} from '../../types/domain';
+
+type RequestFn = <T>(
+  path: string,
+  options?: RequestInit,
+) => Promise<ApiEnvelope<T>>;
 
 export function ScreenContent({
   data,
   error,
+  hotelName,
   loading,
+  request,
   screen,
+  selectedConversation,
+  selectedGuest,
+  selectedReservation,
+  selectedTicket,
   user,
   onBack,
   onLogout,
@@ -73,14 +93,23 @@ export function ScreenContent({
   onOpenRoomForm,
   onOpenStaffProfile,
   onOpenTicket,
+  onOpenContextTicketForm,
   onOpenTicketForm,
   onOpenWhatsAppChat,
   onRefresh,
+  onRefreshResource,
+  onShowDialog,
 }: {
   data: AppData;
   error: string | null;
+  hotelName: string;
   loading: boolean;
+  request: RequestFn;
   screen: ScreenKey;
+  selectedConversation: ArcadiaRecord | null;
+  selectedGuest: ArcadiaRecord | null;
+  selectedReservation: ReservationView | null;
+  selectedTicket: TicketView | null;
   user: UserProfile;
   onBack: () => void;
   onLogout: () => void;
@@ -93,10 +122,106 @@ export function ScreenContent({
   onOpenRoomForm: (room: ArcadiaRecord | null) => void;
   onOpenStaffProfile: (staff: ArcadiaRecord) => void;
   onOpenTicket: (ticket: TicketView) => void;
+  onOpenContextTicketForm: () => void;
   onOpenTicketForm: () => void;
   onOpenWhatsAppChat: (conversation: ArcadiaRecord) => void;
   onRefresh: () => void;
+  onRefreshResource: (resource: ResourceKey) => void;
+  onShowDialog: (dialog: AppDialogRequest) => void;
 }) {
+  if (screen === 'ticketForm') {
+    return (
+      <TicketFormScreen
+        data={data}
+        error={error}
+        hotelId={user.hotel_id}
+        loading={loading}
+        request={request}
+        selectedConversation={selectedConversation}
+        selectedGuest={selectedGuest}
+        selectedReservation={selectedReservation}
+        onBack={onBack}
+        onMenu={onMenu}
+        onRefresh={onRefresh}
+        onRefreshResource={onRefreshResource}
+        onShowDialog={onShowDialog}
+      />
+    );
+  }
+  if (screen === 'ticketDetail') {
+    return (
+      <TicketDetailScreen
+        data={data}
+        error={error}
+        hotelId={user.hotel_id}
+        loading={loading}
+        request={request}
+        ticket={selectedTicket}
+        onBack={onBack}
+        onMenu={onMenu}
+        onOpenWhatsAppConversation={onOpenWhatsAppChat}
+        onRefresh={onRefresh}
+        onRefreshResource={onRefreshResource}
+        onShowDialog={onShowDialog}
+      />
+    );
+  }
+  if (screen === 'reservationDetail') {
+    return (
+      <ReservationDetailScreen
+        data={data}
+        error={error}
+        hotelId={user.hotel_id}
+        loading={loading}
+        request={request}
+        reservation={selectedReservation}
+        onBack={onBack}
+        onCreateTicket={onOpenContextTicketForm}
+        onMenu={onMenu}
+        onOpenWhatsAppConversation={onOpenWhatsAppChat}
+        onRefresh={onRefresh}
+        onRefreshResource={onRefreshResource}
+        onShowDialog={onShowDialog}
+      />
+    );
+  }
+  if (screen === 'guestDetail') {
+    return (
+      <GuestDetailScreen
+        data={data}
+        error={error}
+        guest={selectedGuest}
+        hotelId={user.hotel_id}
+        loading={loading}
+        request={request}
+        onBack={onBack}
+        onCreateTicket={onOpenContextTicketForm}
+        onMenu={onMenu}
+        onOpenWhatsAppConversation={onOpenWhatsAppChat}
+        onRefresh={onRefresh}
+        onRefreshResource={onRefreshResource}
+        onShowDialog={onShowDialog}
+      />
+    );
+  }
+  if (screen === 'whatsappChat') {
+    return (
+      <WhatsAppConversationScreen
+        data={data}
+        conversation={selectedConversation}
+        error={error}
+        hotelId={user.hotel_id}
+        loading={loading}
+        request={request}
+        onBack={onBack}
+        onCreateTicket={onOpenContextTicketForm}
+        onMenu={onMenu}
+        onRefresh={onRefresh}
+        onRefreshResource={onRefreshResource}
+        onShowDialog={onShowDialog}
+      />
+    );
+  }
   if (screen === 'dashboard') {
     return (
       <DashboardScreen
@@ -105,6 +230,7 @@ export function ScreenContent({
         loading={loading}
         onMenu={onMenu}
         onNavigate={onNavigate}
+        onOpenTicketForm={onOpenTicketForm}
         onRefresh={onRefresh}
       />
     );
@@ -156,7 +282,6 @@ export function ScreenContent({
         tickets={data.tickets}
         onBack={onBack}
         onCreateTicket={onOpenTicketForm}
-        onMenu={onMenu}
         onOpenTicket={onOpenTicket}
         onRefresh={onRefresh}
       />
@@ -254,6 +379,7 @@ export function ScreenContent({
   return (
     <ProfileScreen
       user={user}
+      hotelName={hotelName}
       onBack={onBack}
       onLogout={onLogout}
       onMenu={onMenu}
@@ -269,6 +395,7 @@ function DashboardScreen({
   loading,
   onMenu,
   onNavigate,
+  onOpenTicketForm,
   onRefresh,
 }: {
   data: AppData;
@@ -276,6 +403,7 @@ function DashboardScreen({
   loading: boolean;
   onMenu: () => void;
   onNavigate: ScreenAction;
+  onOpenTicketForm: () => void;
   onRefresh: () => void;
 }) {
   return (
@@ -283,7 +411,13 @@ function DashboardScreen({
       style={styles.screen}
       contentContainerStyle={styles.screenContent}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}>
-      <TopAppBar title="Dashboard" leftIcon={Menu} onLeftPress={onMenu} rightIcon={Bell} />
+      <TopAppBar
+        title="Dashboard"
+        leftIcon={Menu}
+        onLeftPress={onMenu}
+        rightIcon={Bell}
+        onRightPress={() => onNavigate('notifications')}
+      />
       <ErrorNotice message={error} onRetry={onRefresh} />
       <View style={styles.overviewCard}>
         <View style={styles.rowBetween}>
@@ -291,9 +425,6 @@ function DashboardScreen({
             <Text style={styles.overviewTitle}>Today's Overview</Text>
             <Text style={styles.overviewDate}>Live operations from API</Text>
           </View>
-          <Pressable style={styles.reportButton}>
-            <Text style={styles.reportButtonText}>View Report</Text>
-          </Pressable>
         </View>
         <View style={styles.overviewStats}>
           <OverviewStat label="Check-ins" value={String(data.todayCheckIns)} trend="Live" />
@@ -303,7 +434,7 @@ function DashboardScreen({
         </View>
       </View>
 
-      <SectionTitle title="Rooms Overview" action="View All" />
+      <SectionTitle title="Rooms Overview" />
       <View style={styles.roomGrid}>
         <MetricTile label="Total Rooms" value={data.roomsTotal} tone="blue" />
         <MetricTile label="Occupied" value={data.occupiedRooms} tone="green" />
@@ -311,16 +442,18 @@ function DashboardScreen({
         <MetricTile label="Out of Order" value={data.outOfOrderRooms} tone="red" />
       </View>
 
-      <SectionTitle title="Department Status" action="View All" />
+      <SectionTitle title="Department Status" />
       <View style={styles.cardStack}>
         <DepartmentRow
           icon={ClipboardCheck}
+          onPress={() => onNavigate('housekeeping')}
           title="Housekeeping"
           tasks={data.housekeeping.length}
           tone="blue"
         />
         <DepartmentRow
           icon={Wrench}
+          onPress={() => onNavigate('tickets')}
           title="Tickets"
           tasks={data.openTickets}
           tone="red"
@@ -328,6 +461,7 @@ function DashboardScreen({
         />
         <DepartmentRow
           icon={Utensils}
+          onPress={() => onNavigate('food')}
           title="F&B Service"
           tasks={data.orders.length}
           tone="orange"
@@ -335,6 +469,7 @@ function DashboardScreen({
         />
         <DepartmentRow
           icon={Users}
+          onPress={() => onNavigate('staff')}
           title="Staff"
           tasks={data.staff.length}
           tone="green"
@@ -342,7 +477,7 @@ function DashboardScreen({
       </View>
 
       <View style={styles.quickGrid}>
-        <QuickAction icon={Ticket} label="Create Ticket" onPress={() => onNavigate('tickets')} />
+        <QuickAction icon={Ticket} label="Create Ticket" onPress={onOpenTicketForm} />
         <QuickAction icon={CalendarDays} label="Reservation" onPress={() => onNavigate('reservations')} />
         <QuickAction icon={QrCode} label="Scan QR" onPress={() => onNavigate('housekeeping')} />
         <QuickAction icon={Bot} label="Ask AI" onPress={() => onNavigate('assistant')} />
@@ -583,7 +718,6 @@ function TicketsScreen({
   tickets,
   onBack,
   onCreateTicket,
-  onMenu,
   onOpenTicket,
   onRefresh,
 }: {
@@ -592,11 +726,11 @@ function TicketsScreen({
   tickets: TicketView[];
   onBack: () => void;
   onCreateTicket: () => void;
-  onMenu: () => void;
   onOpenTicket: (ticket: TicketView) => void;
   onRefresh: () => void;
 }) {
   const [filter, setFilter] = useState('All');
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const filteredTickets = useMemo(
     () => filterByStatus(tickets, filter),
     [filter, tickets],
@@ -617,15 +751,20 @@ function TicketsScreen({
             onLeftPress={onBack}
             rightIcon={Filter}
             secondaryRightIcon={Plus}
-            onRightPress={onMenu}
+            onRightPress={() => setFiltersOpen(current => !current)}
             onSecondaryRightPress={onCreateTicket}
           />
           <ErrorNotice message={error} onRetry={onRefresh} />
-          <ChipRow
-            labels={['All', 'Open', 'In Progress', 'Closed']}
-            activeLabel={filter}
-            onSelect={setFilter}
-          />
+          {filtersOpen ? (
+            <View style={styles.contextBanner}>
+              <Text style={styles.formLabel}>Ticket Filters</Text>
+              <ChipRow
+                labels={['All', 'Open', 'In Progress', 'Closed']}
+                activeLabel={filter}
+                onSelect={setFilter}
+              />
+            </View>
+          ) : null}
         </View>
       }
       ListEmptyComponent={<EmptyState label="No tickets returned from API." />}
@@ -1214,7 +1353,7 @@ function StaffScreen({
         activeLabel={filter}
         onSelect={setFilter}
       />
-      <SectionTitle title="Today's Attendance" action="View Roster" />
+      <SectionTitle title="Today's Attendance" />
       <View style={styles.cardStack}>
         {filteredStaff.map((member, index) => {
           const name = firstRecordValue(member, ['name', 'full_name', 'email']);
@@ -1243,11 +1382,6 @@ function StaffScreen({
       {filteredStaff.length === 0 ? (
         <EmptyState label="No staff records returned from API." />
       ) : null}
-      <View style={styles.actionGrid}>
-        <RoomAction icon={User} label="Directory" onPress={onRefresh} />
-        <RoomAction icon={LogOut} label="Duty Status" onPress={onRefresh} />
-        <RoomAction icon={CalendarDays} label="Shift Plan" onPress={onRefresh} />
-      </View>
     </ScrollView>
   );
 }
@@ -1283,9 +1417,6 @@ function AssistantScreen({
           <Text style={styles.aiListText}>• Vacant: {data.vacantRooms}</Text>
           <Text style={styles.aiListText}>• Out of Order: {data.outOfOrderRooms}</Text>
           <Text style={styles.aiListText}>• Pending Tickets: {data.openTickets}</Text>
-          <Pressable style={styles.aiReportButton}>
-            <Text style={styles.aiReportText}>View Detailed Report</Text>
-          </Pressable>
         </View>
       </ScrollView>
       <View style={styles.composer}>
@@ -1304,6 +1435,7 @@ function AssistantScreen({
 }
 
 function ProfileScreen({
+  hotelName,
   user,
   onBack,
   onLogout,
@@ -1311,6 +1443,7 @@ function ProfileScreen({
   onNavigate,
   onOpenProfileOption,
 }: {
+  hotelName: string;
   user: UserProfile;
   onBack: () => void;
   onLogout: () => void;
@@ -1333,15 +1466,15 @@ function ProfileScreen({
         leftIcon={ChevronLeft}
         onLeftPress={onBack}
         rightIcon={Menu}
-        secondaryRightIcon={Settings}
         onRightPress={onMenu}
       />
       <View style={styles.profileHeader}>
         <Avatar label="A" size={58} />
         <View>
           <Text style={styles.profileName}>{user.name ?? user.email}</Text>
+          <Text style={styles.caption}>{user.email}</Text>
           <Text style={styles.profileRole}>{user.job_role ?? user.user_type ?? 'User'}</Text>
-          <Text style={styles.profileHotel}>{user.hotel_id}</Text>
+          <Text style={styles.profileHotel}>{hotelName}</Text>
         </View>
       </View>
       <View style={styles.profileOptions}>

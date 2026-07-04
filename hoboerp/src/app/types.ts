@@ -20,7 +20,12 @@ export type ScreenKey =
   | 'whatsapp'
   | 'assistant'
   | 'staff'
-  | 'profile';
+  | 'profile'
+  | 'ticketForm'
+  | 'ticketDetail'
+  | 'reservationDetail'
+  | 'guestDetail'
+  | 'whatsappChat';
 
 export type PopupKey =
   | 'ticketForm'

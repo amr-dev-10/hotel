@@ -36,17 +36,17 @@ export function buildSideNavItems(icons: {
 }
 
 export function buildBottomTabs(icons: {
-  Bell: IconComponent;
   Home: IconComponent;
   Plus: IconComponent;
   Search: IconComponent;
   User: IconComponent;
+  Wrench: IconComponent;
 }): AppNavItem[] {
   return [
     {key: 'dashboard', label: 'Home', icon: icons.Home},
     {key: 'reservations', label: 'Search', icon: icons.Search},
     {key: 'assistant', label: '', icon: icons.Plus},
-    {key: 'notifications', label: 'Alerts', icon: icons.Bell},
+    {key: 'escalations', label: 'Escalations', icon: icons.Wrench},
     {key: 'profile', label: 'Profile', icon: icons.User},
   ];
 }

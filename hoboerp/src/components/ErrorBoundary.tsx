@@ -1,10 +1,12 @@
 import React from 'react';
 import {Pressable, StyleSheet, Text, View} from 'react-native';
 
+import {appErrorDialog, type AppDialogRequest} from '../app/AppDialog';
 import {logger} from '../services/logger';
 
 type Props = {
   children: React.ReactNode;
+  onShowDialog?: (dialog: AppDialogRequest) => void;
 };
 
 type State = {
@@ -22,6 +24,12 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     logger.error('Screen boundary caught an error', error, info.componentStack);
+    this.props.onShowDialog?.(
+      appErrorDialog(
+        'Something went wrong',
+        [error.message, info.componentStack].filter(Boolean).join('\n\n'),
+      ),
+    );
   }
 
   reset = () => {
