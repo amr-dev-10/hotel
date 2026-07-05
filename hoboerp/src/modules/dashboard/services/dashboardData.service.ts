@@ -14,8 +14,8 @@ export function buildAppData(
   const vacantRooms = Math.max(roomsTotal - occupiedRooms - outOfOrderRooms, 0);
 
   return {
-    reservations: reservationsSource.slice(0, 12).map(toReservationView),
-    tickets: ticketsSource.slice(0, 12).map(toTicketView),
+    reservations: reservationsSource.map(toReservationView),
+    tickets: ticketsSource.map(toTicketView),
     escalations: resources.escalations.items,
     notifications: resources.notifications.items,
     guests: resources.guests.items,

@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.api.dependencies import require_any_permission, require_permission
 from app.core.database import get_db
 from app.core.exceptions import bad_request, forbidden
+from app.core.permissions import Permissions
 from app.core.responses import ok
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
@@ -96,8 +97,19 @@ def update_user(
     current_user: User = Depends(require_any_permission("user.update", "user.manage")),
 ) -> dict:
     target = UserService(db).get_user(hotel_id, user_id)
-    if not RBACService(db).can_update_staff(current_user, target):
+    rbac = RBACService(db)
+    if not rbac.can_update_staff(current_user, target):
         raise forbidden("Staff member is outside your access scope")
+    update_data = payload.model_dump(exclude_unset=True)
+    if "is_on_duty" in update_data and target.id != current_user.id:
+        can_update_other_duty = (
+            current_user.is_hotel_owner
+            or current_user.user_type == ADMIN_USER_TYPE
+            or current_user.staff_level == "admin"
+            or rbac.has_any(current_user, [Permissions.USER_MANAGE, Permissions.STAFF_MANAGE])
+        )
+        if not can_update_other_duty:
+            raise forbidden("Only an owner, admin, or the staff member can update duty status")
     user = UserService(db).update_user(hotel_id, user_id, payload, current_user)
     return ok(UserRead.model_validate(user).model_dump())
 

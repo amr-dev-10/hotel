@@ -2,6 +2,7 @@ import {useCallback, useEffect, useMemo, useState} from 'react';
 import type {ReactNode} from 'react';
 import {
   ActivityIndicator,
+  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -22,15 +23,17 @@ import {
   TopAppBar,
 } from '../AppComponents';
 import {appErrorDialog, type AppDialogRequest} from '../AppDialog';
-import {Bell, ChevronLeft, Menu, MessageCircle, Send} from '../icons';
+import {Bell, ChevronLeft, ChevronRight, Menu, MessageCircle, Send} from '../icons';
 import {firstRecordValue, isRecordTruthy} from '../dataUtils';
 import {blue, styles} from '../styles';
+import {Permissions} from '../../permissions/permissionCodes';
+import {hasPermission} from '../../permissions/rbac';
 import type {AppData, ReservationView, TicketView} from '../../modules/dashboard';
 import type {ResourceKey} from '../../modules/operations/types';
 import {compactDate, priorityTone, statusTone, text} from '../../modules/operations/utils';
 import {formatErrorDetails} from '../../services/api';
 import type {ApiEnvelope} from '../../types/api';
-import type {ArcadiaRecord} from '../../types/domain';
+import type {ArcadiaRecord, UserProfile} from '../../types/domain';
 
 type RequestFn = <T>(
   path: string,
@@ -58,6 +61,7 @@ export function TicketDetailScreen({
   loading,
   request,
   ticket,
+  user,
   onBack,
   onMenu,
   onOpenNotifications,
@@ -67,6 +71,7 @@ export function TicketDetailScreen({
   onShowDialog,
 }: DetailBaseProps & {
   ticket: TicketView | null;
+  user: UserProfile;
   onOpenWhatsAppConversation: (conversation: ArcadiaRecord) => void;
 }) {
   const ticketId = ticket?.id ?? '';
@@ -96,10 +101,17 @@ export function TicketDetailScreen({
   const [detailLoading, setDetailLoading] = useState(false);
   const [stage, setStage] = useState(stageValue(ticket?.status ?? 'accepted'));
   const [note, setNote] = useState('');
+  const [guestMessage, setGuestMessage] = useState('');
   const [submitting, setSubmitting] = useState<string | null>(null);
 
   const record = useMemo(() => ({...seedRecord, ...(detail ?? {})}), [detail, seedRecord]);
   const conversationId = firstRecordValue(record, ['conversation_id']);
+  const guestId = firstRecordValue(record, ['guest_id']);
+  const activityItems = useMemo(
+    () => buildTicketActivityItems(timeline, messages),
+    [messages, timeline],
+  );
+  const relationLabels = useMemo(() => buildRelationLabels(data, record), [data, record]);
 
   const loadDetail = useCallback(async () => {
     if (!ticketId) {
@@ -139,6 +151,7 @@ export function TicketDetailScreen({
     setTimeline([]);
     setMessages([]);
     setGuestMessages([]);
+    setGuestMessage('');
     setStage(stageValue(ticket?.status ?? 'accepted'));
     loadDetail();
   }, [loadDetail, ticket?.status]);
@@ -149,20 +162,38 @@ export function TicketDetailScreen({
     onShowDialog(appErrorDialog(fallback, details));
   }, [onShowDialog]);
 
-  async function runTicketPost(action: string) {
+  async function runTicketWorkflowAction(action: TicketWorkflowAction) {
     if (!ticketId) {
       return;
     }
-    setSubmitting(action);
+    setSubmitting(action.key);
     try {
-      await request<ArcadiaRecord>(
-        `/api/v1/hotels/${hotelId}/tickets/${ticketId}/${action}`,
-        {method: 'POST'},
-      );
+      if (action.stage) {
+        await request<ArcadiaRecord>(
+          `/api/v1/hotels/${hotelId}/tickets/${ticketId}/stage`,
+          {
+            method: 'PATCH',
+            body: JSON.stringify(
+              compactPayload({
+                note: action.note,
+                stage: action.stage,
+              }),
+            ),
+          },
+        );
+      } else {
+        await request<ArcadiaRecord>(
+          `/api/v1/hotels/${hotelId}/tickets/${ticketId}/${action.action}`,
+          {
+            method: 'POST',
+            body: action.body ? JSON.stringify(action.body) : undefined,
+          },
+        );
+      }
       onRefreshResource('tickets');
       await loadDetail();
       onShowDialog({
-        message: `${titleCase(action)} completed.`,
+        message: `${action.label} completed.`,
         title: 'Ticket updated',
         tone: 'success',
       });
@@ -173,28 +204,67 @@ export function TicketDetailScreen({
     }
   }
 
-  async function saveStage(nextStage = stage) {
-    if (!ticketId) {
+  async function ensureGuestConversationId() {
+    const linkedConversationId = firstRecordValue(record, ['conversation_id']);
+    if (linkedConversationId) {
+      return linkedConversationId;
+    }
+
+    if (!guestId) {
+      throw new Error('Ticket has no guest profile linked for WhatsApp.');
+    }
+
+    const result = await request<{conversation_id: string; reservation_id: string | null}>(
+      `/api/v1/hotels/${hotelId}/guests/${guestId}/conversation`,
+    );
+    const nextConversationId = result.data?.conversation_id;
+    if (!nextConversationId) {
+      throw new Error('Guest WhatsApp conversation was not returned by the API.');
+    }
+
+    setDetail(current => ({
+      ...(current ?? {}),
+      conversation_id: nextConversationId,
+      reservation_id:
+        result.data?.reservation_id ||
+        firstRecordValue(record, ['reservation_id']) ||
+        undefined,
+    }));
+    return nextConversationId;
+  }
+
+  async function sendGuestWhatsAppMessage() {
+    const outgoing = guestMessage.trim();
+    if (!ticketId || !outgoing) {
       return;
     }
-    setSubmitting('stage');
+
+    setSubmitting('guest-whatsapp');
     try {
+      const nextConversationId = await ensureGuestConversationId();
       await request<ArcadiaRecord>(
-        `/api/v1/hotels/${hotelId}/tickets/${ticketId}/stage`,
+        `/api/v1/hotels/${hotelId}/whatsapp/conversations/${nextConversationId}/messages`,
         {
-          method: 'PATCH',
-          body: JSON.stringify({stage: nextStage}),
+          method: 'POST',
+          body: JSON.stringify(
+            compactPayload({
+              message: outgoing,
+              reservation_id: firstRecordValue(record, ['reservation_id']) || undefined,
+              ticket_id: ticketId,
+            }),
+          ),
         },
       );
-      onRefreshResource('tickets');
+      setGuestMessage('');
+      onRefreshResource('whatsapp');
       await loadDetail();
       onShowDialog({
-        message: titleCase(nextStage),
-        title: 'Ticket stage updated',
+        message: 'WhatsApp message sent to the guest.',
+        title: 'Message sent',
         tone: 'success',
       });
     } catch (nextError) {
-      handleError(nextError, 'Ticket stage update failed');
+      handleError(nextError, 'WhatsApp send failed');
     } finally {
       setSubmitting(null);
     }
@@ -250,14 +320,47 @@ export function TicketDetailScreen({
     );
   }
 
+  const ticketDescription =
+    firstRecordValue(record, ['item_description', 'description', 'title']) ||
+    'No description';
+  const latestActivityNote = [...activityItems].reverse().find(item => item.type === 'note');
+  const ticketNote =
+    firstRecordValue(record, ['note', 'notes', 'internal_notes', 'last_note']) ||
+    latestActivityNote?.content ||
+    'No note';
+  const assignedTo = firstRecordValue(record, [
+    'assigned_to',
+    'assigned_to_id',
+    'assigned_staff_id',
+  ]);
+  const assignedToCurrentUser = Boolean(assignedTo && assignedTo === user.id);
+  const smartActions = ticketSmartActions(stage, {
+    assignedToCurrentUser,
+    canAccept:
+      assignedToCurrentUser &&
+      (hasPermission(user.permissions, Permissions.TICKET_ACCEPT) ||
+        hasPermission(user.permissions, Permissions.TICKET_VIEW)),
+    canApprove: hasPermission(user.permissions, Permissions.TICKET_APPROVE),
+    canClose: hasPermission(user.permissions, Permissions.TICKET_CLOSE),
+    canReject:
+      assignedToCurrentUser &&
+      (hasPermission(user.permissions, Permissions.TICKET_REJECT) ||
+        hasPermission(user.permissions, Permissions.TICKET_VIEW)),
+    canWorkTicket:
+      (!assignedTo || assignedToCurrentUser) &&
+      (hasPermission(user.permissions, Permissions.TICKET_COMPLETE_OWN) ||
+        hasPermission(user.permissions, Permissions.TICKET_VIEW)),
+  });
+  const canSendGuestWhatsApp = hasPermission(user.permissions, Permissions.TICKET_ASSIGN);
+
   return (
     <DetailFrame
       actions={[
-        {label: 'Accept Ticket', onPress: () => runTicketPost('accept')},
-        {label: 'Start Work', onPress: () => saveStage('in_progress')},
-        {label: 'Complete Ticket', onPress: () => runTicketPost('complete')},
-        {label: 'Approve Ticket', onPress: () => runTicketPost('approve')},
-        {label: 'Reopen Ticket', onPress: () => runTicketPost('reopen')},
+        ...smartActions.map(action => ({
+          label: action.menuLabel,
+          onPress: () => runTicketWorkflowAction(action),
+          tone: action.tone === 'danger' ? 'danger' as const : 'default' as const,
+        })),
         ...(conversationId
           ? [{label: 'Open WhatsApp', onPress: openWhatsApp}]
           : []),
@@ -282,6 +385,8 @@ export function TicketDetailScreen({
       <DetailSection title="Ticket Summary">
         <InfoLine label="Ticket" value={firstRecordValue(record, ['ticket_code', 'code', 'id'])} />
         <InfoLine label="Type" value={firstRecordValue(record, ['type']) || 'Ticket'} />
+        <InfoLine label="Description" value={ticketDescription} />
+        <InfoLine label="Note" value={ticketNote} />
         <InfoLine label="Guest" value={firstRecordValue(record, ['guest_name', 'guest_full_name']) || 'Unassigned'} />
         <InfoLine label="Room" value={firstRecordValue(record, ['room_number', 'room_name']) || 'Unassigned'} />
         <InfoLine label="Reservation" value={firstRecordValue(record, ['reservation_no', 'booking_id']) || 'None'} />
@@ -291,29 +396,21 @@ export function TicketDetailScreen({
       </DetailSection>
 
       <DetailSection title="Smart Actions">
-        <OptionRow
-          label="Stage"
-          options={[
-            ['accepted', 'Accepted'],
-            ['in_progress', 'In progress'],
-            ['completed', 'Completed'],
-            ['approved', 'Approved'],
-          ]}
-          value={stage}
-          onChange={setStage}
-        />
-        <ActionRow>
-          <ActionButton disabled={Boolean(submitting)} label={submitting === 'stage' ? 'Updating...' : 'Save Stage'} onPress={() => saveStage()} />
-          <ActionButton disabled={Boolean(submitting)} label="Start Work" tone="secondary" onPress={() => saveStage('in_progress')} />
-        </ActionRow>
-        <ActionRow>
-          <ActionButton disabled={Boolean(submitting)} label="Accept" tone="secondary" onPress={() => runTicketPost('accept')} />
-          <ActionButton disabled={Boolean(submitting)} label="Complete" onPress={() => runTicketPost('complete')} />
-        </ActionRow>
-        <ActionRow>
-          <ActionButton disabled={Boolean(submitting)} label="Approve" tone="secondary" onPress={() => runTicketPost('approve')} />
-          <ActionButton disabled={Boolean(submitting)} label="Reopen" onPress={() => runTicketPost('reopen')} />
-        </ActionRow>
+        {smartActions.length ? (
+          <ActionRow>
+            {smartActions.map(action => (
+              <ActionButton
+                key={action.key}
+                disabled={Boolean(submitting)}
+                label={submitting === action.key ? action.loadingLabel : action.label}
+                tone={action.tone}
+                onPress={() => runTicketWorkflowAction(action)}
+              />
+            ))}
+          </ActionRow>
+        ) : (
+          <Text style={styles.caption}>No workflow action is available for this ticket state.</Text>
+        )}
         {conversationId ? (
           <Pressable style={styles.inlineLinkButton} onPress={openWhatsApp}>
             <MessageCircle color={blue} size={16} strokeWidth={2.2} />
@@ -322,27 +419,23 @@ export function TicketDetailScreen({
         ) : null}
       </DetailSection>
 
-      <DetailSection title="Internal Note">
-        <View style={styles.popupComposer}>
-          <TextInput
-            multiline
-            placeholder="Add an internal update..."
-            placeholderTextColor="#94A3B8"
-            style={[styles.popupComposerInput, styles.formInputMultiline]}
-            value={note}
-            onChangeText={setNote}
-          />
-          <Pressable style={styles.popupSendButton} disabled={submitting === 'note'} onPress={addNote}>
-            <Send color={blue} size={18} strokeWidth={2.2} />
-          </Pressable>
-        </View>
-      </DetailSection>
-
-      <TimelineSection items={timeline} title="Timeline" />
-      <TimelineSection items={messages} title="Ticket Notes" />
-      <TimelineSection items={guestMessages} title="Guest WhatsApp Messages" />
-      <RecordFields record={record} title="Backend API Fields" />
-      <StaffSnapshot staff={data.staff} />
+      <ActivityTimeline
+        items={activityItems}
+        note={note}
+        noteSubmitting={submitting === 'note'}
+        onAddNote={addNote}
+        onNoteChange={setNote}
+      />
+      <TicketGuestWhatsAppSection
+        canSend={canSendGuestWhatsApp}
+        hasGuestContext={Boolean(conversationId || guestId)}
+        items={guestMessages}
+        message={guestMessage}
+        messageSubmitting={submitting === 'guest-whatsapp'}
+        onMessageChange={setGuestMessage}
+        onSendMessage={sendGuestWhatsAppMessage}
+      />
+      <RecordFields defaultExpanded={false} record={record} relationLabels={relationLabels} title="Backend API Fields" />
     </DetailFrame>
   );
 }
@@ -356,6 +449,7 @@ export function TicketFormScreen({
   selectedConversation,
   selectedGuest,
   selectedReservation,
+  user,
   onBack,
   onMenu,
   onOpenNotifications,
@@ -366,6 +460,7 @@ export function TicketFormScreen({
   selectedConversation: ArcadiaRecord | null;
   selectedGuest: ArcadiaRecord | null;
   selectedReservation: ReservationView | null;
+  user: UserProfile;
 }) {
   const reservationRecords = useMemo(
     () =>
@@ -506,6 +601,33 @@ export function TicketFormScreen({
     setInlineError(null);
   }
 
+  const canCreateGuest = hasPermission(user.permissions, Permissions.GUEST_CREATE);
+
+  async function createGuestFromSearch(searchValue: string) {
+    const name = searchValue.trim();
+    if (name.length < 2) {
+      throw new Error('Enter at least 2 characters for the guest name.');
+    }
+
+    const result = await request<ArcadiaRecord>(
+      `/api/v1/hotels/${hotelId}/guests`,
+      {
+        method: 'POST',
+        body: JSON.stringify({name, status: 'checked_in'}),
+      },
+    );
+    if (!result.data) {
+      throw new Error('Guest was not returned by the API.');
+    }
+    onRefreshResource('guests');
+    onShowDialog({
+      message: firstRecordValue(result.data, ['name', 'guest_name', 'id']) || 'Guest created.',
+      title: 'Guest created',
+      tone: 'success',
+    });
+    return result.data;
+  }
+
   return (
     <DetailFrame
       actions={[
@@ -572,6 +694,8 @@ export function TicketFormScreen({
           placeholder="Search guest"
           records={data.guests}
           selectedRecord={guestRecord}
+          createActionLabel={canCreateGuest ? 'Create guest' : undefined}
+          onCreateRecord={canCreateGuest ? createGuestFromSearch : undefined}
           onSelect={setGuestRecord}
         />
         <Many2OneField
@@ -1327,9 +1451,41 @@ function DetailSection({
   );
 }
 
+function CollapsibleDetailSection({
+  children,
+  defaultExpanded = true,
+  title,
+}: {
+  children: ReactNode;
+  defaultExpanded?: boolean;
+  title: string;
+}) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+
+  return (
+    <View style={styles.contextBanner}>
+      <Pressable
+        style={styles.collapsibleSectionHeader}
+        onPress={() => setExpanded(current => !current)}>
+        <Text style={[styles.formLabel, styles.collapsibleSectionTitle]}>{title}</Text>
+        <View
+          style={[
+            styles.collapsibleSectionIcon,
+            expanded && styles.collapsibleSectionIconOpen,
+          ]}>
+          <ChevronRight color="#64748B" size={17} strokeWidth={2.2} />
+        </View>
+      </Pressable>
+      {expanded ? <View style={styles.collapsibleSectionBody}>{children}</View> : null}
+    </View>
+  );
+}
+
 function ActionRow({children}: {children: ReactNode}) {
   return <View style={styles.popupActions}>{children}</View>;
 }
+
+type ActionButtonTone = 'primary' | 'secondary' | 'success' | 'warning' | 'danger';
 
 function ActionButton({
   disabled,
@@ -1340,7 +1496,7 @@ function ActionButton({
   disabled?: boolean;
   label: string;
   onPress: () => void;
-  tone?: 'primary' | 'secondary';
+  tone?: ActionButtonTone;
 }) {
   return (
     <Pressable
@@ -1348,6 +1504,9 @@ function ActionButton({
       style={[
         styles.popupActionButton,
         tone === 'secondary' && styles.secondaryActionButton,
+        tone === 'success' && styles.successActionButton,
+        tone === 'warning' && styles.warningActionButton,
+        tone === 'danger' && styles.dangerActionButton,
         disabled && styles.disabledActionButton,
       ]}
       onPress={onPress}>
@@ -1355,6 +1514,7 @@ function ActionButton({
         style={[
           styles.popupActionText,
           tone === 'secondary' && styles.secondaryActionText,
+          tone === 'warning' && styles.warningActionText,
         ]}>
         {label}
       </Text>
@@ -1391,15 +1551,19 @@ function EditableField({
 }
 
 function Many2OneField({
+  createActionLabel,
   displayKeys,
   label,
+  onCreateRecord,
   placeholder,
   records,
   selectedRecord,
   onSelect,
 }: {
+  createActionLabel?: string;
   displayKeys: string[];
   label: string;
+  onCreateRecord?: (query: string) => Promise<ArcadiaRecord | null>;
   placeholder: string;
   records: ArcadiaRecord[];
   selectedRecord: ArcadiaRecord | null;
@@ -1407,8 +1571,11 @@ function Many2OneField({
 }) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(10);
+  const [creating, setCreating] = useState(false);
+  const [pickerError, setPickerError] = useState<string | null>(null);
   const selectedTitle = firstRecordValue(selectedRecord, displayKeys);
-  const options = useMemo(() => {
+  const filteredOptions = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return records
       .filter(record => {
@@ -1418,9 +1585,45 @@ function Many2OneField({
         return displayKeys.some(key =>
           String(record[key] ?? '').toLowerCase().includes(needle),
         );
-      })
-      .slice(0, 8);
+      });
   }, [displayKeys, query, records]);
+  const options = useMemo(
+    () => filteredOptions.slice(0, visibleCount),
+    [filteredOptions, visibleCount],
+  );
+  const hasMoreOptions = visibleCount < filteredOptions.length;
+
+  useEffect(() => {
+    setVisibleCount(10);
+    setPickerError(null);
+  }, [query, open]);
+
+  function loadMoreOptions() {
+    if (hasMoreOptions) {
+      setVisibleCount(current => Math.min(current + 10, filteredOptions.length));
+    }
+  }
+
+  async function handleCreateRecord() {
+    if (!onCreateRecord || creating) {
+      return;
+    }
+
+    setCreating(true);
+    setPickerError(null);
+    try {
+      const record = await onCreateRecord(query);
+      if (record) {
+        onSelect(record);
+        setQuery('');
+        setOpen(false);
+      }
+    } catch (nextError) {
+      setPickerError(formatErrorDetails(nextError, 'Create record failed'));
+    } finally {
+      setCreating(false);
+    }
+  }
 
   return (
     <View style={styles.formField}>
@@ -1438,49 +1641,111 @@ function Many2OneField({
           </Pressable>
         </View>
       ) : null}
-      <TextInput
-        placeholder={selectedTitle || placeholder}
-        placeholderTextColor="#94A3B8"
-        style={styles.formInput}
-        value={query}
-        onChangeText={value => {
-          setQuery(value);
-          setOpen(true);
-        }}
-        onFocus={() => setOpen(true)}
-      />
-      {open ? (
-        <View style={styles.lookupList}>
-          {options.length > 0 ? (
-            options.map((record, index) => {
-              const title = firstRecordValue(record, displayKeys) || `Record ${index + 1}`;
-              const subtitle = firstRecordValue(record, [
-                'room_number',
-                'guest_name',
-                'phone',
-                'email',
-                'status',
-                'job_role',
-              ]);
-              return (
-                <Pressable
-                  key={`${title}-${index}`}
-                  style={styles.lookupOption}
-                  onPress={() => {
-                    onSelect(record);
-                    setQuery('');
-                    setOpen(false);
-                  }}>
-                  <Text style={styles.lookupTitle}>{title}</Text>
-                  {subtitle ? <Text style={styles.captionTiny}>{subtitle}</Text> : null}
-                </Pressable>
-              );
-            })
-          ) : (
-            <Text style={styles.lookupEmpty}>No matching records</Text>
-          )}
-        </View>
-      ) : null}
+      <Pressable style={styles.lookupInputButton} onPress={() => setOpen(true)}>
+        <Text
+          numberOfLines={1}
+          style={[
+            styles.lookupInputText,
+            !selectedTitle && styles.lookupPlaceholderText,
+          ]}>
+          {selectedTitle || placeholder}
+        </Text>
+        <ChevronRight color="#94A3B8" size={18} strokeWidth={2.2} />
+      </Pressable>
+      <Modal
+        animationType="slide"
+        transparent
+        visible={open}
+        onRequestClose={() => setOpen(false)}>
+        <Pressable style={styles.relationPickerBackdrop} onPress={() => setOpen(false)}>
+          <Pressable style={styles.relationPickerSheet}>
+            <View style={styles.quickDrawerHandle} />
+            <View style={styles.relationPickerHeader}>
+              <Text style={styles.relationPickerTitle}>{label}</Text>
+              <Pressable style={styles.popupCloseButton} onPress={() => setOpen(false)}>
+                <Text style={styles.popupCloseText}>x</Text>
+              </Pressable>
+            </View>
+            <TextInput
+              autoFocus
+              placeholder={placeholder}
+              placeholderTextColor="#94A3B8"
+              style={styles.formInput}
+              value={query}
+              onChangeText={setQuery}
+            />
+            {onCreateRecord && createActionLabel ? (
+              <Pressable
+                disabled={creating}
+                style={[
+                  styles.lookupSmartAction,
+                  creating && styles.disabledActionButton,
+                ]}
+                onPress={handleCreateRecord}>
+                <Text style={styles.lookupSmartActionText}>
+                  {creating
+                    ? 'Creating...'
+                    : query.trim()
+                      ? `${createActionLabel}: ${query.trim()}`
+                      : createActionLabel}
+                </Text>
+              </Pressable>
+            ) : null}
+            {pickerError ? (
+              <View style={styles.formErrorBox}>
+                <Text style={styles.formErrorTitle}>Action failed</Text>
+                <Text style={styles.formErrorText}>{pickerError}</Text>
+              </View>
+            ) : null}
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              nestedScrollEnabled
+              showsVerticalScrollIndicator
+              style={styles.relationPickerList}
+              onScroll={({nativeEvent}) => {
+                const distanceFromBottom =
+                  nativeEvent.contentSize.height -
+                  (nativeEvent.contentOffset.y + nativeEvent.layoutMeasurement.height);
+                if (distanceFromBottom < 72) {
+                  loadMoreOptions();
+                }
+              }}
+              scrollEventThrottle={16}>
+              {options.length > 0 ? (
+                options.map((record, index) => {
+                  const title = firstRecordValue(record, displayKeys) || `Record ${index + 1}`;
+                  const subtitle = firstRecordValue(record, [
+                    'room_number',
+                    'guest_name',
+                    'phone',
+                    'email',
+                    'status',
+                    'job_role',
+                  ]);
+                  return (
+                    <Pressable
+                      key={`${firstRecordValue(record, ['id', 'user_id', 'email', 'phone']) || title}-${index}`}
+                      style={styles.lookupOption}
+                      onPress={() => {
+                        onSelect(record);
+                        setQuery('');
+                        setOpen(false);
+                      }}>
+                      <Text style={styles.lookupTitle}>{title}</Text>
+                      {subtitle ? <Text style={styles.captionTiny}>{subtitle}</Text> : null}
+                    </Pressable>
+                  );
+                })
+              ) : (
+                <Text style={styles.lookupEmpty}>No matching records</Text>
+              )}
+              <Text style={styles.lookupEmpty}>
+                {hasMoreOptions ? 'Scroll for more records' : 'All matching records loaded'}
+              </Text>
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -1531,15 +1796,198 @@ function InlineError({message}: {message: string | null}) {
   );
 }
 
+type TicketActivityItem = {
+  content: string;
+  createdAt: string;
+  id: string;
+  raw: ArcadiaRecord;
+  title: string;
+  type: 'event' | 'note';
+};
+
+type RelationLabels = Record<string, string>;
+
+type TicketWorkflowAction = {
+  action?: string;
+  body?: Record<string, unknown>;
+  key: string;
+  label: string;
+  loadingLabel: string;
+  menuLabel: string;
+  note?: string;
+  stage?: string;
+  tone: ActionButtonTone;
+};
+
+function ActivityTimeline({
+  items,
+  note,
+  noteSubmitting,
+  onAddNote,
+  onNoteChange,
+}: {
+  items: TicketActivityItem[];
+  note: string;
+  noteSubmitting: boolean;
+  onAddNote: () => void;
+  onNoteChange: (value: string) => void;
+}) {
+  return (
+    <CollapsibleDetailSection defaultExpanded={false} title="Activity">
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        nestedScrollEnabled
+        persistentScrollbar
+        showsVerticalScrollIndicator
+        style={styles.activityTimelineScroll}
+        contentContainerStyle={styles.activityTimelineList}>
+        {items.length ? (
+          items.map(item => (
+            <View key={`${item.type}-${item.id}`} style={styles.activityTimelineItem}>
+              <View
+                style={[
+                  styles.activityTimelineDot,
+                  item.type === 'note'
+                    ? styles.activityTimelineDotNote
+                    : styles.activityTimelineDotEvent,
+                ]}
+              />
+              <View style={styles.activityTimelineText}>
+                <Text style={styles.lookupTitle}>{item.title}</Text>
+                <Text style={styles.caption}>{item.content}</Text>
+                <Text style={styles.captionTiny}>{compactDate(item.createdAt)}</Text>
+              </View>
+            </View>
+          ))
+        ) : (
+          <Text style={styles.caption}>No activity returned from this API.</Text>
+        )}
+      </ScrollView>
+      <View style={styles.popupComposer}>
+        <TextInput
+          multiline
+          placeholder="Add an internal update..."
+          placeholderTextColor="#94A3B8"
+          style={[styles.popupComposerInput, styles.formInputMultiline]}
+          value={note}
+          onChangeText={onNoteChange}
+        />
+        <Pressable style={styles.popupSendButton} disabled={noteSubmitting || !note.trim()} onPress={onAddNote}>
+          <Send color={blue} size={18} strokeWidth={2.2} />
+        </Pressable>
+      </View>
+    </CollapsibleDetailSection>
+  );
+}
+
+function TicketGuestWhatsAppSection({
+  canSend,
+  hasGuestContext,
+  items,
+  message,
+  messageSubmitting,
+  onMessageChange,
+  onSendMessage,
+}: {
+  canSend: boolean;
+  hasGuestContext: boolean;
+  items: ArcadiaRecord[];
+  message: string;
+  messageSubmitting: boolean;
+  onMessageChange: (value: string) => void;
+  onSendMessage: () => void;
+}) {
+  const [visibleCount, setVisibleCount] = useState(20);
+
+  useEffect(() => {
+    setVisibleCount(20);
+  }, [items.length]);
+
+  const visibleItems = useMemo(
+    () => items.slice(Math.max(0, items.length - visibleCount)),
+    [items, visibleCount],
+  );
+  const canLoadEarlier = visibleCount < items.length;
+
+  return (
+    <CollapsibleDetailSection defaultExpanded={false} title="Guest WhatsApp Messages">
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        nestedScrollEnabled
+        persistentScrollbar
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator
+        style={styles.chatTranscriptScroll}
+        contentContainerStyle={styles.chatTranscript}
+        onScroll={({nativeEvent}) => {
+          if (nativeEvent.contentOffset.y <= 16 && canLoadEarlier) {
+            setVisibleCount(current => Math.min(items.length, current + 20));
+          }
+        }}>
+        {canLoadEarlier ? (
+          <Text style={styles.captionTiny}>Scroll up to load earlier messages.</Text>
+        ) : null}
+        {visibleItems.length ? (
+          visibleItems.map((item, index) => {
+            const outbound =
+              firstRecordValue(item, ['direction']) === 'outbound' ||
+              firstRecordValue(item, ['sender_type']) === 'staff';
+            return (
+              <View
+                key={`${firstRecordValue(item, ['id', 'created_at', 'meta_message_id'])}-${index}`}
+                style={outbound ? styles.chatBubbleAgent : styles.chatBubbleGuest}>
+                <Text style={outbound ? styles.chatBubbleAgentText : styles.chatBubbleGuestText}>
+                  {firstRecordValue(item, ['message_text', 'message', 'content', 'body', 'message_type'])}
+                </Text>
+                <Text style={[styles.captionTiny, outbound && styles.chatBubbleAgentMeta]}>
+                  {compactDate(firstRecordValue(item, ['created_at', 'timestamp', 'updated_at']))}
+                </Text>
+              </View>
+            );
+          })
+        ) : (
+          <Text style={styles.chatMessageGuest}>No guest WhatsApp messages linked to this ticket yet.</Text>
+        )}
+      </ScrollView>
+      {canSend && hasGuestContext ? (
+        <View style={styles.popupComposer}>
+          <TextInput
+            multiline
+            placeholder="Type a WhatsApp message..."
+            placeholderTextColor="#94A3B8"
+            style={[styles.popupComposerInput, styles.formInputMultiline]}
+            value={message}
+            onChangeText={onMessageChange}
+          />
+          <Pressable
+            style={styles.popupSendButton}
+            disabled={messageSubmitting || !message.trim()}
+            onPress={onSendMessage}>
+            <Send color={blue} size={18} strokeWidth={2.2} />
+          </Pressable>
+        </View>
+      ) : (
+        <Text style={styles.caption}>
+          {hasGuestContext
+            ? 'WhatsApp send is available to staff with ticket assignment permission.'
+            : 'Link a guest or WhatsApp conversation before sending a message.'}
+        </Text>
+      )}
+    </CollapsibleDetailSection>
+  );
+}
+
 function TimelineSection({
+  defaultExpanded = true,
   items,
   title,
 }: {
+  defaultExpanded?: boolean;
   items: ArcadiaRecord[];
   title: string;
 }) {
   return (
-    <DetailSection title={title}>
+    <CollapsibleDetailSection defaultExpanded={defaultExpanded} title={title}>
       {items.length ? (
         items.map((item, index) => (
           <View key={`${firstRecordValue(item, ['id', 'created_at', 'timestamp'])}-${index}`} style={styles.lookupOption}>
@@ -1557,14 +2005,18 @@ function TimelineSection({
       ) : (
         <Text style={styles.caption}>No records returned from this API.</Text>
       )}
-    </DetailSection>
+    </CollapsibleDetailSection>
   );
 }
 
 function RecordFields({
+  defaultExpanded = true,
+  relationLabels = {},
   record,
   title,
 }: {
+  defaultExpanded?: boolean;
+  relationLabels?: RelationLabels;
   record: ArcadiaRecord;
   title: string;
 }) {
@@ -1582,41 +2034,183 @@ function RecordFields({
   }
 
   return (
-    <DetailSection title={title}>
+    <CollapsibleDetailSection defaultExpanded={defaultExpanded} title={title}>
       {entries.map(([key, value]) => (
-        <InfoLine key={key} label={formatKey(key)} value={formatValue(value)} />
+        <InfoLine key={key} label={formatKey(key)} value={formatValue(value, relationLabels)} />
       ))}
-    </DetailSection>
+    </CollapsibleDetailSection>
   );
 }
 
-function StaffSnapshot({staff}: {staff: ArcadiaRecord[]}) {
-  if (!staff.length) {
-    return null;
+export function buildTicketActivityItems(
+  timeline: ArcadiaRecord[],
+  messages: ArcadiaRecord[],
+): TicketActivityItem[] {
+  const items: TicketActivityItem[] = [];
+  const seen = new Set<string>();
+
+  timeline.forEach((item, index) => {
+    const itemType = firstRecordValue(item, ['item_type']);
+    const id = firstRecordValue(item, ['id']) || `timeline-${index}`;
+    const content = firstRecordValue(item, [
+      'content',
+      'description',
+      'message_text',
+      'message',
+      'status',
+    ]) || compactRecord(item);
+    const isNote = itemType === 'message' || Boolean(firstRecordValue(item, ['sender_type']));
+    const key = isNote ? `note:${id}` : `event:${id}`;
+
+    if (seen.has(key)) {
+      return;
+    }
+
+    seen.add(key);
+    items.push({
+      content,
+      createdAt: firstRecordValue(item, ['created_at', 'timestamp', 'updated_at']),
+      id,
+      raw: item,
+      title: isNote
+        ? `${titleCase(firstRecordValue(item, ['sender_type']) || 'Staff')} note`
+        : titleCase(firstRecordValue(item, ['event_type', 'title']) || 'System event'),
+      type: isNote ? 'note' : 'event',
+    });
+  });
+
+  messages.forEach((message, index) => {
+    const id = firstRecordValue(message, ['id']) || `message-${index}`;
+    const key = `note:${id}`;
+    if (seen.has(key)) {
+      return;
+    }
+
+    seen.add(key);
+    items.push({
+      content: firstRecordValue(message, ['content', 'message_text', 'message']) || compactRecord(message),
+      createdAt: firstRecordValue(message, ['created_at', 'timestamp', 'updated_at']),
+      id,
+      raw: message,
+      title: `${titleCase(firstRecordValue(message, ['sender_type']) || 'Staff')} note`,
+      type: 'note',
+    });
+  });
+
+  return items.sort((left, right) => {
+    const leftTime = Date.parse(left.createdAt);
+    const rightTime = Date.parse(right.createdAt);
+    if (Number.isNaN(leftTime) || Number.isNaN(rightTime)) {
+      return 0;
+    }
+    return leftTime - rightTime;
+  });
+}
+
+export function ticketSmartActions(stage: string, options: {
+  assignedToCurrentUser: boolean;
+  canAccept: boolean;
+  canApprove: boolean;
+  canClose: boolean;
+  canReject: boolean;
+  canWorkTicket: boolean;
+}): TicketWorkflowAction[] {
+  const normalizedStage = normalize(stage);
+  const actions: TicketWorkflowAction[] = [];
+
+  if (
+    normalizedStage === 'pending_accept' ||
+    (['created', 'open'].includes(normalizedStage) && options.assignedToCurrentUser)
+  ) {
+    if (options.canAccept) {
+      actions.push({
+        action: 'accept',
+        key: 'accept',
+        label: 'Accept',
+        loadingLabel: 'Accepting...',
+        menuLabel: 'Accept Ticket',
+        tone: 'primary',
+      });
+    }
+    if (options.canReject) {
+      actions.push({
+        action: 'reject',
+        body: {reason: 'Rejected from mobile app'},
+        key: 'reject',
+        label: 'Reject',
+        loadingLabel: 'Rejecting...',
+        menuLabel: 'Reject Ticket',
+        tone: 'danger',
+      });
+    }
   }
 
-  return (
-    <DetailSection title="Available Staff">
-      {staff.slice(0, 5).map((member, index) => {
-        const name = firstRecordValue(member, ['name', 'full_name', 'email']) || `Staff ${index + 1}`;
-        return (
-          <View key={`${firstRecordValue(member, ['id', 'email'])}-${index}`} style={styles.staffCard}>
-            <Avatar label={name.charAt(0)} size={36} />
-            <View style={styles.staffText}>
-              <Text style={styles.cardTitle}>{name}</Text>
-              <Text style={styles.caption}>
-                {firstRecordValue(member, ['job_role', 'role', 'department_name']) || 'Staff'}
-              </Text>
-            </View>
-            <StatusBadge
-              label={isRecordTruthy(member, ['is_on_duty']) ? 'On duty' : 'Available'}
-              tone={isRecordTruthy(member, ['is_on_duty']) ? 'green' : 'blue'}
-            />
-          </View>
-        );
-      })}
-    </DetailSection>
-  );
+  if (['accepted', 'reopened'].includes(normalizedStage) && options.canClose) {
+    actions.push({
+      key: 'stage:in_progress',
+      label: 'Start Progress',
+      loadingLabel: 'Starting...',
+      menuLabel: 'Move to In Progress',
+      stage: 'in_progress',
+      tone: 'primary',
+    });
+  }
+
+  if (['accepted', 'in_progress', 'reopened'].includes(normalizedStage) && options.canWorkTicket) {
+    actions.push({
+        action: 'complete',
+        key: 'complete',
+        label: 'Complete',
+        loadingLabel: 'Completing...',
+        menuLabel: 'Complete Ticket',
+        tone: 'success',
+    });
+  }
+
+  if (['pending_approval', 'completed'].includes(normalizedStage) && options.canApprove) {
+    actions.push(
+      {
+        action: 'approve',
+        key: 'approve',
+        label: 'Approve',
+        loadingLabel: 'Approving...',
+        menuLabel: 'Approve Ticket',
+        tone: 'success',
+      },
+      {
+        action: 'reopen',
+        key: 'reopen',
+        label: 'Reopen',
+        loadingLabel: 'Reopening...',
+        menuLabel: 'Reopen Ticket',
+        tone: 'warning',
+      },
+    );
+  }
+
+  if (['approved', 'closed'].includes(normalizedStage) && options.canApprove) {
+    actions.push({
+      action: 'reopen',
+      key: 'reopen',
+      label: 'Reopen',
+      loadingLabel: 'Reopening...',
+      menuLabel: 'Reopen Ticket',
+      tone: 'warning',
+    });
+  }
+
+  if (['created', 'open', 'pending_accept'].includes(normalizedStage) && options.canClose) {
+    actions.push({
+      key: 'stage:cancelled',
+      label: 'Cancel',
+      loadingLabel: 'Cancelling...',
+      menuLabel: 'Cancel Ticket',
+      stage: 'cancelled',
+      tone: 'danger',
+    });
+  }
+
+  return actions;
 }
 
 function compactPayload(payload: Record<string, unknown>) {
@@ -1646,14 +2240,93 @@ function formatKey(key: string) {
     .replace(/\b\w/g, match => match.toUpperCase());
 }
 
-function formatValue(value: unknown) {
-  if (Array.isArray(value) || (value && typeof value === 'object')) {
-    return JSON.stringify(value);
+export function buildRelationLabels(data: AppData, record: ArcadiaRecord = {}) {
+  const labels: RelationLabels = {};
+
+  const addRecord = (item: ArcadiaRecord, displayKeys: string[]) => {
+    const label = firstRecordValue(item, displayKeys);
+    if (!label) {
+      return;
+    }
+
+    [
+      'id',
+      'user_id',
+      'staff_id',
+      'guest_id',
+      'room_id',
+      'reservation_id',
+      'conversation_id',
+      'assigned_to',
+    ].forEach(key => {
+      const id = firstRecordValue(item, [key]);
+      if (id) {
+        labels[id] = label;
+      }
+    });
+  };
+
+  data.staff.forEach(item => addRecord(item, ['name', 'full_name', 'email', 'id']));
+  data.guests.forEach(item => addRecord(item, ['name', 'guest_name', 'full_name', 'phone', 'id']));
+  data.rooms.forEach(item => addRecord(item, ['room_number', 'name', 'number', 'id']));
+  data.reservations.forEach(item => addRecord(item.raw, ['reservation_no', 'booking_id', 'guest_name', 'id']));
+  data.whatsapp.forEach(item => addRecord(item, ['guest_name', 'contact_name', 'phone', 'id']));
+
+  const assignedTo = firstRecordValue(record, ['assigned_to', 'assigned_to_id', 'assigned_staff_id']);
+  const assignedToName = firstRecordValue(record, ['assigned_to_name', 'assignee_name', 'staff_name']);
+  if (assignedTo && assignedToName) {
+    labels[assignedTo] = assignedToName;
+  }
+
+  const followerIds = record.followers;
+  const followerNames = firstArrayValue(record, ['follower_names', 'followers_names']);
+  if (Array.isArray(followerIds) && followerNames.length) {
+    followerIds.forEach((id, index) => {
+      const label = text(followerNames[index]);
+      if (label) {
+        labels[text(id)] = label;
+      }
+    });
+  }
+
+  return labels;
+}
+
+function firstArrayValue(record: ArcadiaRecord, keys: string[]) {
+  for (const key of keys) {
+    const value = record[key];
+    if (Array.isArray(value)) {
+      return value;
+    }
+  }
+  return [];
+}
+
+export function formatValue(value: unknown, relationLabels: RelationLabels = {}): string {
+  if (Array.isArray(value)) {
+    const formatted: string[] = value
+      .map(item => formatValue(item, relationLabels))
+      .filter(Boolean);
+    return formatted.length ? formatted.join(', ') : 'None';
+  }
+  if (value && typeof value === 'object') {
+    const record = value as ArcadiaRecord;
+    const displayName =
+      firstRecordValue(record, ['name', 'full_name', 'guest_name', 'contact_name', 'room_number', 'reservation_no']) ||
+      relationLabels[firstRecordValue(record, ['id', 'user_id', 'guest_id', 'room_id', 'reservation_id', 'conversation_id'])];
+    if (displayName) {
+      return displayName;
+    }
+    return Object.entries(record)
+      .slice(0, 4)
+      .map(([key, nestedValue]) => `${formatKey(key)}: ${formatValue(nestedValue, relationLabels)}`)
+      .join(' / ');
   }
   if (typeof value === 'boolean') {
     return value ? 'Yes' : 'No';
   }
-  return text(value);
+  const raw = text(value);
+  return relationLabels[raw] ?? raw;
 }
 
 function actionProcessLabel(subject: string, action: string | null, fallback: string) {
@@ -1664,11 +2337,16 @@ function actionProcessLabel(subject: string, action: string | null, fallback: st
   const labels: Record<string, string> = {
     'check-in': 'Completing check in',
     'check-out': 'Completing check out',
+    'guest-whatsapp': 'Sending WhatsApp message',
     note: `Saving ${subject} note`,
     send: 'Sending WhatsApp message',
     stage: `Updating ${subject} stage`,
     whatsapp: 'Opening WhatsApp conversation',
   };
+
+  if (action.startsWith('stage:')) {
+    return `Updating ${subject} stage`;
+  }
 
   return labels[action] ?? `${titleCase(action)} ${subject}`;
 }

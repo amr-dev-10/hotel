@@ -371,3 +371,65 @@ def test_staff_can_read_and_update_only_own_shift() -> None:
             json={"status": "checked_in"},
         )
         assert other_update.status_code == 403
+
+
+def test_staff_duty_update_is_limited_to_self_or_admin() -> None:
+    with TestClient(app) as client:
+        hotel_id, _, owner_token = _bootstrap(client)
+        owner_headers = {"Authorization": f"Bearer {owner_token}"}
+        departments = _department_ids(client, hotel_id, owner_headers)
+        suffix = uuid4().hex[:8]
+        staff_a = _create_user(
+            client,
+            hotel_id,
+            owner_headers,
+            "Duty Staff A",
+            f"duty-a-{suffix}@example.com",
+            department_id=departments["housekeeping"],
+        )
+        staff_b = _create_user(
+            client,
+            hotel_id,
+            owner_headers,
+            "Duty Staff B",
+            f"duty-b-{suffix}@example.com",
+            department_id=departments["housekeeping"],
+        )
+        role_id = _create_role(
+            client,
+            hotel_id,
+            owner_headers,
+            ["staff.view", "staff.update"],
+            {"staff.view": "department", "staff.update": "department"},
+        )
+        _assign_roles(client, hotel_id, owner_headers, staff_a, [role_id])
+
+        login = client.post(
+            "/api/v1/auth/login",
+            json={"email": f"duty-a-{suffix}@example.com", "password": "secretpass123"},
+        )
+        assert login.status_code == 200
+        staff_headers = {"Authorization": f"Bearer {login.json()['data']['access_token']}"}
+
+        own_duty = client.patch(
+            f"/api/v1/hotels/{hotel_id}/users/{staff_a}",
+            headers=staff_headers,
+            json={"is_on_duty": False},
+        )
+        assert own_duty.status_code == 200
+        assert own_duty.json()["data"]["is_on_duty"] is False
+
+        other_duty = client.patch(
+            f"/api/v1/hotels/{hotel_id}/users/{staff_b}",
+            headers=staff_headers,
+            json={"is_on_duty": False},
+        )
+        assert other_duty.status_code == 403
+
+        admin_duty = client.patch(
+            f"/api/v1/hotels/{hotel_id}/users/{staff_b}",
+            headers=owner_headers,
+            json={"is_on_duty": False},
+        )
+        assert admin_duty.status_code == 200
+        assert admin_duty.json()["data"]["is_on_duty"] is False

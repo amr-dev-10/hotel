@@ -1,6 +1,10 @@
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
   BackHandler,
+  Easing,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -9,12 +13,39 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import {ErrorBoundary} from '../components/ErrorBoundary';
-import {AppDialog, type AppDialogRequest} from './AppDialog';
-import {CustomPopup} from './CustomPopup';
-import {ScreenContent} from './screens/OperationsScreens';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { ErrorBoundary } from '../components/ErrorBoundary';
+import { login as loginApi, me as meApi } from '../modules/auth/api/auth.api';
+import { LoginScreen } from '../modules/auth/screens/LoginScreen';
+import {
+  buildAppData,
+  isScreenLoading,
+  screenResourceError,
+  type ReservationView,
+  type TicketView,
+} from '../modules/dashboard';
+import { resourceLabels } from '../modules/operations/constants';
+import { useOperationsWorkspace } from '../modules/operations/hooks/useOperationsWorkspace';
+import type { ResourceKey } from '../modules/operations/types';
+import { DispatchModal } from '../modules/ticket/components/DispatchModal';
+import {
+  canOpenScreen,
+  canUseAction,
+  filterNavItemsForUser,
+  requiredPermissionLabel,
+} from '../permissions/navigationGuard';
+import { apiRequest } from '../services/api';
+import {
+  SESSION_STORAGE_KEY,
+  useAuthStore,
+} from '../store/authStore';
+import { useNotificationStore } from '../store/notificationStore';
+import type { ApiEnvelope } from '../types/api';
+import type { ArcadiaRecord, LoginData, Session } from '../types/domain';
+import { useMobileWebSocket } from '../websocket';
+import { BottomNav } from './AppComponents';
+import { AppDialog, type AppDialogRequest } from './AppDialog';
+import { CustomPopup } from './CustomPopup';
 import {
   BriefcaseBusiness,
   CalendarDays,
@@ -25,42 +56,14 @@ import {
   MessageCircle,
   Package,
   Ticket,
-  Utensils,
   Users,
+  Utensils,
   Wrench,
 } from './icons';
-import {BottomNav} from './AppComponents';
-import {buildSideNavItems} from './navigationConfig';
-import {styles} from './styles';
-import type {PopupKey, ScreenAction, ScreenKey} from './types';
-import {
-  buildAppData,
-  isScreenLoading,
-  screenResourceError,
-  type ReservationView,
-  type TicketView,
-} from '../modules/dashboard';
-import {resourceLabels} from '../modules/operations/constants';
-import type {ResourceKey} from '../modules/operations/types';
-import {login as loginApi, me as meApi} from '../modules/auth/api/auth.api';
-import {LoginScreen} from '../modules/auth/screens/LoginScreen';
-import {useOperationsWorkspace} from '../modules/operations/hooks/useOperationsWorkspace';
-import {DispatchModal} from '../modules/ticket/components/DispatchModal';
-import {
-  canOpenScreen,
-  canUseAction,
-  filterNavItemsForUser,
-  requiredPermissionLabel,
-} from '../permissions/navigationGuard';
-import {apiRequest} from '../services/api';
-import {
-  SESSION_STORAGE_KEY,
-  useAuthStore,
-} from '../store/authStore';
-import {useNotificationStore} from '../store/notificationStore';
-import type {ApiEnvelope} from '../types/api';
-import type {ArcadiaRecord, LoginData, Session} from '../types/domain';
-import {useMobileWebSocket} from '../websocket';
+import { buildSideNavItems } from './navigationConfig';
+import { ScreenContent } from './screens/OperationsScreens';
+import { styles } from './styles';
+import type { PopupKey, ScreenAction, ScreenKey } from './types';
 
 
 const sideNavItems = buildSideNavItems({
@@ -76,6 +79,8 @@ const sideNavItems = buildSideNavItems({
   Utensils,
   Wrench,
 });
+
+const hoboSticker = require('../assets/icons/hobo_splash_sticker.png');
 
 function App(): React.JSX.Element {
   const {width} = useWindowDimensions();
@@ -176,6 +181,8 @@ function App(): React.JSX.Element {
     let mounted = true;
 
     async function restoreSession() {
+      const splashStartedAt = Date.now();
+
       try {
         const stored = await AsyncStorage.getItem(SESSION_STORAGE_KEY);
         if (!stored) {
@@ -201,6 +208,14 @@ function App(): React.JSX.Element {
         await AsyncStorage.removeItem(SESSION_STORAGE_KEY);
         clearAuthStore();
       } finally {
+        const minimumSplashMs = typeof jest === 'undefined' ? 3000 : 0;
+        const remainingSplashMs = Math.max(
+          0,
+          minimumSplashMs - (Date.now() - splashStartedAt),
+        );
+        if (remainingSplashMs > 0) {
+          await new Promise<void>(resolve => setTimeout(() => resolve(), remainingSplashMs));
+        }
         if (mounted) {
           setSessionRestoring(false);
         }
@@ -543,14 +558,7 @@ function App(): React.JSX.Element {
   );
 
   if (sessionRestoring) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
-        <View style={styles.restoreSessionState}>
-          <Text style={styles.emptyStateText}>Restoring session...</Text>
-        </View>
-      </SafeAreaView>
-    );
+    return <SplashLoadingScreen />;
   }
 
   if (!session) {
@@ -674,6 +682,58 @@ function App(): React.JSX.Element {
           onShowDialog={setAppDialog}
           token={session.accessToken}
         />
+      </View>
+    </SafeAreaView>
+  );
+}
+
+function SplashLoadingScreen() {
+  const rotation = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (typeof jest !== 'undefined') {
+      return undefined;
+    }
+
+    const animation = Animated.loop(
+      Animated.timing(rotation, {
+        duration: 1400,
+        easing: Easing.linear,
+        toValue: 1,
+        useNativeDriver: true,
+      }),
+    );
+
+    animation.start();
+    return () => animation.stop();
+  }, [rotation]);
+
+  const rotate = rotation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  return (
+    <SafeAreaView style={styles.splashSafeArea}>
+      <StatusBar barStyle="light-content" backgroundColor="#0046D8" />
+      <View style={styles.splashScreen}>
+        <View style={styles.splashCenter}>
+          <View style={styles.splashLogoOrbit}>
+            <Animated.View style={[styles.splashRing, {transform: [{rotate}]}]}>
+              <View style={styles.splashRingDot} />
+            </Animated.View>
+            <View style={styles.splashLogoPlate}>
+              <Image
+                source={hoboSticker}
+                resizeMode="contain"
+                style={styles.splashLogoImage}
+              />
+            </View>
+          </View>
+          <Text style={styles.splashTitle}>HOBO ERP</Text>
+          <Text style={styles.splashSubtitle}>SMART BUSINESS SOLUTION</Text>
+        </View>
+        {/* <Text style={styles.splashLoadingText}>LOADING...</Text> */}
       </View>
     </SafeAreaView>
   );

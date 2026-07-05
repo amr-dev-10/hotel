@@ -1,5 +1,5 @@
 import {useEffect, useMemo, useState} from 'react';
-import {ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, Text, TextInput, View} from 'react-native';
+import {ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, ScrollView, Text, TextInput, View} from 'react-native';
 
 import {
   ActionMenu,
@@ -32,6 +32,7 @@ import {
   Bell,
   CalendarDays,
   ChevronLeft,
+  ChevronRight,
   ClipboardCheck,
   Filter,
   Hotel,
@@ -64,6 +65,7 @@ import type {ScreenAction, ScreenKey} from '../types';
 import type {AppData, ReservationView, TicketView} from '../../modules/dashboard';
 import type {ActionHandler, ResourceKey} from '../../modules/operations/types';
 import {statusTone} from '../../modules/operations/utils';
+import {formatErrorDetails} from '../../services/api';
 import type {ApiEnvelope} from '../../types/api';
 import type {ArcadiaRecord, UserProfile} from '../../types/domain';
 
@@ -193,6 +195,7 @@ export function ScreenContent({
         selectedConversation={selectedConversation}
         selectedGuest={selectedGuest}
         selectedReservation={selectedReservation}
+        user={user}
         onBack={onBack}
         onMenu={onMenu}
         onRefresh={onRefresh}
@@ -211,6 +214,7 @@ export function ScreenContent({
         loading={loading}
         request={request}
         ticket={selectedTicket}
+        user={user}
         onBack={onBack}
         onMenu={onMenu}
         onOpenWhatsAppConversation={onOpenWhatsAppChat}
@@ -352,6 +356,7 @@ export function ScreenContent({
         loadingProcesses={loadingProcesses}
         error={error}
         tickets={data.tickets}
+        user={user}
         onBack={onBack}
         onCreateTicket={onOpenTicketForm}
         onOpenTicket={onOpenTicket}
@@ -460,12 +465,16 @@ export function ScreenContent({
         loading={loading}
         error={error}
         loadingProcesses={loadingProcesses}
+        hotelId={user.hotel_id}
+        request={request}
         staff={data.staff}
         onBack={onBack}
         onMenu={onMenu}
         onOpenNotifications={onOpenNotifications}
         onOpenStaffProfile={onOpenStaffProfile}
         onRefresh={onRefresh}
+        onRefreshResource={onRefreshResource}
+        onShowDialog={onShowDialog}
       />
     );
   }
@@ -504,6 +513,22 @@ function DashboardScreen({
   onOpenTicketForm: () => void;
   onRefresh: () => void;
 }) {
+  const [quickActionsOpen, setQuickActionsOpen] = useState(false);
+  const [quickActionsExpanded, setQuickActionsExpanded] = useState(true);
+  const quickActions = [
+    {icon: Ticket, label: 'Create Ticket', onPress: onOpenTicketForm},
+    {icon: CalendarDays, label: 'Reservation', onPress: () => onNavigate('reservations')},
+    {icon: Users, label: 'Guest', onPress: () => onNavigate('guests')},
+    {icon: Utensils, label: 'Kitchen', onPress: () => onNavigate('kitchen')},
+  ];
+
+  const runQuickAction = (action: () => void) => {
+    action();
+  };
+
+  useEffect(() => {
+  }, []);
+
   return (
     <ScrollView
       style={styles.screen}
@@ -580,16 +605,26 @@ function DashboardScreen({
       </View>
 
       <View style={styles.quickGrid}>
-        <View style={styles.quickMenuHeader}>
+        <Pressable 
+          style={styles.quickMenuHeader} 
+          onPress={() => setQuickActionsExpanded(current => !current)}>
           <Text style={styles.quickMenuTitle}>Quick Actions</Text>
-          <Pressable style={styles.quickMenuAddButton} onPress={onOpenTicketForm}>
-            <Plus color="#FFFFFF" size={18} strokeWidth={2.4} />
-          </Pressable>
-        </View>
-        <QuickAction icon={Ticket} label="Create Ticket" onPress={onOpenTicketForm} />
-        <QuickAction icon={CalendarDays} label="Reservation" onPress={() => onNavigate('reservations')} />
-        <QuickAction icon={Users} label="Guest" onPress={() => onNavigate('guests')} />
-        <QuickAction icon={Utensils} label="Kitchen" onPress={() => onNavigate('kitchen')} />
+          <View style={[styles.collapsibleSectionIcon, quickActionsExpanded && styles.collapsibleSectionIconOpen]}>
+            <ChevronRight color={blue} size={18} strokeWidth={2.4} />
+          </View>
+        </Pressable>
+        {quickActionsExpanded ? (
+          <View style={[styles.collapsibleSectionBody, styles.quickDrawerList]}>
+            {quickActions.map(action => (
+              <QuickAction
+                key={action.label}
+                icon={action.icon}
+                label={action.label}
+                onPress={() => runQuickAction(action.onPress)}
+              />
+            ))}
+          </View>
+        ) : null}
       </View>
     </ScrollView>
   );
@@ -927,6 +962,7 @@ function TicketsScreen({
   loading,
   loadingProcesses,
   tickets,
+  user,
   onBack,
   onCreateTicket,
   onOpenTicket,
@@ -938,6 +974,7 @@ function TicketsScreen({
   loading: boolean;
   loadingProcesses: string[];
   tickets: TicketView[];
+  user: UserProfile;
   onBack: () => void;
   onCreateTicket: () => void;
   onOpenTicket: (ticket: TicketView) => void;
@@ -947,12 +984,21 @@ function TicketsScreen({
 }) {
   const [filter, setFilter] = useState('All');
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [smartFilter, setSmartFilter] = useState<'assigned' | 'all'>('assigned');
   const [query, setQuery] = useState('');
+  const smartFilteredTickets = useMemo(
+    () =>
+      smartFilter === 'all'
+        ? tickets
+        : tickets.filter(ticket => isTicketAssignedToUser(ticket, user.id)),
+    [smartFilter, tickets, user.id],
+  );
   const filteredTickets = useMemo(
-    () => filterRecordsBySearch(filterByStatus(tickets, filter), query),
-    [filter, query, tickets],
+    () => filterRecordsBySearch(filterByStatus(smartFilteredTickets, filter), query),
+    [filter, query, smartFilteredTickets],
   );
   const {hasMore, loadMore, visibleItems} = useScrollPagination(filteredTickets);
+  const smartFilterLabel = smartFilter === 'assigned' ? 'Assigned to me' : 'All Tickets';
 
   return (
     <FlatList
@@ -988,6 +1034,11 @@ function TicketsScreen({
             value={query}
             onChangeText={setQuery}
           />
+          <ChipRow
+            labels={['Assigned to me', 'All Tickets']}
+            activeLabel={smartFilterLabel}
+            onSelect={label => setSmartFilter(label === 'All Tickets' ? 'all' : 'assigned')}
+          />
           {filtersOpen ? (
             <View style={styles.contextBanner}>
               <Text style={styles.formLabel}>Ticket Filters</Text>
@@ -1000,7 +1051,17 @@ function TicketsScreen({
           ) : null}
         </View>
       }
-      ListEmptyComponent={loading ? null : <EmptyState label="No tickets returned from API." />}
+      ListEmptyComponent={
+        loading ? null : (
+          <EmptyState
+            label={
+              smartFilter === 'assigned'
+                ? 'No tickets are assigned to you. Switch to All Tickets to see the full queue.'
+                : 'No tickets returned from API.'
+            }
+          />
+        )
+      }
       renderItem={({item}) => (
         <TicketCard
           ticket={item}
@@ -1024,6 +1085,21 @@ function TicketsScreen({
       )}
     />
   );
+}
+
+function isTicketAssignedToUser(ticket: TicketView, userId: string) {
+  if (!userId) {
+    return false;
+  }
+
+  const assignedTo = firstRecordValue(ticket.raw, [
+    'assigned_to',
+    'assigned_to_id',
+    'assigned_staff_id',
+    'assignee_id',
+    'owner_id',
+  ]);
+  return assignedTo === userId;
 }
 
 function EscalationsScreen({
@@ -1719,27 +1795,36 @@ function WhatsAppScreen({
 
 function StaffScreen({
   error,
+  hotelId,
   loading,
   loadingProcesses,
+  request,
   staff,
   onBack,
   onMenu,
   onOpenNotifications,
   onOpenStaffProfile,
   onRefresh,
+  onRefreshResource,
+  onShowDialog,
 }: {
   error: string | null;
+  hotelId: string;
   loading: boolean;
   loadingProcesses: string[];
+  request: RequestFn;
   staff: ArcadiaRecord[];
   onBack: () => void;
   onMenu: () => void;
   onOpenNotifications: () => void;
   onOpenStaffProfile: (staff: ArcadiaRecord) => void;
   onRefresh: () => void;
+  onRefreshResource: (resource: ResourceKey) => void;
+  onShowDialog: (dialog: AppDialogRequest) => void;
 }) {
   const [filter, setFilter] = useState('All');
   const [query, setQuery] = useState('');
+  const [deactivatingStaffId, setDeactivatingStaffId] = useState<string | null>(null);
   const filteredStaff = useMemo(() => {
     let filtered = staff;
     if (filter === 'On Duty') {
@@ -1760,6 +1845,58 @@ function StaffScreen({
     return filterRecordsBySearch(filtered, query);
   }, [filter, query, staff]);
   const {hasMore, loadMore, visibleItems} = useScrollPagination(filteredStaff);
+
+  async function deactivateStaff(member: ArcadiaRecord) {
+    const staffId = firstRecordValue(member, ['id', 'user_id']);
+    if (!staffId) {
+      onShowDialog({
+        message: 'The selected staff record is missing an id.',
+        title: 'Deactivate failed',
+        tone: 'error',
+      });
+      return;
+    }
+
+    setDeactivatingStaffId(staffId);
+    try {
+      await request<ArcadiaRecord>(
+        `/api/v1/hotels/${hotelId}/users/${staffId}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({is_active: false, is_on_duty: false}),
+        },
+      );
+      onRefreshResource('staff');
+      onShowDialog({
+        message: `${firstRecordValue(member, ['name', 'full_name', 'email']) || 'Staff'} was deactivated.`,
+        title: 'Staff updated',
+        tone: 'success',
+      });
+    } catch (nextError) {
+      const details = formatErrorDetails(nextError, 'Staff deactivate failed');
+      onShowDialog({
+        details,
+        message: details.split('\n').find(Boolean) || 'The staff record could not be updated.',
+        title: 'Staff deactivate failed',
+        tone: 'error',
+      });
+    } finally {
+      setDeactivatingStaffId(null);
+    }
+  }
+
+  function confirmDeactivateStaff(member: ArcadiaRecord) {
+    const name = firstRecordValue(member, ['name', 'full_name', 'email']) || 'this staff member';
+    onShowDialog({
+      actions: [
+        {label: 'Cancel', tone: 'secondary'},
+        {label: 'Deactivate', onPress: () => deactivateStaff(member)},
+      ],
+      message: `${name} will be marked inactive and off duty.`,
+      title: 'Deactivate staff?',
+      tone: 'info',
+    });
+  }
 
   return (
     <ScrollView
@@ -1818,6 +1955,7 @@ function StaffScreen({
           const onDuty = isRecordTruthy(member, ['is_on_duty']);
           const active = isRecordTruthy(member, ['is_active']);
           const status = onDuty ? 'On Duty' : active ? 'Off Duty' : 'Inactive';
+          const staffId = firstRecordValue(member, ['id', 'user_id']);
           return (
           <Pressable
             key={`${name}-${index}`}
@@ -1838,8 +1976,18 @@ function StaffScreen({
               <ActionMenu
                 items={[
                   {label: 'Open Profile', onPress: () => onOpenStaffProfile(member)},
-                  {label: 'Assign Task', onPress: () => onOpenStaffProfile(member)},
-                  {label: 'Deactivate', tone: 'danger', onPress: () => onOpenStaffProfile(member)},
+                  ...(active
+                    ? [
+                        {
+                          label:
+                            deactivatingStaffId === staffId
+                              ? 'Deactivating...'
+                              : 'Deactivate',
+                          tone: 'danger' as const,
+                          onPress: () => confirmDeactivateStaff(member),
+                        },
+                      ]
+                    : []),
                 ]}
               />
             </View>

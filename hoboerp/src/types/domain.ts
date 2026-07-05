@@ -7,6 +7,7 @@ export type UserProfile = {
   user_type?: string;
   staff_level?: string;
   job_role?: string;
+  is_hotel_owner?: boolean;
   is_on_duty?: boolean;
   permissions?: string[];
 };

@@ -18,6 +18,8 @@ import type {PopupKey} from './types';
 import type {AppData, ReservationView, TicketView} from '../modules/dashboard';
 import type {ResourceKey} from '../modules/operations/types';
 import {priorityTone, statusTone} from '../modules/operations/utils';
+import {Permissions} from '../permissions/permissionCodes';
+import {hasAnyPermission} from '../permissions/rbac';
 import {formatErrorDetails} from '../services/api';
 import type {ApiEnvelope} from '../types/api';
 import type {ArcadiaRecord, UserProfile} from '../types/domain';
@@ -246,6 +248,7 @@ export function CustomPopup({
                 hotelId={user.hotel_id}
                 request={request}
                 staff={staff}
+                user={user}
                 onClose={onClose}
                 onError={handleError}
                 onRefreshResource={onRefreshResource}
@@ -1223,6 +1226,7 @@ function StaffProfile({
   hotelId,
   request,
   staff,
+  user,
   onClose,
   onError,
   onRefreshResource,
@@ -1231,6 +1235,7 @@ function StaffProfile({
   hotelId: string;
   request: RequestFn;
   staff: ArcadiaRecord | null;
+  user: UserProfile;
   onClose: () => void;
   onError: (error: unknown, fallback: string) => void;
   onRefreshResource: (resource: ResourceKey) => void;
@@ -1241,6 +1246,15 @@ function StaffProfile({
   const name = firstRecordValue(staff, ['name', 'full_name', 'email']) || 'Staff Member';
   const onDuty = isRecordTruthy(staff ?? {}, ['is_on_duty']);
   const active = isRecordTruthy(staff ?? {}, ['is_active']);
+  const canUpdateDuty =
+    user.id === staffId ||
+    Boolean(user.is_hotel_owner) ||
+    user.user_type === 'HOTEL_ADMIN' ||
+    user.staff_level === 'admin' ||
+    hasAnyPermission(user.permissions, [
+      Permissions.USER_MANAGE,
+      Permissions.STAFF_MANAGE,
+    ]);
 
   async function updateStaff(payload: Record<string, unknown>, successLabel: string) {
     if (!staffId) {
@@ -1283,19 +1297,25 @@ function StaffProfile({
       <InfoLine label="Level" value={firstRecordValue(staff, ['staff_level', 'user_type']) || 'Staff'} />
       <InfoLine label="Duty" value={onDuty ? 'On duty' : 'Off duty'} />
       <InfoLine label="Account" value={active ? 'Active' : 'Inactive'} />
-      <View style={styles.popupActions}>
-        <PopupActionButton
-          label={submitting ? 'Working...' : 'Set On Duty'}
-          tone="secondary"
-          disabled={submitting}
-          onPress={() => updateStaff({is_on_duty: true}, 'Staff marked on duty.')}
-        />
-        <PopupActionButton
-          label={submitting ? 'Working...' : 'Set Off Duty'}
-          disabled={submitting}
-          onPress={() => updateStaff({is_on_duty: false}, 'Staff marked off duty.')}
-        />
-      </View>
+      {canUpdateDuty ? (
+        <View style={styles.popupActions}>
+          <PopupActionButton
+            label={submitting ? 'Working...' : 'Set On Duty'}
+            tone="secondary"
+            disabled={submitting}
+            onPress={() => updateStaff({is_on_duty: true}, 'Staff marked on duty.')}
+          />
+          <PopupActionButton
+            label={submitting ? 'Working...' : 'Set Off Duty'}
+            disabled={submitting}
+            onPress={() => updateStaff({is_on_duty: false}, 'Staff marked off duty.')}
+          />
+        </View>
+      ) : (
+        <Text style={styles.popupBodyText}>
+          Duty status can be changed by an owner, admin, or this staff member.
+        </Text>
+      )}
     </View>
   );
 }
