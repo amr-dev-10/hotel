@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 
-import {Eye} from '../../../app/icons';
+import {Eye} from '../../../components/icons';
 
 type LoginProps = {
   email: string;

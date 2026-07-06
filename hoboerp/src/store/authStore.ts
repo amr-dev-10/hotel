@@ -13,12 +13,22 @@ type AuthState = {
   isRestoring: boolean;
   refreshToken: string | null;
   token: string | null;
+  login: (session: Session) => void;
   logout: () => void;
   setCurrentUser: (currentUser: UserProfile) => void;
   setHotelName: (hotelName: string | null) => void;
   setRestoring: (isRestoring: boolean) => void;
   setSession: (session: Session) => void;
 };
+
+function sessionState(session: Session) {
+  return {
+    currentHotelId: session.user.hotel_id,
+    currentUser: session.user,
+    refreshToken: session.refreshToken,
+    token: session.accessToken,
+  };
+}
 
 export const useAuthStore = create<AuthState>()(
   persist(
@@ -29,6 +39,7 @@ export const useAuthStore = create<AuthState>()(
       isRestoring: true,
       refreshToken: null,
       token: null,
+      login: session => set(sessionState(session)),
       logout: () =>
         set({
           currentHotelId: null,
@@ -44,13 +55,7 @@ export const useAuthStore = create<AuthState>()(
         }),
       setHotelName: hotelName => set({hotelName}),
       setRestoring: isRestoring => set({isRestoring}),
-      setSession: session =>
-        set({
-          currentHotelId: session.user.hotel_id,
-          currentUser: session.user,
-          refreshToken: session.refreshToken,
-          token: session.accessToken,
-        }),
+      setSession: session => set(sessionState(session)),
     }),
     {
       name: 'hoboerp.auth.store.v1',

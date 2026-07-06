@@ -1,0 +1,10 @@
+appId: com.hoboerp
+---
+- launchApp:
+    clearState: true
+- tapOn: "Email"
+- inputText: "owner@admin.com"
+- tapOn: "Password"
+- inputText: "admin@123"
+- tapOn: "Sign in"
+- assertVisible: "Quick Actions"

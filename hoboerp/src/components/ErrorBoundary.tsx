@@ -1,7 +1,7 @@
 import React from 'react';
 import {Pressable, StyleSheet, Text, View} from 'react-native';
 
-import {appErrorDialog, type AppDialogRequest} from '../app/AppDialog';
+import {appErrorDialog, type AppDialogRequest} from './AppDialog';
 import {logger} from '../services/logger';
 
 type Props = {

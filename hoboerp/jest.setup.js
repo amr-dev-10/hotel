@@ -1,4 +1,6 @@
 /* global jest */
+require('@testing-library/jest-native/extend-expect');
+
 const mockAsyncStorage = new Map();
 
 jest.mock('@react-native-async-storage/async-storage', () => ({

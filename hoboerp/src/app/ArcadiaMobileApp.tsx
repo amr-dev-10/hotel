@@ -42,10 +42,10 @@ import {
 import { useNotificationStore } from '../store/notificationStore';
 import type { ApiEnvelope } from '../types/api';
 import type { ArcadiaRecord, LoginData, Session } from '../types/domain';
-import { useMobileWebSocket } from '../websocket';
-import { BottomNav } from './AppComponents';
-import { AppDialog, type AppDialogRequest } from './AppDialog';
-import { CustomPopup } from './CustomPopup';
+import { useMobileWebSocket } from '../services/websocket';
+import { BottomNav } from '../components/AppComponents';
+import { AppDialog, type AppDialogRequest } from '../components/AppDialog';
+import { CustomPopup } from '../modules/operations/components/CustomPopup';
 import {
   BriefcaseBusiness,
   CalendarDays,
@@ -59,11 +59,11 @@ import {
   Users,
   Utensils,
   Wrench,
-} from './icons';
-import { buildSideNavItems } from './navigationConfig';
-import { ScreenContent } from './screens/OperationsScreens';
-import { styles } from './styles';
-import type { PopupKey, ScreenAction, ScreenKey } from './types';
+} from '../components/icons';
+import { buildSideNavItems } from '../navigation/navigationConfig';
+import { ScreenContent } from '../modules/operations/screens/ScreenContent';
+import { styles } from '../theme/styles';
+import type { PopupKey, ScreenAction, ScreenKey } from '../navigation/types';
 
 
 const sideNavItems = buildSideNavItems({
@@ -599,6 +599,7 @@ function App(): React.JSX.Element {
               loadingProcesses={loadingProcesses}
               request={request}
               screen={screen}
+              permissions={permissions}
               selectedConversation={selectedConversation}
               selectedGuest={selectedGuest}
               selectedReservation={selectedReservation}

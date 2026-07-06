@@ -1,7 +1,7 @@
 import type {ReactNode} from 'react';
 import {Text, View} from 'react-native';
 
-import {styles} from '../../app/styles';
+import {styles} from '../../theme/styles';
 import {useRBAC} from '../hooks/useRBAC';
 
 type Props = {

@@ -1,4 +1,4 @@
-import type {ScreenKey} from '../app/types';
+import type {ScreenKey} from '../navigation/types';
 import {
   Permissions,
   shiftViewPermissions,

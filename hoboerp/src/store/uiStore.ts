@@ -1,6 +1,6 @@
 import {create} from 'zustand';
 
-import type {ScreenKey} from '../app/types';
+import type {ScreenKey} from '../navigation/types';
 
 type UiState = {
   activeScreen: ScreenKey;

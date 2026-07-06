@@ -11,8 +11,8 @@ import {
 import {
   appErrorDialog,
   type AppDialogRequest,
-} from '../../../app/AppDialog';
-import {styles} from '../../../app/styles';
+} from '../../../components/AppDialog';
+import {styles} from '../../../theme/styles';
 import {apiRequest, formatErrorDetails} from '../../../services/api';
 import {
   type DispatchAlertState,
