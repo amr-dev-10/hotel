@@ -4,15 +4,19 @@ import {textColor} from '../theme/styles';
 import type {IconComponent} from '../navigation/types';
 
 type IconName =
+  | 'alertCircle'
   | 'bell'
   | 'bot'
   | 'briefcase'
   | 'calendar'
+  | 'checkCircle'
   | 'chevronLeft'
   | 'chevronRight'
+  | 'clock'
   | 'clipboard'
   | 'filter'
   | 'eye'
+  | 'helpCircle'
   | 'home'
   | 'hotel'
   | 'key'
@@ -30,6 +34,7 @@ type IconName =
   | 'send'
   | 'settings'
   | 'ticket'
+  | 'trendingUp'
   | 'utensils'
   | 'user'
   | 'users'
@@ -70,6 +75,13 @@ function iconNode(
   },
 ) {
   switch (name) {
+    case 'alertCircle':
+      return (
+        <>
+          <Circle cx="12" cy="12" r="9" {...props} />
+          <Path d="M12 8v5M12 16h.01" {...props} />
+        </>
+      );
     case 'bell':
       return (
         <>
@@ -102,10 +114,24 @@ function iconNode(
           <Path d="M16 3v4M8 3v4M3 10h18" {...props} />
         </>
       );
+    case 'checkCircle':
+      return (
+        <>
+          <Circle cx="12" cy="12" r="9" {...props} />
+          <Path d="m8.5 12.5 2.2 2.2 4.8-5.2" {...props} />
+        </>
+      );
     case 'chevronLeft':
       return <Polyline points="15 18 9 12 15 6" {...props} />;
     case 'chevronRight':
       return <Polyline points="9 18 15 12 9 6" {...props} />;
+    case 'clock':
+      return (
+        <>
+          <Circle cx="12" cy="12" r="9" {...props} />
+          <Path d="M12 7v5l3.5 2" {...props} />
+        </>
+      );
     case 'clipboard':
       return (
         <>
@@ -121,6 +147,14 @@ function iconNode(
         <>
           <Path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z" {...props} />
           <Circle cx="12" cy="12" r="3" {...props} />
+        </>
+      );
+    case 'helpCircle':
+      return (
+        <>
+          <Circle cx="12" cy="12" r="9" {...props} />
+          <Path d="M9.5 9a2.8 2.8 0 0 1 5.2 1.4c0 1.8-1.7 2.4-2.3 3.3" {...props} />
+          <Path d="M12 17h.01" {...props} />
         </>
       );
     case 'home':
@@ -220,6 +254,13 @@ function iconNode(
       );
     case 'ticket':
       return <Path d="M3 9a3 3 0 0 0 0 6v3h18v-3a3 3 0 0 0 0-6V6H3zM9 6v12" {...props} />;
+    case 'trendingUp':
+      return (
+        <>
+          <Path d="m3 16 6-6 4 4 7-7" {...props} />
+          <Path d="M14 7h6v6" {...props} />
+        </>
+      );
     case 'utensils':
       return <Path d="M4 3v8M8 3v8M6 3v18M14 3v8a4 4 0 0 0 4 4v6" {...props} />;
     case 'user':
@@ -248,15 +289,19 @@ function makeIcon(name: IconName): IconComponent {
   return props => <AppIcon name={name} {...props} />;
 }
 
+export const AlertCircle = makeIcon('alertCircle');
 export const Bell = makeIcon('bell');
 export const Bot = makeIcon('bot');
 export const BriefcaseBusiness = makeIcon('briefcase');
 export const CalendarDays = makeIcon('calendar');
+export const CheckCircle = makeIcon('checkCircle');
 export const ChevronLeft = makeIcon('chevronLeft');
 export const ChevronRight = makeIcon('chevronRight');
+export const Clock = makeIcon('clock');
 export const ClipboardCheck = makeIcon('clipboard');
 export const Filter = makeIcon('filter');
 export const Eye = makeIcon('eye');
+export const HelpCircle = makeIcon('helpCircle');
 export const Home = makeIcon('home');
 export const Hotel = makeIcon('hotel');
 export const KeyRound = makeIcon('key');
@@ -274,6 +319,7 @@ export const Search = makeIcon('search');
 export const Send = makeIcon('send');
 export const Settings = makeIcon('settings');
 export const Ticket = makeIcon('ticket');
+export const TrendingUp = makeIcon('trendingUp');
 export const Utensils = makeIcon('utensils');
 export const User = makeIcon('user');
 export const Users = makeIcon('users');

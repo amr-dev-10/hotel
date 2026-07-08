@@ -43,27 +43,32 @@ export function DetailFrame({
   onRefresh: () => void;
 }) {
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.screenContent}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}>
-      <TopAppBar
-        title={title}
-        leftIcon={ChevronLeft}
-        onLeftPress={onBack}
-        rightIcon={Menu}
-        notificationIcon={Bell}
-        onRightPress={onMenu}
-        onNotificationPress={onOpenNotifications}
-        rightAccessory={actions ? <ActionMenu items={actions} /> : undefined}
-      />
+    <View style={styles.screen}>
+      <View style={styles.staticTopAppBar}>
+        <TopAppBar
+          title={title}
+          leftIcon={ChevronLeft}
+          onLeftPress={onBack}
+          rightIcon={Menu}
+          notificationIcon={Bell}
+          onRightPress={onMenu}
+          onNotificationPress={onOpenNotifications}
+          rightAccessory={actions ? <ActionMenu items={actions} /> : undefined}
+        />
+      </View>
       <LoadingProcessCard
         active={loading}
+        floating
         label={loadingLabel ?? `Loading ${title.toLowerCase()}`}
       />
-      <ErrorNotice message={error} onRetry={onRefresh} />
-      {children}
-    </ScrollView>
+      <ScrollView
+        style={styles.screen}
+        contentContainerStyle={styles.screenContent}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}>
+        <ErrorNotice message={error} onRetry={onRefresh} />
+        {children}
+      </ScrollView>
+    </View>
   );
 }
 

@@ -10,7 +10,7 @@ import type {
 } from './types';
 
 export const escalationScopeLabels: Record<EscalationScope, string> = {
-  all: 'All escalations',
+  all: 'All Escalations',
   department: 'Department',
   mine: 'Mine',
 };
@@ -58,6 +58,7 @@ export function toEscalatedTicket(record: ArcadiaRecord): EscalatedTicket {
     reason: firstRecordValue(record, ['reason', 'summary', 'title']) || 'escalated',
     rule_id: nullable(firstRecordValue(record, ['rule_id'])),
     ticket: {
+      assigned_to: nullable(firstRecordValue(nestedTicket, ['assigned_to', 'assignee_id'])),
       assigned_to_name: nullable(
         firstRecordValue(nestedTicket, ['assigned_to_name', 'assignee_name']),
       ),
@@ -117,8 +118,14 @@ export function escalationMatchesStatus(item: EscalatedTicket, filter: string) {
   const stage = normalize(item.ticket.stage);
   const reason = normalize(item.reason);
 
+  if (normalizedFilter === 'unassigned') {
+    return !item.ticket.assigned_to && !item.ticket.assigned_to_name;
+  }
   if (normalizedFilter === 'pending accept') {
     return stage === 'pending accept';
+  }
+  if (normalizedFilter === 'backlog') {
+    return stage.includes('backlog') || reason.includes('backlog');
   }
   if (normalizedFilter === 'breached') {
     return reason.includes('breach') || reason.includes('sla');

@@ -28,7 +28,8 @@ class NotificationCenterService:
         )
         self.db.add(notification)
         self.db.flush()
-        NotificationService().publish_user_notification(
+        notification_service = NotificationService(self.db)
+        notification_service.publish_user_notification(
             hotel_id,
             notification.user_id,
             {
@@ -49,6 +50,18 @@ class NotificationCenterService:
                 },
             },
         )
+        if notification.channel == "fcm":
+            notification_service.send_fcm_to_user(
+                notification.user_id,
+                notification.title,
+                notification.message,
+                {
+                    "notification_id": notification.id,
+                    "notification_type": notification.notification_type,
+                    "reference_id": notification.reference_id,
+                    **(notification.metadata_json or {}),
+                },
+            )
         if commit:
             self.db.commit()
             self.db.refresh(notification)

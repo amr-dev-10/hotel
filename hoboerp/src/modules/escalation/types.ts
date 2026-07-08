@@ -3,6 +3,7 @@ import type {ArcadiaRecord} from '../../types/domain';
 export type EscalationScope = 'all' | 'department' | 'mine';
 
 export type EscalatedTicketRecord = {
+  assigned_to: string | null;
   assigned_to_name: string | null;
   guest_name: string | null;
   id: string;

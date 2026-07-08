@@ -133,89 +133,94 @@ export function DashboardScreen({
   }, []);
 
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.screenContent}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}>
-      <TopAppBar
-        title="Dashboard"
-        leftIcon={Menu}
-        onLeftPress={onMenu}
-        rightIcon={Bell}
-        onRightPress={onOpenNotifications}
-      />
+    <View style={styles.screen}>
+      <View style={styles.staticTopAppBar}>
+        <TopAppBar
+          title="Dashboard"
+          leftIcon={Menu}
+          onLeftPress={onMenu}
+          rightIcon={Bell}
+          onRightPress={onOpenNotifications}
+        />
+      </View>
       <LoadingProcessCard
         active={loading}
+        floating
         label="Loading dashboard data"
         processes={loadingProcesses}
       />
-      <ErrorNotice message={error} onRetry={onRefresh} />
-      <View style={styles.overviewCard}>
-        <View style={styles.rowBetween}>
-          <View>
-            <Text style={styles.overviewTitle}>Today's Overview</Text>
-            <Text style={styles.overviewDate}>Live operations from API</Text>
-          </View>
-        </View>
-        <View style={styles.overviewStats}>
-          <OverviewStat label="Check-ins" value={String(data.todayCheckIns)} trend="Live" />
-          <OverviewStat label="Check-outs" value={String(data.todayCheckOuts)} trend="Live" />
-          <OverviewStat label="Occupancy" value={`${data.occupancy}%`} trend="Live" />
-          <OverviewStat label="Pending Tickets" value={String(data.openTickets)} trend="Live" danger />
-        </View>
-      </View>
-
-      <SectionTitle title="Rooms Overview" />
-      <View style={styles.roomGrid}>
-        <MetricTile label="Total Rooms" value={data.roomsTotal} tone="blue" />
-        <MetricTile label="Occupied" value={data.occupiedRooms} tone="green" />
-        <MetricTile label="Vacant" value={data.vacantRooms} tone="orange" />
-        <MetricTile label="Out of Order" value={data.outOfOrderRooms} tone="red" />
-      </View>
-
-      {departmentRows.length ? (
-        <>
-          <SectionTitle title="Department Status" />
-          <View style={styles.cardStack}>
-            {departmentRows.map(row => (
-              <DepartmentRow
-                key={row.title}
-                icon={row.icon}
-                onPress={row.onPress}
-                title={row.title}
-                tasks={row.tasks}
-                tone={row.tone}
-                up={row.up}
-              />
-            ))}
-          </View>
-        </>
-      ) : null}
-
-      {quickActions.length ? (
-        <View style={styles.quickGrid}>
-          <Pressable
-            style={styles.quickMenuHeader}
-            onPress={() => setQuickActionsExpanded(current => !current)}>
-            <Text style={styles.quickMenuTitle}>Quick Actions</Text>
-            <View style={[styles.collapsibleSectionIcon, quickActionsExpanded && styles.collapsibleSectionIconOpen]}>
-              <ChevronRight color={blue} size={18} strokeWidth={2.4} />
+      <ScrollView
+        style={styles.screen}
+        contentContainerStyle={styles.screenContent}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}>
+        <ErrorNotice message={error} onRetry={onRefresh} />
+        <View style={styles.overviewCard}>
+          <View style={styles.rowBetween}>
+            <View>
+              <Text style={styles.overviewTitle}>Today's Overview</Text>
+              <Text style={styles.overviewDate}>Live operations from API</Text>
             </View>
-          </Pressable>
-          {quickActionsExpanded ? (
-            <View style={[styles.collapsibleSectionBody, styles.quickDrawerList]}>
-              {quickActions.map(action => (
-                <QuickAction
-                  key={action.label}
-                  icon={action.icon}
-                  label={action.label}
-                  onPress={() => runQuickAction(action.onPress)}
+          </View>
+          <View style={styles.overviewStats}>
+            <OverviewStat label="Check-ins" value={String(data.todayCheckIns)} trend="Live" />
+            <OverviewStat label="Check-outs" value={String(data.todayCheckOuts)} trend="Live" />
+            <OverviewStat label="Occupancy" value={`${data.occupancy}%`} trend="Live" />
+            <OverviewStat label="Pending Tickets" value={String(data.openTickets)} trend="Live" danger />
+          </View>
+        </View>
+
+        <SectionTitle title="Rooms Overview" />
+        <View style={styles.roomGrid}>
+          <MetricTile label="Total Rooms" value={data.roomsTotal} tone="blue" />
+          <MetricTile label="Occupied" value={data.occupiedRooms} tone="green" />
+          <MetricTile label="Vacant" value={data.vacantRooms} tone="orange" />
+          <MetricTile label="Out of Order" value={data.outOfOrderRooms} tone="red" />
+        </View>
+
+        {departmentRows.length ? (
+          <>
+            <SectionTitle title="Department Status" />
+            <View style={styles.cardStack}>
+              {departmentRows.map(row => (
+                <DepartmentRow
+                  key={row.title}
+                  icon={row.icon}
+                  onPress={row.onPress}
+                  title={row.title}
+                  tasks={row.tasks}
+                  tone={row.tone}
+                  up={row.up}
                 />
               ))}
             </View>
-          ) : null}
-        </View>
-      ) : null}
-    </ScrollView>
+          </>
+        ) : null}
+
+        {quickActions.length ? (
+          <View style={styles.quickGrid}>
+            <Pressable
+              style={styles.quickMenuHeader}
+              onPress={() => setQuickActionsExpanded(current => !current)}>
+              <Text style={styles.quickMenuTitle}>Quick Actions</Text>
+              <View style={[styles.collapsibleSectionIcon, quickActionsExpanded && styles.collapsibleSectionIconOpen]}>
+                <ChevronRight color={blue} size={18} strokeWidth={2.4} />
+              </View>
+            </Pressable>
+            {quickActionsExpanded ? (
+              <View style={[styles.collapsibleSectionBody, styles.quickDrawerList]}>
+                {quickActions.map(action => (
+                  <QuickAction
+                    key={action.label}
+                    icon={action.icon}
+                    label={action.label}
+                    onPress={() => runQuickAction(action.onPress)}
+                  />
+                ))}
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+      </ScrollView>
+    </View>
   );
 }

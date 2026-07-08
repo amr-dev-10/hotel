@@ -76,33 +76,37 @@ export function ReservationsScreen({
   const {hasMore, loadMore, visibleItems} = useScrollPagination(filteredReservations);
 
   return (
-    <FlatList
-      style={styles.screen}
-      contentContainerStyle={styles.screenContent}
-      data={visibleItems}
-      keyExtractor={(item, index) => `${item.bookingId}-${index}`}
-      onEndReached={loadMore}
-      onEndReachedThreshold={0.35}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}
-      ListFooterComponent={<ListFooter hasMore={hasMore} loading={loading} />}
-      ListHeaderComponent={
-        <View>
-          <TopAppBar
-            title="Reservations"
-            leftIcon={ChevronLeft}
-            onLeftPress={onBack}
-            rightIcon={Menu}
-            notificationIcon={Bell}
-            secondaryRightIcon={Plus}
-            onRightPress={onMenu}
-            onNotificationPress={onOpenNotifications}
-            onSecondaryRightPress={onOpenReservationForm}
-          />
-          <LoadingProcessCard
-            active={loading}
-            label="Loading reservations"
-            processes={loadingProcesses}
-          />
+    <View style={styles.screen}>
+      <View style={styles.staticTopAppBar}>
+        <TopAppBar
+          title="Reservations"
+          leftIcon={ChevronLeft}
+          onLeftPress={onBack}
+          rightIcon={Menu}
+          notificationIcon={Bell}
+          secondaryRightIcon={Plus}
+          onRightPress={onMenu}
+          onNotificationPress={onOpenNotifications}
+          onSecondaryRightPress={onOpenReservationForm}
+        />
+      </View>
+      <LoadingProcessCard
+        active={loading}
+        floating
+        label="Loading reservations"
+        processes={loadingProcesses}
+      />
+      <FlatList
+        style={styles.screen}
+        contentContainerStyle={styles.screenContent}
+        data={visibleItems}
+        keyExtractor={(item, index) => `${item.bookingId}-${index}`}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.35}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}
+        ListFooterComponent={<ListFooter hasMore={hasMore} loading={loading} />}
+        ListHeaderComponent={
+          <View>
           <ErrorNotice message={error} onRetry={onRefresh} />
           <SearchBox
             placeholder="Search by guest, room, booking ID..."
@@ -131,7 +135,8 @@ export function ReservationsScreen({
           ]}
         />
       )}
-    />
+      />
+    </View>
   );
 }
 
@@ -167,33 +172,37 @@ export function GuestsScreen({
   const {hasMore, loadMore, visibleItems} = useScrollPagination(filteredGuests);
 
   return (
-    <FlatList
-      style={styles.screen}
-      contentContainerStyle={styles.screenContent}
-      data={visibleItems}
-      keyExtractor={(item, index) =>
-        `${firstRecordValue(item, ['id', 'phone', 'whatsapp_phone', 'name'])}-${index}`
-      }
-      onEndReached={loadMore}
-      onEndReachedThreshold={0.35}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}
-      ListFooterComponent={<ListFooter hasMore={hasMore} loading={loading} />}
-      ListHeaderComponent={
-        <View>
-          <TopAppBar
-            title="Guests"
-            leftIcon={ChevronLeft}
-            onLeftPress={onBack}
-            rightIcon={Menu}
-            notificationIcon={Bell}
-            onRightPress={onMenu}
-            onNotificationPress={onOpenNotifications}
-          />
-          <LoadingProcessCard
-            active={loading}
-            label="Loading guests"
-            processes={loadingProcesses}
-          />
+    <View style={styles.screen}>
+      <View style={styles.staticTopAppBar}>
+        <TopAppBar
+          title="Guests"
+          leftIcon={ChevronLeft}
+          onLeftPress={onBack}
+          rightIcon={Menu}
+          notificationIcon={Bell}
+          onRightPress={onMenu}
+          onNotificationPress={onOpenNotifications}
+        />
+      </View>
+      <LoadingProcessCard
+        active={loading}
+        floating
+        label="Loading guests"
+        processes={loadingProcesses}
+      />
+      <FlatList
+        style={styles.screen}
+        contentContainerStyle={styles.screenContent}
+        data={visibleItems}
+        keyExtractor={(item, index) =>
+          `${firstRecordValue(item, ['id', 'phone', 'whatsapp_phone', 'name'])}-${index}`
+        }
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.35}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}
+        ListFooterComponent={<ListFooter hasMore={hasMore} loading={loading} />}
+        ListHeaderComponent={
+          <View>
           <ErrorNotice message={error} onRetry={onRefresh} />
           <SearchBox
             placeholder="Search guest, phone, email..."
@@ -237,6 +246,7 @@ export function GuestsScreen({
           </Pressable>
         );
       }}
-    />
+      />
+    </View>
   );
 }

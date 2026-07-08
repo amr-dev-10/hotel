@@ -28,6 +28,7 @@ import { resourceLabels } from '../modules/operations/constants';
 import { useOperationsWorkspace } from '../modules/operations/hooks/useOperationsWorkspace';
 import type { ResourceKey } from '../modules/operations/types';
 import { DispatchModal } from '../modules/ticket/components/DispatchModal';
+import { EscalationAlertModal } from '../modules/escalation/components/EscalationAlertModal';
 import {
   canOpenScreen,
   canUseAction,
@@ -62,6 +63,10 @@ import {
 } from '../components/icons';
 import { buildSideNavItems } from '../navigation/navigationConfig';
 import { ScreenContent } from '../modules/operations/screens/ScreenContent';
+import {
+  registerEscalationPushNotifications,
+  unregisterEscalationPushNotifications,
+} from '../services/pushNotifications';
 import { styles } from '../theme/styles';
 import type { PopupKey, ScreenAction, ScreenKey } from '../navigation/types';
 
@@ -264,6 +269,12 @@ function App(): React.JSX.Element {
   }, [email, loadAllResources, loadHotelProfile, password, setAuthSession]);
 
   const handleLogout = useCallback(() => {
+    if (session) {
+      unregisterEscalationPushNotifications({
+        hotelId: session.user.hotel_id,
+        token: session.accessToken,
+      }).catch(() => undefined);
+    }
     setSession(null);
     clearAuthStore();
     clearNotifications();
@@ -274,7 +285,7 @@ function App(): React.JSX.Element {
     setHotelName('');
     setAuthHotelName(null);
     setDrawerOpen(false);
-  }, [clearAuthStore, clearNotifications, resetWorkspace, setAuthHotelName]);
+  }, [clearAuthStore, clearNotifications, resetWorkspace, session, setAuthHotelName]);
 
   const permissions = session?.user.permissions;
 
@@ -500,6 +511,38 @@ function App(): React.JSX.Element {
     [loadResource],
   );
 
+  useEffect(() => {
+    if (!session) {
+      return undefined;
+    }
+
+    let active = true;
+    let cleanup: (() => void) | undefined;
+    registerEscalationPushNotifications({
+      hotelId: session.user.hotel_id,
+      token: session.accessToken,
+      userId: session.user.id,
+      onEscalationRefresh: () => {
+        refreshResource('tickets');
+        refreshResource('escalations');
+        refreshResource('notifications');
+      },
+    })
+      .then(unsubscribe => {
+        if (active) {
+          cleanup = unsubscribe;
+        } else {
+          unsubscribe();
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      active = false;
+      cleanup?.();
+    };
+  }, [refreshResource, session]);
+
   const refreshActiveData = useCallback(() => {
     if (screen === 'reservations' || screen === 'reservationDetail') {
       loadResource('reservations');
@@ -677,6 +720,7 @@ function App(): React.JSX.Element {
           onShowDialog={setAppDialog}
         />
         <AppDialog dialog={appDialog} onClose={() => setAppDialog(null)} />
+        <EscalationAlertModal onOpenEscalations={() => openScreen('escalations')} />
         <DispatchModal
           hotelId={session.user.hotel_id}
           onRefreshResource={refreshResource}
@@ -824,7 +868,10 @@ function formatActionLoading(actionLoading: string | null) {
   const [resource, , action] = actionLoading.split(':');
   const actionLabels: Record<string, string> = {
     accept: 'Accepting',
+    approve: 'Approving',
     complete: 'Completing',
+    delete: 'Deleting',
+    reject: 'Rejecting',
     reopen: 'Reopening',
     preparing: 'Moving to preparing',
     ready: 'Marking ready',

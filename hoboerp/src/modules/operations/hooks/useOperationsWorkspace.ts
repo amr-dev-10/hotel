@@ -129,9 +129,13 @@ export function useOperationsWorkspace(
           action,
           session.accessToken,
         );
-        if (payload.data) {
+        if (payload.data?.id) {
           replaceResourceItem('tickets', payload.data);
         }
+        await Promise.all([
+          loadResource('tickets'),
+          loadResource('escalations'),
+        ]);
       } catch (error) {
         const details = formatErrorDetails(error, 'Unable to update ticket.');
         showDialog?.(errorDialog('Ticket action failed', details));
@@ -139,7 +143,7 @@ export function useOperationsWorkspace(
         setActionLoading(null);
       }
     },
-    [replaceResourceItem, session?.accessToken, session?.user.hotel_id, showDialog],
+    [loadResource, replaceResourceItem, session?.accessToken, session?.user.hotel_id, showDialog],
   );
 
   const runOrderAction = useCallback(

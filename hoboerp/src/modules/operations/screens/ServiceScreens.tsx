@@ -88,33 +88,37 @@ export function NotificationsScreen({
   const {hasMore, loadMore, visibleItems} = useScrollPagination(filteredNotifications);
 
   return (
-    <FlatList
-      style={styles.screen}
-      contentContainerStyle={styles.screenContent}
-      data={visibleItems}
-      keyExtractor={(item, index) =>
-        `${firstRecordValue(item, ['id', 'notification_id'])}-${index}`
-      }
-      onEndReached={loadMore}
-      onEndReachedThreshold={0.35}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}
-      ListFooterComponent={<ListFooter hasMore={hasMore} loading={loading} />}
-      ListHeaderComponent={
-        <View>
-          <TopAppBar
-            title="Notifications"
-            leftIcon={ChevronLeft}
-            onLeftPress={onBack}
-            rightIcon={Menu}
-            notificationIcon={Bell}
-            onRightPress={onMenu}
-            onNotificationPress={onOpenNotifications}
-          />
-          <LoadingProcessCard
-            active={loading}
-            label="Loading notifications"
-            processes={loadingProcesses}
-          />
+    <View style={styles.screen}>
+      <View style={styles.staticTopAppBar}>
+        <TopAppBar
+          title="Notifications"
+          leftIcon={ChevronLeft}
+          onLeftPress={onBack}
+          rightIcon={Menu}
+          notificationIcon={Bell}
+          onRightPress={onMenu}
+          onNotificationPress={onOpenNotifications}
+        />
+      </View>
+      <LoadingProcessCard
+        active={loading}
+        floating
+        label="Loading notifications"
+        processes={loadingProcesses}
+      />
+      <FlatList
+        style={styles.screen}
+        contentContainerStyle={styles.screenContent}
+        data={visibleItems}
+        keyExtractor={(item, index) =>
+          `${firstRecordValue(item, ['id', 'notification_id'])}-${index}`
+        }
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.35}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}
+        ListFooterComponent={<ListFooter hasMore={hasMore} loading={loading} />}
+        ListHeaderComponent={
+          <View>
           <ErrorNotice message={error} onRetry={onRefresh} />
           <SearchBox
             placeholder="Search notifications..."
@@ -161,7 +165,8 @@ export function NotificationsScreen({
           </View>
         );
       }}
-    />
+      />
+    </View>
   );
 }
 
@@ -195,81 +200,86 @@ export function HousekeepingScreen({
   const {hasMore, loadMore, visibleItems} = useScrollPagination(filteredTasks);
 
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.screenContent}
-      onScroll={handleScrollLoadMore(loadMore)}
-      scrollEventThrottle={16}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}>
-      <TopAppBar
-        title="Housekeeping"
-        leftIcon={ChevronLeft}
-        onLeftPress={onBack}
-      rightIcon={Menu}
-      notificationIcon={Bell}
-      onRightPress={onMenu}
-      onNotificationPress={onOpenNotifications}
-    />
+    <View style={styles.screen}>
+      <View style={styles.staticTopAppBar}>
+        <TopAppBar
+          title="Housekeeping"
+          leftIcon={ChevronLeft}
+          onLeftPress={onBack}
+          rightIcon={Menu}
+          notificationIcon={Bell}
+          onRightPress={onMenu}
+          onNotificationPress={onOpenNotifications}
+        />
+      </View>
       <LoadingProcessCard
         active={loading}
+        floating
         label="Loading housekeeping"
         processes={loadingProcesses}
       />
-      <ErrorNotice message={error} onRetry={onRefresh} />
-      <SearchBox
-        placeholder="Search room, task, status..."
-        value={query}
-        onChangeText={setQuery}
-      />
-      <View style={styles.tabs}>
-        <View style={[styles.tabItem, styles.activeTabItem]}>
-          <Text style={[styles.tabText, styles.activeTabText]}>Tasks</Text>
-        </View>
-        <View style={styles.tabItem}>
-          <Text style={styles.tabText}>Rooms</Text>
-        </View>
-      </View>
-      <ChipRow
-        labels={['All', 'Pending', 'In Progress', 'Completed']}
-        activeLabel={filter}
-        onSelect={setFilter}
-      />
-      <SectionTitle title="Today's Tasks" badge={String(filteredTasks.length)} />
-      <View style={styles.cardStack}>
-        {visibleItems.map((task, index) => {
-          const status = firstRecordValue(task, ['status', 'stage']);
-          const room = firstRecordValue(task, ['room_number', 'room', 'room_name']);
-          return (
-          <View key={`${room}-${index}`} style={styles.taskCard}>
-            <View style={styles.staffText}>
-              <Text style={styles.cardTitle}>{room}</Text>
-              <Text style={styles.cardSubtitleStrong}>
-                {firstRecordValue(task, ['task_name', 'title', 'description'])}
-              </Text>
-              <Text style={styles.caption}>
-                Due: {firstRecordValue(task, ['due_time', 'due_at', 'scheduled_at'])}
-              </Text>
-            </View>
-            <StatusBadge label={status} tone={statusTone(status)} />
-            <ActionMenu
-              items={[
-                {label: 'Mark In Progress', onPress: () => onQuickRecordAction('housekeeping', task, 'in_progress')},
-                {label: 'Mark Completed', onPress: () => onQuickRecordAction('housekeeping', task, 'completed')},
-                {label: 'Delete Record', tone: 'danger', onPress: () => onQuickRecordAction('housekeeping', task, 'delete')},
-              ]}
-            />
+      <ScrollView
+        style={styles.screen}
+        contentContainerStyle={styles.screenContent}
+        onScroll={handleScrollLoadMore(loadMore)}
+        scrollEventThrottle={16}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}>
+        <ErrorNotice message={error} onRetry={onRefresh} />
+        <SearchBox
+          placeholder="Search room, task, status..."
+          value={query}
+          onChangeText={setQuery}
+        />
+        <View style={styles.tabs}>
+          <View style={[styles.tabItem, styles.activeTabItem]}>
+            <Text style={[styles.tabText, styles.activeTabText]}>Tasks</Text>
           </View>
-        );})}
-      </View>
-      {filteredTasks.length === 0 && !loading ? (
-        <EmptyState label="No housekeeping tasks returned from API." />
-      ) : null}
-      <Pressable style={styles.fullPrimaryButton}>
-        <QrCode color="#FFFFFF" size={18} strokeWidth={2} />
-        <Text style={styles.fullPrimaryButtonText}>Scan Room QR</Text>
-      </Pressable>
-      <ListFooter hasMore={hasMore} loading={loading} />
-    </ScrollView>
+          <View style={styles.tabItem}>
+            <Text style={styles.tabText}>Rooms</Text>
+          </View>
+        </View>
+        <ChipRow
+          labels={['All', 'Pending', 'In Progress', 'Completed']}
+          activeLabel={filter}
+          onSelect={setFilter}
+        />
+        <SectionTitle title="Today's Tasks" badge={String(filteredTasks.length)} />
+        <View style={styles.cardStack}>
+          {visibleItems.map((task, index) => {
+            const status = firstRecordValue(task, ['status', 'stage']);
+            const room = firstRecordValue(task, ['room_number', 'room', 'room_name']);
+            return (
+            <View key={`${room}-${index}`} style={styles.taskCard}>
+              <View style={styles.staffText}>
+                <Text style={styles.cardTitle}>{room}</Text>
+                <Text style={styles.cardSubtitleStrong}>
+                  {firstRecordValue(task, ['task_name', 'title', 'description'])}
+                </Text>
+                <Text style={styles.caption}>
+                  Due: {firstRecordValue(task, ['due_time', 'due_at', 'scheduled_at'])}
+                </Text>
+              </View>
+              <StatusBadge label={status} tone={statusTone(status)} />
+              <ActionMenu
+                items={[
+                  {label: 'Mark In Progress', onPress: () => onQuickRecordAction('housekeeping', task, 'in_progress')},
+                  {label: 'Mark Completed', onPress: () => onQuickRecordAction('housekeeping', task, 'completed')},
+                  {label: 'Delete Record', tone: 'danger', onPress: () => onQuickRecordAction('housekeeping', task, 'delete')},
+                ]}
+              />
+            </View>
+          );})}
+        </View>
+        {filteredTasks.length === 0 && !loading ? (
+          <EmptyState label="No housekeeping tasks returned from API." />
+        ) : null}
+        <Pressable style={styles.fullPrimaryButton}>
+          <QrCode color="#FFFFFF" size={18} strokeWidth={2} />
+          <Text style={styles.fullPrimaryButtonText}>Scan Room QR</Text>
+        </Pressable>
+        <ListFooter hasMore={hasMore} loading={loading} />
+      </ScrollView>
+    </View>
   );
 }
 
@@ -305,11 +315,7 @@ export function FoodScreen({
 
   return (
     <View style={styles.screen}>
-      <ScrollView
-        contentContainerStyle={styles.screenContentWithCart}
-        onScroll={handleScrollLoadMore(loadMore)}
-        scrollEventThrottle={16}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}>
+      <View style={styles.staticTopAppBar}>
         <TopAppBar
           title="F&B"
           leftIcon={ChevronLeft}
@@ -319,11 +325,18 @@ export function FoodScreen({
           onRightPress={onMenu}
           onNotificationPress={onOpenNotifications}
         />
-        <LoadingProcessCard
-          active={loading}
-          label="Loading F&B orders"
-          processes={loadingProcesses}
-        />
+      </View>
+      <LoadingProcessCard
+        active={loading}
+        floating
+        label="Loading F&B orders"
+        processes={loadingProcesses}
+      />
+      <ScrollView
+        contentContainerStyle={styles.screenContentWithCart}
+        onScroll={handleScrollLoadMore(loadMore)}
+        scrollEventThrottle={16}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}>
         <ErrorNotice message={error} onRetry={onRefresh} />
         <SearchBox
           placeholder="Search order, guest, room..."
@@ -425,33 +438,37 @@ export function KitchenScreen({
   const {hasMore, loadMore, visibleItems} = useScrollPagination(filteredOrders);
 
   return (
-    <FlatList
-      style={styles.screen}
-      contentContainerStyle={styles.screenContent}
-      data={visibleItems}
-      keyExtractor={(item, index) =>
-        `${firstRecordValue(item, ['id', 'order_number'])}-${index}`
-      }
-      onEndReached={loadMore}
-      onEndReachedThreshold={0.35}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}
-      ListFooterComponent={<ListFooter hasMore={hasMore} loading={loading} />}
-      ListHeaderComponent={
-        <View>
-          <TopAppBar
-            title="Kitchen"
-            leftIcon={ChevronLeft}
-            onLeftPress={onBack}
-            rightIcon={Menu}
-            notificationIcon={Bell}
-            onRightPress={onMenu}
-            onNotificationPress={onOpenNotifications}
-          />
-          <LoadingProcessCard
-            active={loading}
-            label="Loading kitchen orders"
-            processes={loadingProcesses}
-          />
+    <View style={styles.screen}>
+      <View style={styles.staticTopAppBar}>
+        <TopAppBar
+          title="Kitchen"
+          leftIcon={ChevronLeft}
+          onLeftPress={onBack}
+          rightIcon={Menu}
+          notificationIcon={Bell}
+          onRightPress={onMenu}
+          onNotificationPress={onOpenNotifications}
+        />
+      </View>
+      <LoadingProcessCard
+        active={loading}
+        floating
+        label="Loading kitchen orders"
+        processes={loadingProcesses}
+      />
+      <FlatList
+        style={styles.screen}
+        contentContainerStyle={styles.screenContent}
+        data={visibleItems}
+        keyExtractor={(item, index) =>
+          `${firstRecordValue(item, ['id', 'order_number'])}-${index}`
+        }
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.35}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}
+        ListFooterComponent={<ListFooter hasMore={hasMore} loading={loading} />}
+        ListHeaderComponent={
+          <View>
           <ErrorNotice message={error} onRetry={onRefresh} />
           <SearchBox
             placeholder="Search order, guest, room..."
@@ -515,7 +532,8 @@ export function KitchenScreen({
           </View>
         );
       }}
-    />
+      />
+    </View>
   );
 }
 
@@ -549,85 +567,90 @@ export function WhatsAppScreen({
   const {hasMore, loadMore, visibleItems} = useScrollPagination(filteredConversations);
 
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.screenContent}
-      onScroll={handleScrollLoadMore(loadMore)}
-      scrollEventThrottle={16}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}>
-      <TopAppBar
-        title="WhatsApp"
-        leftIcon={ChevronLeft}
-        onLeftPress={onBack}
-      rightIcon={Menu}
-      notificationIcon={Bell}
-      onRightPress={onMenu}
-      onNotificationPress={onOpenNotifications}
-    />
+    <View style={styles.screen}>
+      <View style={styles.staticTopAppBar}>
+        <TopAppBar
+          title="WhatsApp"
+          leftIcon={ChevronLeft}
+          onLeftPress={onBack}
+          rightIcon={Menu}
+          notificationIcon={Bell}
+          onRightPress={onMenu}
+          onNotificationPress={onOpenNotifications}
+        />
+      </View>
       <LoadingProcessCard
         active={loading}
+        floating
         label="Loading WhatsApp conversations"
         processes={loadingProcesses}
       />
-      <ErrorNotice message={error} onRetry={onRefresh} />
-      <SearchBox
-        placeholder="Search conversations..."
-        value={query}
-        onChangeText={setQuery}
-      />
-      <ChipRow
-        labels={['All', 'Open', 'Pending', 'Resolved']}
-        activeLabel={filter}
-        onSelect={setFilter}
-      />
-      <View style={styles.cardStack}>
-        {visibleItems.map((conversation, index) => {
-          const name = firstRecordValue(conversation, [
-            'guest_name',
-            'contact_name',
-            'name',
-            'phone',
-          ]);
-          const unread = firstRecordValue(conversation, ['unread_count', 'unread']);
-          return (
-          <Pressable
-            key={`${name}-${index}`}
-            style={styles.chatRow}
-            onPress={() => onOpenChat(conversation)}>
-            <View style={styles.whatsappIcon}>
-              <MessageCircle color="#FFFFFF" size={18} strokeWidth={2} />
-            </View>
-            <View style={styles.chatText}>
-              <Text style={styles.cardTitle}>{name}</Text>
-              <Text style={styles.caption}>
-                {firstRecordValue(conversation, ['last_message', 'message', 'preview'])}
-              </Text>
-            </View>
-            <View style={styles.chatMeta}>
-              <Text style={styles.captionTiny}>
-                {firstRecordValue(conversation, ['last_message_at', 'updated_at'])}
-              </Text>
-              {unread ? (
-                <View style={styles.unreadDot}>
-                  <Text style={styles.unreadText}>{unread}</Text>
-                </View>
-              ) : null}
-              <ActionMenu
-                items={[
-                  {label: 'Open Chat', onPress: () => onOpenChat(conversation)},
-                  {label: 'Mark Resolved', onPress: () => onOpenChat(conversation)},
-                  {label: 'Create Ticket', onPress: () => onOpenChat(conversation)},
-                ]}
-              />
-            </View>
-          </Pressable>
-        );})}
-      </View>
-      {filteredConversations.length === 0 && !loading ? (
-        <EmptyState label="No WhatsApp conversations returned from API." />
-      ) : null}
-      <ListFooter hasMore={hasMore} loading={loading} />
-    </ScrollView>
+      <ScrollView
+        style={styles.screen}
+        contentContainerStyle={styles.screenContent}
+        onScroll={handleScrollLoadMore(loadMore)}
+        scrollEventThrottle={16}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}>
+        <ErrorNotice message={error} onRetry={onRefresh} />
+        <SearchBox
+          placeholder="Search conversations..."
+          value={query}
+          onChangeText={setQuery}
+        />
+        <ChipRow
+          labels={['All', 'Open', 'Pending', 'Resolved']}
+          activeLabel={filter}
+          onSelect={setFilter}
+        />
+        <View style={styles.cardStack}>
+          {visibleItems.map((conversation, index) => {
+            const name = firstRecordValue(conversation, [
+              'guest_name',
+              'contact_name',
+              'name',
+              'phone',
+            ]);
+            const unread = firstRecordValue(conversation, ['unread_count', 'unread']);
+            return (
+            <Pressable
+              key={`${name}-${index}`}
+              style={styles.chatRow}
+              onPress={() => onOpenChat(conversation)}>
+              <View style={styles.whatsappIcon}>
+                <MessageCircle color="#FFFFFF" size={18} strokeWidth={2} />
+              </View>
+              <View style={styles.chatText}>
+                <Text style={styles.cardTitle}>{name}</Text>
+                <Text style={styles.caption}>
+                  {firstRecordValue(conversation, ['last_message', 'message', 'preview'])}
+                </Text>
+              </View>
+              <View style={styles.chatMeta}>
+                <Text style={styles.captionTiny}>
+                  {firstRecordValue(conversation, ['last_message_at', 'updated_at'])}
+                </Text>
+                {unread ? (
+                  <View style={styles.unreadDot}>
+                    <Text style={styles.unreadText}>{unread}</Text>
+                  </View>
+                ) : null}
+                <ActionMenu
+                  items={[
+                    {label: 'Open Chat', onPress: () => onOpenChat(conversation)},
+                    {label: 'Mark Resolved', onPress: () => onOpenChat(conversation)},
+                    {label: 'Create Ticket', onPress: () => onOpenChat(conversation)},
+                  ]}
+                />
+              </View>
+            </Pressable>
+          );})}
+        </View>
+        {filteredConversations.length === 0 && !loading ? (
+          <EmptyState label="No WhatsApp conversations returned from API." />
+        ) : null}
+        <ListFooter hasMore={hasMore} loading={loading} />
+      </ScrollView>
+    </View>
   );
 }
 
@@ -737,105 +760,110 @@ export function StaffScreen({
   }
 
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.screenContent}
-      onScroll={handleScrollLoadMore(loadMore)}
-      scrollEventThrottle={16}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}>
-      <TopAppBar
-        title="Staff Portal"
-        leftIcon={ChevronLeft}
-        onLeftPress={onBack}
-      rightIcon={Menu}
-      notificationIcon={Bell}
-      onRightPress={onMenu}
-      onNotificationPress={onOpenNotifications}
-    />
+    <View style={styles.screen}>
+      <View style={styles.staticTopAppBar}>
+        <TopAppBar
+          title="Staff Portal"
+          leftIcon={ChevronLeft}
+          onLeftPress={onBack}
+          rightIcon={Menu}
+          notificationIcon={Bell}
+          onRightPress={onMenu}
+          onNotificationPress={onOpenNotifications}
+        />
+      </View>
       <LoadingProcessCard
         active={loading}
+        floating
         label="Loading staff"
         processes={loadingProcesses}
       />
-      <ErrorNotice message={error} onRetry={onRefresh} />
-      <SearchBox
-        placeholder="Search staff, role, department..."
-        value={query}
-        onChangeText={setQuery}
-      />
-      <View style={styles.staffSummaryGrid}>
-        <MetricTile label="Total" value={staff.length} tone="blue" />
-        <MetricTile
-          label="On Duty"
-          value={staff.filter(item => isRecordTruthy(item, ['is_on_duty'])).length}
-          tone="green"
+      <ScrollView
+        style={styles.screen}
+        contentContainerStyle={styles.screenContent}
+        onScroll={handleScrollLoadMore(loadMore)}
+        scrollEventThrottle={16}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}>
+        <ErrorNotice message={error} onRetry={onRefresh} />
+        <SearchBox
+          placeholder="Search staff, role, department..."
+          value={query}
+          onChangeText={setQuery}
         />
-        <MetricTile
-          label="Active"
-          value={staff.filter(item => isRecordTruthy(item, ['is_active'])).length}
-          tone="orange"
+        <View style={styles.staffSummaryGrid}>
+          <MetricTile label="Total" value={staff.length} tone="blue" />
+          <MetricTile
+            label="On Duty"
+            value={staff.filter(item => isRecordTruthy(item, ['is_on_duty'])).length}
+            tone="green"
+          />
+          <MetricTile
+            label="Active"
+            value={staff.filter(item => isRecordTruthy(item, ['is_active'])).length}
+            tone="orange"
+          />
+          <MetricTile
+            label="Inactive"
+            value={staff.filter(item => !isRecordTruthy(item, ['is_active'])).length}
+            tone="red"
+          />
+        </View>
+        <ChipRow
+          labels={['All', 'On Duty', 'Off Duty', 'Active', 'Inactive']}
+          activeLabel={filter}
+          onSelect={setFilter}
         />
-        <MetricTile
-          label="Inactive"
-          value={staff.filter(item => !isRecordTruthy(item, ['is_active'])).length}
-          tone="red"
-        />
-      </View>
-      <ChipRow
-        labels={['All', 'On Duty', 'Off Duty', 'Active', 'Inactive']}
-        activeLabel={filter}
-        onSelect={setFilter}
-      />
-      <SectionTitle title="Today's Attendance" />
-      <View style={styles.cardStack}>
-        {visibleItems.map((member, index) => {
-          const name = firstRecordValue(member, ['name', 'full_name', 'email']);
-          const onDuty = isRecordTruthy(member, ['is_on_duty']);
-          const active = isRecordTruthy(member, ['is_active']);
-          const status = onDuty ? 'On Duty' : active ? 'Off Duty' : 'Inactive';
-          const staffId = firstRecordValue(member, ['id', 'user_id']);
-          return (
-          <Pressable
-            key={`${name}-${index}`}
-            style={styles.staffCard}
-            onPress={() => onOpenStaffProfile(member)}>
-            <Avatar label={name.charAt(0)} size={42} />
-            <View style={styles.staffText}>
-              <Text style={styles.cardTitle}>{name}</Text>
-              <Text style={styles.caption}>
-                {firstRecordValue(member, ['job_role', 'role', 'department_name'])}
-              </Text>
-              <Text style={styles.captionTiny}>
-                Last punch: {firstRecordValue(member, ['last_punch_at', 'check_in_time'])}
-              </Text>
-            </View>
-            <View style={styles.ticketCardActions}>
-              <StatusBadge label={status} tone={statusTone(status)} />
-              <ActionMenu
-                items={[
-                  {label: 'Open Profile', onPress: () => onOpenStaffProfile(member)},
-                  ...(active
-                    ? [
-                        {
-                          label:
-                            deactivatingStaffId === staffId
-                              ? 'Deactivating...'
-                              : 'Deactivate',
-                          tone: 'danger' as const,
-                          onPress: () => confirmDeactivateStaff(member),
-                        },
-                      ]
-                    : []),
-                ]}
-              />
-            </View>
-          </Pressable>
-        );})}
-      </View>
-      {filteredStaff.length === 0 && !loading ? (
-        <EmptyState label="No staff records returned from API." />
-      ) : null}
-      <ListFooter hasMore={hasMore} loading={loading} />
-    </ScrollView>
+        <SectionTitle title="Today's Attendance" />
+        <View style={styles.cardStack}>
+          {visibleItems.map((member, index) => {
+            const name = firstRecordValue(member, ['name', 'full_name', 'email']);
+            const onDuty = isRecordTruthy(member, ['is_on_duty']);
+            const active = isRecordTruthy(member, ['is_active']);
+            const status = onDuty ? 'On Duty' : active ? 'Off Duty' : 'Inactive';
+            const staffId = firstRecordValue(member, ['id', 'user_id']);
+            return (
+            <Pressable
+              key={`${name}-${index}`}
+              style={styles.staffCard}
+              onPress={() => onOpenStaffProfile(member)}>
+              <Avatar label={name.charAt(0)} size={42} />
+              <View style={styles.staffText}>
+                <Text style={styles.cardTitle}>{name}</Text>
+                <Text style={styles.caption}>
+                  {firstRecordValue(member, ['job_role', 'role', 'department_name'])}
+                </Text>
+                <Text style={styles.captionTiny}>
+                  Last punch: {firstRecordValue(member, ['last_punch_at', 'check_in_time'])}
+                </Text>
+              </View>
+              <View style={styles.ticketCardActions}>
+                <StatusBadge label={status} tone={statusTone(status)} />
+                <ActionMenu
+                  items={[
+                    {label: 'Open Profile', onPress: () => onOpenStaffProfile(member)},
+                    ...(active
+                      ? [
+                          {
+                            label:
+                              deactivatingStaffId === staffId
+                                ? 'Deactivating...'
+                                : 'Deactivate',
+                            tone: 'danger' as const,
+                            onPress: () => confirmDeactivateStaff(member),
+                          },
+                        ]
+                      : []),
+                  ]}
+                />
+              </View>
+            </Pressable>
+          );})}
+        </View>
+        {filteredStaff.length === 0 && !loading ? (
+          <EmptyState label="No staff records returned from API." />
+        ) : null}
+        <ListFooter hasMore={hasMore} loading={loading} />
+      </ScrollView>
+    </View>
   );
 }

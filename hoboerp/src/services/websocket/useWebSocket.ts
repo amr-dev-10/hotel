@@ -7,6 +7,7 @@ import {
   type AppNotification,
   type DispatchAlertState,
   type DispatchTicket,
+  type EscalationAlertState,
   useNotificationStore,
 } from '../../store/notificationStore';
 import {WebSocketEvents} from './channels';
@@ -55,6 +56,14 @@ export function useMobileWebSocket({
         if (dispatch) {
           useNotificationStore.getState().setActiveDispatch(dispatch);
         }
+        const escalationAlert = escalationAlertFromNotification(notification);
+        if (escalationAlert) {
+          useNotificationStore
+            .getState()
+            .setActiveEscalationAlert(escalationAlert);
+          onRefreshResource?.('tickets');
+          onRefreshResource?.('escalations');
+        }
         onRefreshResource?.('notifications');
       }),
       mobileWebSocketClient.onEvent(WebSocketEvents.TICKET_DISPATCH, payload => {
@@ -74,6 +83,12 @@ export function useMobileWebSocket({
       }),
       mobileWebSocketClient.onEvent(WebSocketEvents.TICKET_ESCALATED, payload => {
         clearDispatchFromPayload(payload);
+        const escalationAlert = escalationAlertFromPayload(payload);
+        if (escalationAlert) {
+          useNotificationStore
+            .getState()
+            .setActiveEscalationAlert(escalationAlert);
+        }
         onRefreshResource?.('tickets');
         onRefreshResource?.('escalations');
         onRefreshResource?.('notifications');
@@ -118,6 +133,68 @@ function dispatchFromNotification(
   };
 }
 
+function escalationAlertFromNotification(
+  notification: AppNotification,
+): EscalationAlertState | null {
+  const type = String(
+    notification.type ??
+      notification.notification_type ??
+      notification.metadata?.notification_type ??
+      notification.metadata?.type ??
+      '',
+  ).toLowerCase();
+  const event = String(notification.metadata?.event ?? '').toLowerCase();
+  if (!type.includes('escalation') && !event.includes('escalat')) {
+    return null;
+  }
+
+  return {
+    id: notification.id,
+    created_at: notification.created_at ?? null,
+    message:
+      notification.message ??
+      notification.body ??
+      'A ticket escalation needs attention.',
+    priority: stringValue(notification.metadata?.priority),
+    room_number: stringValue(notification.metadata?.room_number),
+    ticket_id:
+      stringValue(notification.metadata?.ticket_id) ??
+      stringValue(notification.metadata?.reference_id),
+    title: notification.title ?? 'New escalation',
+  };
+}
+
+function escalationAlertFromPayload(
+  payload: Record<string, unknown>,
+): EscalationAlertState | null {
+  const ticket = isRecord(payload.ticket) ? payload.ticket : null;
+  const ticketId =
+    stringValue(payload.ticket_id) ??
+    stringValue(payload.reference_id) ??
+    stringValue(ticket?.id);
+  const id =
+    stringValue(payload.notification_id) ??
+    ticketId ??
+    `ticket-escalated-${Date.now()}`;
+  return {
+    id,
+    created_at: stringValue(payload.created_at),
+    message:
+      stringValue(payload.message) ??
+      stringValue(ticket?.item_description) ??
+      stringValue(ticket?.title) ??
+      'A ticket escalation needs attention.',
+    priority: stringValue(payload.priority) ?? stringValue(ticket?.priority),
+    room_number:
+      stringValue(payload.room_number) ?? stringValue(ticket?.room_number),
+    ticket_id: ticketId,
+    title:
+      stringValue(payload.title) ??
+      stringValue(ticket?.ticket_code) ??
+      'New escalation',
+  };
+}
+
 function dispatchFromPayload(
   payload: Record<string, unknown>,
 ): DispatchAlertState | null {
@@ -140,6 +217,10 @@ function dispatchFromPayload(
   };
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object');
+}
+
 function isDispatchTicket(value: unknown): value is DispatchTicket {
   return Boolean(
     value &&
@@ -147,6 +228,15 @@ function isDispatchTicket(value: unknown): value is DispatchTicket {
       'id' in value &&
       ('ticket_code' in value || 'title' in value || 'item_description' in value),
   );
+}
+
+function stringValue(value: unknown) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const text = String(value).trim();
+  return text || null;
 }
 
 function notificationFromPayload(

@@ -3,6 +3,7 @@ import {
   FlatList,
   Pressable,
   RefreshControl,
+  ScrollView,
   Text,
   View
 } from 'react-native';
@@ -12,9 +13,7 @@ import {
   ChipRow,
   EmptyState,
   ErrorNotice,
-  InfoLine,
   LoadingProcessCard,
-  MetricTile,
   SearchBox,
   StatusBadge,
   TicketCard,
@@ -23,20 +22,24 @@ import {
 
 import {
   Bell,
+  CalendarDays,
+  CheckCircle,
   ChevronLeft,
   Filter,
+  HelpCircle,
   Hotel,
   Menu,
   Plus,
-  Ticket
+  Ticket,
+  User
 } from '../../../components/icons';
 import {
   filterByStatus,
   firstRecordValue,
   filterRecordsBySearch
 } from '../../../utils/dataUtils';
-import {blue, styles} from '../../../theme/styles';
-import type {ScreenAction} from '../../../navigation/types';
+import {blue, muted, styles} from '../../../theme/styles';
+import type {IconComponent, ScreenAction} from '../../../navigation/types';
 import type {TicketView} from '../../dashboard';
 import type {ActionHandler} from '../types';
 import {priorityTone, statusTone} from '../utils';
@@ -51,7 +54,6 @@ import {
   escalationScopeOptions,
   escalationSearchBlob,
   escalationToTicketView,
-  formatEscalationAge,
   titleCase,
   useEscalations,
   type EscalatedTicket,
@@ -113,35 +115,39 @@ export function RoomScreen({
   const {hasMore, loadMore, visibleItems} = useScrollPagination(filteredRooms);
 
   return (
-    <FlatList
-      style={styles.screen}
-      contentContainerStyle={styles.screenContent}
-      data={visibleItems}
-      keyExtractor={(item, index) =>
-        `${firstRecordValue(item, ['id', 'room_number', 'number'])}-${index}`
-      }
-      onEndReached={loadMore}
-      onEndReachedThreshold={0.35}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}
-      ListFooterComponent={<ListFooter hasMore={hasMore} loading={loading} />}
-      ListHeaderComponent={
-        <View>
-          <TopAppBar
-            title="Rooms"
-            leftIcon={ChevronLeft}
-            onLeftPress={onBack}
-            rightIcon={Menu}
-            notificationIcon={Bell}
-            secondaryRightIcon={Plus}
-            onRightPress={onMenu}
-            onNotificationPress={onOpenNotifications}
-            onSecondaryRightPress={() => onOpenRoomForm(null)}
-          />
-          <LoadingProcessCard
-            active={loading}
-            label="Loading rooms"
-            processes={loadingProcesses}
-          />
+    <View style={styles.screen}>
+      <View style={styles.staticTopAppBar}>
+        <TopAppBar
+          title="Rooms"
+          leftIcon={ChevronLeft}
+          onLeftPress={onBack}
+          rightIcon={Menu}
+          notificationIcon={Bell}
+          secondaryRightIcon={Plus}
+          onRightPress={onMenu}
+          onNotificationPress={onOpenNotifications}
+          onSecondaryRightPress={() => onOpenRoomForm(null)}
+        />
+      </View>
+      <LoadingProcessCard
+        active={loading}
+        floating
+        label="Loading rooms"
+        processes={loadingProcesses}
+      />
+      <FlatList
+        style={styles.screen}
+        contentContainerStyle={styles.screenContent}
+        data={visibleItems}
+        keyExtractor={(item, index) =>
+          `${firstRecordValue(item, ['id', 'room_number', 'number'])}-${index}`
+        }
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.35}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}
+        ListFooterComponent={<ListFooter hasMore={hasMore} loading={loading} />}
+        ListHeaderComponent={
+          <View>
           <ErrorNotice message={error} onRetry={onRefresh} />
           <SearchBox
             placeholder="Search room, type, floor..."
@@ -188,7 +194,8 @@ export function RoomScreen({
           </Pressable>
         );
       }}
-    />
+      />
+    </View>
   );
 }
 
@@ -236,33 +243,37 @@ export function TicketsScreen({
   const smartFilterLabel = smartFilter === 'assigned' ? 'Assigned to me' : 'All Tickets';
 
   return (
-    <FlatList
-      style={styles.screen}
-      contentContainerStyle={styles.screenContent}
-      data={visibleItems}
-      keyExtractor={(item, index) => `${item.code}-${index}`}
-      onEndReached={loadMore}
-      onEndReachedThreshold={0.35}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}
-      ListFooterComponent={<ListFooter hasMore={hasMore} loading={loading} />}
-      ListHeaderComponent={
-        <View>
-          <TopAppBar
-            title="Tickets"
-            leftIcon={ChevronLeft}
-            onLeftPress={onBack}
-            rightIcon={Filter}
-            notificationIcon={Bell}
-            secondaryRightIcon={Plus}
-            onRightPress={() => setFiltersOpen(current => !current)}
-            onNotificationPress={onOpenNotifications}
-            onSecondaryRightPress={onCreateTicket}
-          />
-          <LoadingProcessCard
-            active={loading}
-            label="Loading tickets"
-            processes={loadingProcesses}
-          />
+    <View style={styles.screen}>
+      <View style={styles.staticTopAppBar}>
+        <TopAppBar
+          title="Tickets"
+          leftIcon={ChevronLeft}
+          onLeftPress={onBack}
+          rightIcon={Filter}
+          notificationIcon={Bell}
+          secondaryRightIcon={Plus}
+          onRightPress={() => setFiltersOpen(current => !current)}
+          onNotificationPress={onOpenNotifications}
+          onSecondaryRightPress={onCreateTicket}
+        />
+      </View>
+      <LoadingProcessCard
+        active={loading}
+        floating
+        label="Loading tickets"
+        processes={loadingProcesses}
+      />
+      <FlatList
+        style={styles.screen}
+        contentContainerStyle={styles.screenContent}
+        data={visibleItems}
+        keyExtractor={(item, index) => `${item.code}-${index}`}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.35}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}
+        ListFooterComponent={<ListFooter hasMore={hasMore} loading={loading} />}
+        ListHeaderComponent={
+          <View>
           <ErrorNotice message={error} onRetry={onRefresh} />
           <SearchBox
             placeholder="Search ticket, guest, room..."
@@ -318,7 +329,8 @@ export function TicketsScreen({
           ]}
         />
       )}
-    />
+      />
+    </View>
   );
 }
 
@@ -354,7 +366,7 @@ export function EscalationsScreen({
   const [scope, setScope] = useState<EscalationScope>(() =>
     defaultEscalationScope(user),
   );
-  const [filter, setFilter] = useState('All');
+  const [filter, setFilter] = useState('Unassigned');
   const [query, setQuery] = useState('');
   const scopeOptions = useMemo(() => escalationScopeOptions(user), [user]);
   const scopeLabels = useMemo(
@@ -375,18 +387,37 @@ export function EscalationsScreen({
   const metrics = useMemo(() => escalationMetrics(rows), [rows]);
   const filteredEscalations = useMemo(
     () =>
-      rows.filter(item => {
-        const matchesStatus = escalationMatchesStatus(item, filter);
-        const matchesSearch =
-          !query.trim() ||
-          escalationSearchBlob(item).includes(query.trim().toLowerCase());
-        return matchesStatus && matchesSearch;
-      }),
+      rows
+        .filter(item => {
+          const matchesStatus = escalationMatchesStatus(item, filter);
+          const matchesSearch =
+            !query.trim() ||
+            escalationSearchBlob(item).includes(query.trim().toLowerCase());
+          return matchesStatus && matchesSearch;
+        })
+        .sort(
+          (left, right) =>
+            escalationTimestamp(right.escalated_at) -
+            escalationTimestamp(left.escalated_at),
+        ),
     [filter, query, rows],
   );
   const {hasMore, loadMore, visibleItems} = useScrollPagination(filteredEscalations);
   const activeLoading = loading || scopedLoading;
   const activeError = scopedError ?? error;
+  const visibleLoadingProcesses = useMemo(
+    () =>
+      loading
+        ? loadingProcesses.filter(process => {
+            const normalizedProcess = process.trim().toLowerCase();
+            return (
+              normalizedProcess !== 'loading escalation' &&
+              normalizedProcess !== 'loading escalations'
+            );
+          })
+        : [],
+    [loading, loadingProcesses],
+  );
 
   useEffect(() => {
     if (canViewAllEscalations(user)) {
@@ -398,8 +429,8 @@ export function EscalationsScreen({
   }, [scope, user]);
 
   async function handleRefresh() {
-    await refresh();
     onRefresh();
+    await refresh();
   }
 
   function selectScope(label: string) {
@@ -410,40 +441,56 @@ export function EscalationsScreen({
   }
 
   return (
-    <FlatList
-      style={styles.screen}
-      contentContainerStyle={styles.screenContent}
-      data={visibleItems}
-      keyExtractor={(item, index) =>
-        `${item.escalation_id}-${index}`
-      }
-      onEndReached={loadMore}
-      onEndReachedThreshold={0.35}
-      refreshControl={<RefreshControl refreshing={activeLoading} onRefresh={handleRefresh} />}
-      ListFooterComponent={<ListFooter hasMore={hasMore} loading={activeLoading} />}
-      ListHeaderComponent={
-        <View>
-          <TopAppBar
-            title="Escalations"
-            leftIcon={ChevronLeft}
-            onLeftPress={onBack}
-            rightIcon={Menu}
-            notificationIcon={Bell}
-            onRightPress={onMenu}
-            onNotificationPress={onOpenNotifications}
-          />
-          <LoadingProcessCard
-            active={activeLoading}
-            label="Loading escalations"
-            processes={loadingProcesses}
-          />
+    <View style={styles.screen}>
+      <View style={styles.staticTopAppBar}>
+        <TopAppBar
+          title="Escalations"
+          leftIcon={ChevronLeft}
+          onLeftPress={onBack}
+          rightIcon={Menu}
+          notificationIcon={Bell}
+          onRightPress={onMenu}
+          onNotificationPress={onOpenNotifications}
+        />
+      </View>
+      <LoadingProcessCard
+        active={activeLoading}
+        floating
+        label="Loading escalations"
+        processes={visibleLoadingProcesses}
+      />
+      <FlatList
+        style={styles.screen}
+        contentContainerStyle={styles.screenContent}
+        data={visibleItems}
+        keyExtractor={(item, index) =>
+          `${item.escalation_id}-${index}`
+        }
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.35}
+        refreshControl={<RefreshControl refreshing={activeLoading} onRefresh={handleRefresh} />}
+        ListFooterComponent={<ListFooter hasMore={hasMore} loading={activeLoading} />}
+        ListHeaderComponent={
+          <View>
           <ErrorNotice message={activeError} onRetry={handleRefresh} />
-          <View style={styles.staffSummaryGrid}>
-            <MetricTile label="Escalated" value={metrics.total} tone="blue" />
-            <MetricTile label="Priority 4+" value={metrics.critical} tone="red" />
-            <MetricTile label="Pending" value={metrics.pending} tone="orange" />
+          <View style={styles.escalationMetricGrid}>
+            <EscalationMetricTile
+              label="Escalation"
+              value={metrics.total}
+              tone="blue"
+            />
+            <EscalationMetricTile
+              label="Priority +"
+              value={metrics.critical}
+              tone="red"
+            />
+            <EscalationMetricTile
+              label="Pending"
+              value={metrics.pending}
+              tone="orange"
+            />
           </View>
-          <ChipRow
+          <EscalationScopeTabs
             labels={scopeLabels}
             activeLabel={escalationScopeLabels[scope]}
             onSelect={selectScope}
@@ -453,8 +500,8 @@ export function EscalationsScreen({
             value={query}
             onChangeText={setQuery}
           />
-          <ChipRow
-            labels={['All', 'Pending accept', 'Open', 'Resolved', 'Breached']}
+          <EscalationStatusFilters
+            labels={['Unassigned', 'All', 'Pending Accept', 'Open', 'Resolved', 'Backlog']}
             activeLabel={filter}
             onSelect={setFilter}
           />
@@ -470,7 +517,8 @@ export function EscalationsScreen({
           onQuickRecordAction={onQuickRecordAction}
         />
       )}
-    />
+      />
+    </View>
   );
 }
 
@@ -485,54 +533,248 @@ function EscalationCard({
 }) {
   const levelLabel =
     item.escalation_level > 0 ? `Level ${item.escalation_level}` : 'Pending accept';
-  const levelTone = item.escalation_level >= 3 ? 'red' : 'orange';
+  const stageLabel = titleCase(item.ticket.stage);
+  const assigneeName = item.ticket.assigned_to_name ?? 'Unassigned';
+  const roomLabel = item.ticket.room_number ? `Room ${item.ticket.room_number}` : 'No room';
   const ticketActionRecord = {
     ...item.ticket.raw,
     id: item.ticket_id || item.ticket.id,
   };
 
   return (
-    <View style={styles.ticketCard}>
-      <View style={styles.rowBetween}>
-        <Text style={styles.ticketCode}>{item.escalation_id}</Text>
-        <View style={styles.ticketCardActions}>
-          <StatusBadge label={levelLabel} tone={levelTone} />
+    <View style={styles.escalationCard}>
+      <View style={styles.escalationCardAccent} />
+      <View style={styles.escalationCardHeader}>
+        <View style={styles.escalationTicketIcon}>
+          <CalendarDays color={blue} size={18} strokeWidth={2.2} />
+        </View>
+        <View style={styles.escalationCardTitleBlock}>
+          <Text numberOfLines={1} style={styles.escalationTicketCode}>
+            {item.ticket.ticket_code}
+          </Text>
+          <Text numberOfLines={1} style={styles.escalationTicketId}>
+            {compactEscalationId(item.escalation_id)}
+          </Text>
+        </View>
+        <View style={styles.escalationBadgeStack}>
+          <StatusBadge label={stageLabel} tone={statusTone(item.ticket.stage)} />
           <StatusBadge
             label={`P${item.ticket.priority}`}
             tone={priorityTone(String(item.ticket.priority))}
           />
-          <ActionMenu
-            items={[
-              {label: 'Open Ticket', onPress: onOpenTicket},
-              {
-                label: 'Acknowledge',
-                onPress: () => onQuickRecordAction('escalations', item.raw, 'acknowledge'),
-              },
-              {
-                label: 'Resolve',
-                onPress: () => onQuickRecordAction('escalations', item.raw, 'resolve'),
-              },
-              {
-                label: 'Accept Ticket',
-                onPress: () => onQuickRecordAction('tickets', ticketActionRecord, 'accept'),
-              },
-            ]}
-          />
         </View>
+        <ActionMenu
+          items={[
+            {label: 'Open Ticket', onPress: onOpenTicket},
+            {
+              label: 'Accept Ticket',
+              onPress: () => onQuickRecordAction('tickets', ticketActionRecord, 'accept'),
+            },
+            {
+              label: 'Reject Ticket',
+              tone: 'danger',
+              onPress: () => onQuickRecordAction('tickets', ticketActionRecord, 'reject'),
+            },
+            {
+              label: 'Complete Ticket',
+              onPress: () => onQuickRecordAction('tickets', ticketActionRecord, 'complete'),
+            },
+            {
+              label: 'Approve Ticket',
+              onPress: () => onQuickRecordAction('tickets', ticketActionRecord, 'approve'),
+            },
+            {
+              label: 'Reopen Ticket',
+              onPress: () => onQuickRecordAction('tickets', ticketActionRecord, 'reopen'),
+            },
+            {
+              label: 'Delete Ticket',
+              tone: 'danger',
+              onPress: () => onQuickRecordAction('tickets', ticketActionRecord, 'delete'),
+            },
+          ]}
+        />
       </View>
-      <View style={styles.popupBadgeRow}>
-        <StatusBadge label={titleCase(item.ticket.stage)} tone={statusTone(item.ticket.stage)} />
-        <Text style={styles.captionTiny}>{formatEscalationAge(item.escalated_at)}</Text>
+      <Text style={styles.escalationTitle}>{item.ticket.item_description}</Text>
+      <View style={styles.escalationMetaRow}>
+        <CalendarDays color={muted} size={15} strokeWidth={2} />
+        <Text numberOfLines={1} style={styles.escalationMetaText}>
+          {roomLabel}  -  {assigneeName}
+        </Text>
       </View>
-      <Text style={styles.ticketTitle}>{item.ticket.ticket_code}</Text>
-      <Text style={styles.cardSubtitle}>{item.ticket.item_description}</Text>
-      <InfoLine label="Reason" value={titleCase(item.reason)} />
-      <InfoLine label="Assigned" value={item.ticket.assigned_to_name ?? 'Unassigned'} />
-      <InfoLine label="Escalated to" value={item.escalated_to_name ?? 'Unassigned'} />
-      <InfoLine
-        label="Room"
-        value={item.ticket.room_number ? `Room ${item.ticket.room_number}` : 'No room'}
-      />
+      <View style={styles.escalationActionRow}>
+        <Pressable
+          style={styles.escalationAcceptButton}
+          onPress={() => onQuickRecordAction('tickets', ticketActionRecord, 'accept')}>
+          <CheckCircle color="#FFFFFF" size={18} strokeWidth={2.1} />
+          <Text style={styles.escalationAcceptText}>Accept</Text>
+        </Pressable>
+        <Pressable style={styles.escalationOpenButton} onPress={onOpenTicket}>
+          <Ticket color={blue} size={18} strokeWidth={2.1} />
+          <Text style={styles.escalationOpenText}>Open Ticket</Text>
+        </Pressable>
+      </View>
+      <View style={styles.escalationDetailPanel}>
+        <EscalationDetailRow
+          icon={HelpCircle}
+          label="Reason"
+          value={levelLabel === 'Pending accept' ? 'Pending Acceptance' : titleCase(item.reason)}
+        />
+        <EscalationDetailRow
+          icon={User}
+          label="Assigned"
+          value={assigneeName}
+        />
+        <EscalationDetailRow
+          icon={Ticket}
+          label="Escalated to"
+          value={item.escalated_to_name ?? 'Unassigned'}
+          isLast
+        />
+      </View>
     </View>
   );
+}
+
+function EscalationMetricTile({
+  label,
+  tone,
+  value,
+}: {
+  label: string;
+  tone: 'blue' | 'orange' | 'red';
+  value: number;
+}) {
+  return (
+    <View style={styles.escalationMetricTile}>
+      <Text style={[styles.escalationMetricValue, escalationMetricTextStyle(tone)]}>
+        {value}
+      </Text>
+      <Text numberOfLines={1} style={styles.escalationMetricLabel}>
+        {label}
+      </Text>
+      <View style={[styles.escalationMetricBar, escalationMetricBarStyle(tone)]} />
+    </View>
+  );
+}
+
+function EscalationScopeTabs({
+  activeLabel,
+  labels,
+  onSelect,
+}: {
+  activeLabel: string;
+  labels: string[];
+  onSelect: (label: string) => void;
+}) {
+  return (
+    <View style={styles.escalationScopeTabs}>
+      {labels.map(label => {
+        const active = label === activeLabel;
+        return (
+          <Pressable
+            key={label}
+            style={[styles.escalationScopeTab, active && styles.escalationScopeTabActive]}
+            onPress={() => onSelect(label)}>
+            <Text
+              numberOfLines={1}
+              style={[
+                styles.escalationScopeTabText,
+                active && styles.escalationScopeTabTextActive,
+              ]}>
+              {label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function EscalationStatusFilters({
+  activeLabel,
+  labels,
+  onSelect,
+}: {
+  activeLabel: string;
+  labels: string[];
+  onSelect: (label: string) => void;
+}) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.escalationFilterRow}>
+      {labels.map(label => {
+        const active = label === activeLabel;
+        return (
+          <Pressable
+            key={label}
+            style={[styles.escalationFilterPill, active && styles.escalationFilterPillActive]}
+            onPress={() => onSelect(label)}>
+            <Text
+              numberOfLines={1}
+              style={[
+                styles.escalationFilterPillText,
+                active && styles.escalationFilterPillTextActive,
+              ]}>
+              {label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
+function EscalationDetailRow({
+  icon: Icon,
+  isLast,
+  label,
+  value,
+}: {
+  icon: IconComponent;
+  isLast?: boolean;
+  label: string;
+  value: string;
+}) {
+  return (
+    <View style={[styles.escalationDetailRow, isLast && styles.escalationDetailRowLast]}>
+      <View style={styles.escalationDetailIcon}>
+        <Icon color="#64748B" size={16} strokeWidth={2.1} />
+      </View>
+      <Text style={styles.escalationDetailLabel}>{label}</Text>
+      <Text numberOfLines={1} style={styles.escalationDetailValue}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+function compactEscalationId(value: string) {
+  if (value.length <= 32) {
+    return value;
+  }
+  return `${value.slice(0, 8)}-${value.slice(9, 13)}-${value.slice(14, 18)}...`;
+}
+
+function escalationTimestamp(value: string) {
+  const timestamp = Date.parse(value);
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
+function escalationMetricTextStyle(tone: 'blue' | 'orange' | 'red') {
+  return {
+    blue: styles.blueText,
+    orange: styles.orangeText,
+    red: styles.redText,
+  }[tone];
+}
+
+function escalationMetricBarStyle(tone: 'blue' | 'orange' | 'red') {
+  return {
+    blue: styles.escalationMetricBarBlue,
+    orange: styles.escalationMetricBarOrange,
+    red: styles.escalationMetricBarRed,
+  }[tone];
 }

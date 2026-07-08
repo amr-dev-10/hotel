@@ -1,6 +1,9 @@
 package com.hoboerp
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.Application
+import android.os.Build
 import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
 import com.facebook.react.ReactHost
@@ -22,6 +25,24 @@ class MainApplication : Application(), ReactApplication {
 
   override fun onCreate() {
     super.onCreate()
+    createNotificationChannels()
     loadReactNative(this)
+  }
+
+  private fun createNotificationChannels() {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+      return
+    }
+
+    val channel = NotificationChannel(
+      "escalations",
+      "Escalation alerts",
+      NotificationManager.IMPORTANCE_HIGH,
+    ).apply {
+      description = "Urgent ticket escalation alerts"
+      enableVibration(true)
+    }
+    val manager = getSystemService(NotificationManager::class.java)
+    manager.createNotificationChannel(channel)
   }
 }

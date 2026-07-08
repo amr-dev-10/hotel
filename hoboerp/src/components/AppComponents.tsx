@@ -465,10 +465,12 @@ export function ErrorNotice({
 
 export function LoadingProcessCard({
   active = true,
+  floating = false,
   label = 'Loading latest data',
   processes = [],
 }: {
   active?: boolean;
+  floating?: boolean;
   label?: string;
   processes?: string[];
 }) {
@@ -482,7 +484,7 @@ export function LoadingProcessCard({
   }
 
   return (
-    <View style={styles.loadingProcessCard}>
+    <View style={[styles.loadingProcessCard, floating ? styles.loadingProcessFloatingCard : null]}>
       <View style={styles.loadingProcessTitleRow}>
         <ActivityIndicator color={blue} size="small" />
         <View style={styles.loadingProcessTextBlock}>

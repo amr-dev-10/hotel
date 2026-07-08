@@ -7,11 +7,17 @@ export function updateTicketAction(
   action: string,
   token: string,
   body?: Record<string, unknown>,
+  method: 'POST' | 'DELETE' = 'POST',
 ) {
+  const path =
+    action === 'delete'
+      ? `/api/v1/hotels/${hotelId}/tickets/${ticketId}`
+      : `/api/v1/hotels/${hotelId}/tickets/${ticketId}/${action}`;
+
   return apiRequest<ArcadiaRecord>(
-    `/api/v1/hotels/${hotelId}/tickets/${ticketId}/${action}`,
+    path,
     {
-      method: 'POST',
+      method,
       token,
       body: body ? JSON.stringify(body) : undefined,
     },

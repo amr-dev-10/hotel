@@ -45,7 +45,7 @@ export function AssistantScreen({
 }) {
   return (
     <View style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.chatContent}>
+      <View style={styles.staticTopAppBar}>
         <TopAppBar
           title="AI Assistant"
           leftIcon={ChevronLeft}
@@ -55,6 +55,8 @@ export function AssistantScreen({
           onRightPress={onMenu}
           onNotificationPress={onOpenNotifications}
         />
+      </View>
+      <ScrollView contentContainerStyle={styles.chatContent}>
         <View style={styles.userBubble}>
           <Text style={styles.userBubbleText}>Show me today's occupancy and pending tickets</Text>
           <Text style={styles.bubbleTime}>10:30 AM</Text>
@@ -112,43 +114,47 @@ export function ProfileScreen({
   ] as const;
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}>
-      <TopAppBar
-        title="Profile"
-        leftIcon={ChevronLeft}
-        onLeftPress={onBack}
-        rightIcon={Menu}
-        notificationIcon={Bell}
-        onRightPress={onMenu}
-        onNotificationPress={onOpenNotifications}
-      />
-      <View style={styles.profileHeader}>
-        <Avatar label="A" size={58} />
-        <View>
-          <Text style={styles.profileName}>{user.name ?? user.email}</Text>
-          <Text style={styles.caption}>{user.email}</Text>
-          <Text style={styles.profileRole}>{user.job_role ?? user.user_type ?? 'User'}</Text>
-          <Text style={styles.profileHotel}>{hotelName}</Text>
+    <View style={styles.screen}>
+      <View style={styles.staticTopAppBar}>
+        <TopAppBar
+          title="Profile"
+          leftIcon={ChevronLeft}
+          onLeftPress={onBack}
+          rightIcon={Menu}
+          notificationIcon={Bell}
+          onRightPress={onMenu}
+          onNotificationPress={onOpenNotifications}
+        />
+      </View>
+      <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}>
+        <View style={styles.profileHeader}>
+          <Avatar label="A" size={58} />
+          <View>
+            <Text style={styles.profileName}>{user.name ?? user.email}</Text>
+            <Text style={styles.caption}>{user.email}</Text>
+            <Text style={styles.profileRole}>{user.job_role ?? user.user_type ?? 'User'}</Text>
+            <Text style={styles.profileHotel}>{hotelName}</Text>
+          </View>
         </View>
-      </View>
-      <View style={styles.profileOptions}>
-        {options.map(([label, Icon]) => (
-          <ProfileOption
-            key={label}
-            icon={Icon}
-            label={label}
-            onPress={() =>
-              label === 'Notifications'
-                ? onNavigate('notifications')
-                : onOpenProfileOption(label)
-            }
-          />
-        ))}
-        <Pressable style={styles.profileOption} onPress={onLogout}>
-          <LogOut color="#DC2626" size={19} strokeWidth={2} />
-          <Text style={styles.logoutText}>Logout</Text>
-        </Pressable>
-      </View>
-    </ScrollView>
+        <View style={styles.profileOptions}>
+          {options.map(([label, Icon]) => (
+            <ProfileOption
+              key={label}
+              icon={Icon}
+              label={label}
+              onPress={() =>
+                label === 'Notifications'
+                  ? onNavigate('notifications')
+                  : onOpenProfileOption(label)
+              }
+            />
+          ))}
+          <Pressable style={styles.profileOption} onPress={onLogout}>
+            <LogOut color="#DC2626" size={19} strokeWidth={2} />
+            <Text style={styles.logoutText}>Logout</Text>
+          </Pressable>
+        </View>
+      </ScrollView>
+    </View>
   );
 }

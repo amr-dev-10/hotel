@@ -9,6 +9,7 @@ export type AppNotification = {
   id: string;
   message?: string | null;
   metadata?: ArcadiaRecord | null;
+  notification_type?: string | null;
   read_at?: string | null;
   status?: string | null;
   title?: string | null;
@@ -41,25 +42,39 @@ export type DispatchAlertState = {
   ticket: DispatchTicket;
 };
 
+export type EscalationAlertState = {
+  created_at?: string | null;
+  id: string;
+  message: string;
+  priority?: string | null;
+  room_number?: string | null;
+  ticket_id?: string | null;
+  title: string;
+};
+
 type ConnectionState = 'connected' | 'connecting' | 'disconnected' | 'error';
 
 type NotificationState = {
   activeDispatch: DispatchAlertState | null;
+  activeEscalationAlert: EscalationAlertState | null;
   connectionState: ConnectionState;
   lastToast: AppNotification | null;
   notifications: AppNotification[];
   unreadCount: number;
   addNotification: (notification: AppNotification) => void;
   clear: () => void;
+  clearEscalationAlert: () => void;
   clearDispatchForTicket: (ticketId: string) => void;
   markRead: (notificationId: string) => void;
   setActiveDispatch: (dispatch: DispatchAlertState | null) => void;
+  setActiveEscalationAlert: (alert: EscalationAlertState | null) => void;
   setConnectionState: (connectionState: ConnectionState) => void;
   setNotifications: (notifications: AppNotification[]) => void;
 };
 
 export const useNotificationStore = create<NotificationState>(set => ({
   activeDispatch: null,
+  activeEscalationAlert: null,
   connectionState: 'disconnected',
   lastToast: null,
   notifications: [],
@@ -80,10 +95,12 @@ export const useNotificationStore = create<NotificationState>(set => ({
   clear: () =>
     set({
       activeDispatch: null,
+      activeEscalationAlert: null,
       lastToast: null,
       notifications: [],
       unreadCount: 0,
     }),
+  clearEscalationAlert: () => set({activeEscalationAlert: null}),
   clearDispatchForTicket: ticketId =>
     set(state => ({
       activeDispatch:
@@ -105,6 +122,13 @@ export const useNotificationStore = create<NotificationState>(set => ({
       };
     }),
   setActiveDispatch: activeDispatch => set({activeDispatch}),
+  setActiveEscalationAlert: activeEscalationAlert =>
+    set(state => ({
+      activeEscalationAlert:
+        state.activeEscalationAlert?.id === activeEscalationAlert?.id
+          ? state.activeEscalationAlert
+          : activeEscalationAlert,
+    })),
   setConnectionState: connectionState => set({connectionState}),
   setNotifications: notifications =>
     set({

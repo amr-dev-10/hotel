@@ -6,6 +6,10 @@ export function runTicketWorkflowAction(
   action: string,
   token: string,
 ) {
+  if (action === 'delete') {
+    return updateTicketAction(hotelId, ticketId, action, token, undefined, 'DELETE');
+  }
+
   const body =
     action === 'reject' ? {reason: 'Rejected from mobile app'} : undefined;
 
