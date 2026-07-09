@@ -13,6 +13,7 @@ export const screenPermissionMap: Partial<Record<ScreenKey, string[]>> = {
   guestDetail: [Permissions.GUEST_VIEW, Permissions.GUEST_VIEW_BASIC],
   guests: [Permissions.GUEST_VIEW, Permissions.GUEST_VIEW_BASIC],
   housekeeping: [Permissions.HOUSEKEEPING_MANAGE],
+  hierarchy: [Permissions.USER_VIEW, Permissions.STAFF_VIEW],
   kitchen: [Permissions.RESTAURANT_MANAGE],
   reservationDetail: [Permissions.RESERVATION_VIEW],
   reservations: [Permissions.RESERVATION_VIEW],

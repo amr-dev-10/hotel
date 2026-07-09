@@ -62,7 +62,7 @@ export function isScreenLoading(
     return resources.rooms.loading;
   }
   if (screen === 'food') {
-    return resources.orders.loading;
+    return false;
   }
   if (screen === 'kitchen') {
     return resources.orders.loading;
@@ -107,7 +107,7 @@ export function screenResourceError(
   if (screen === 'room') {
     return resources.rooms.error;
   }
-  if (screen === 'food' || screen === 'kitchen') {
+  if (screen === 'kitchen') {
     return resources.orders.error;
   }
   if (screen === 'staff') {

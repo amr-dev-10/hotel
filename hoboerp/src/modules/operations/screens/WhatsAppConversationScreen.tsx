@@ -45,11 +45,13 @@ import {
 import type {DetailBaseProps} from './detail/detailTypes';
 import {
   actionProcessLabel,
+  buildRelationLabels,
   compactPayload,
   titleCase
 } from './detail/detailUtils';
 
 export function WhatsAppConversationScreen({
+  data,
   error,
   hotelId,
   loading,
@@ -74,6 +76,7 @@ export function WhatsAppConversationScreen({
   const [detailLoading, setDetailLoading] = useState(false);
   const [submitting, setSubmitting] = useState<string | null>(null);
   const record = useMemo(() => ({...(conversation ?? {}), ...(conversationState ?? {})}), [conversation, conversationState]);
+  const relationLabels = useMemo(() => buildRelationLabels(data, record), [data, record]);
   const status = firstRecordValue(record, ['status']) || 'open';
   const priority = firstRecordValue(record, ['priority']) || 'normal';
 
@@ -281,7 +284,7 @@ export function WhatsAppConversationScreen({
         </View>
       </DetailSection>
 
-      <RecordFields record={record} title="Backend API Fields" />
+      <RecordFields record={record} relationLabels={relationLabels} title="Backend API Fields" />
     </DetailFrame>
   );
 }

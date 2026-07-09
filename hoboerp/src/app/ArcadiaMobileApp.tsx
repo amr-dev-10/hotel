@@ -562,9 +562,6 @@ function App(): React.JSX.Element {
     if (screen === 'room') {
       loadResource('rooms');
     }
-    if (screen === 'food') {
-      loadResource('orders');
-    }
     if (screen === 'kitchen') {
       loadResource('orders');
     }

@@ -20,6 +20,7 @@ export type ScreenKey =
   | 'whatsapp'
   | 'assistant'
   | 'staff'
+  | 'hierarchy'
   | 'profile'
   | 'ticketForm'
   | 'ticketDetail'

@@ -30,7 +30,7 @@ export function buildSideNavItems(icons: {
     {key: 'food', label: 'F&B', icon: icons.Utensils},
     {key: 'kitchen', label: 'Kitchen', icon: icons.Package},
     {key: 'housekeeping', label: 'Housekeeping', icon: icons.ClipboardCheck},
-    {key: 'staff', label: 'Hierarchy', icon: icons.BriefcaseBusiness},
+    {key: 'hierarchy', label: 'Hierarchy', icon: icons.BriefcaseBusiness},
     {key: 'whatsapp', label: 'WhatsApp', icon: icons.MessageCircle},
   ];
 }

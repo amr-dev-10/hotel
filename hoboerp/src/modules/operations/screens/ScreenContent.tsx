@@ -16,6 +16,7 @@ import {
   EscalationsScreen,
   FoodScreen,
   GuestsScreen,
+  HierarchyScreen,
   HousekeepingScreen,
   KitchenScreen,
   NotificationsScreen,
@@ -317,13 +318,17 @@ export function ScreenContent({
       <HousekeepingScreen
         loading={loading}
         error={error}
+        hotelId={user.hotel_id}
         loadingProcesses={loadingProcesses}
+        request={request}
+        rooms={data.rooms}
+        staff={data.staff}
         tasks={data.housekeeping}
         onBack={onBack}
         onMenu={onMenu}
         onOpenNotifications={onOpenNotifications}
-        onQuickRecordAction={onQuickRecordAction}
         onRefresh={onRefresh}
+        onShowDialog={onShowDialog}
       />
     );
   }
@@ -332,13 +337,13 @@ export function ScreenContent({
       <FoodScreen
         loading={loading}
         error={error}
+        hotelId={user.hotel_id}
         loadingProcesses={loadingProcesses}
-        orders={data.orders}
+        request={request}
         onBack={onBack}
         onMenu={onMenu}
         onOpenNotifications={onOpenNotifications}
-        onQuickRecordAction={onQuickRecordAction}
-        onRefresh={onRefresh}
+        onShowDialog={onShowDialog}
       />
     );
   }
@@ -347,8 +352,13 @@ export function ScreenContent({
       <KitchenScreen
         loading={loading}
         error={error}
+        guests={data.guests}
+        hotelId={user.hotel_id}
         loadingProcesses={loadingProcesses}
         orders={data.orders}
+        request={request}
+        reservations={data.reservations}
+        rooms={data.rooms}
         onBack={onBack}
         onMenu={onMenu}
         onOpenNotifications={onOpenNotifications}
@@ -362,13 +372,18 @@ export function ScreenContent({
       <WhatsAppScreen
         conversations={data.whatsapp}
         error={error}
+        hotelId={user.hotel_id}
         loading={loading}
         loadingProcesses={loadingProcesses}
+        request={request}
+        staff={data.staff}
+        userId={user.id}
         onBack={onBack}
         onMenu={onMenu}
         onOpenChat={onOpenWhatsAppChat}
         onOpenNotifications={onOpenNotifications}
         onRefresh={onRefresh}
+        onShowDialog={onShowDialog}
       />
     );
   }
@@ -391,6 +406,22 @@ export function ScreenContent({
         onRefresh={onRefresh}
         onRefreshResource={onRefreshResource}
         onShowDialog={onShowDialog}
+      />
+    );
+  }
+  if (screen === 'hierarchy') {
+    return (
+      <HierarchyScreen
+        error={error}
+        hotelId={user.hotel_id}
+        loading={loading}
+        loadingProcesses={loadingProcesses}
+        request={request}
+        userDepartmentId={user.department_id ?? ''}
+        onBack={onBack}
+        onMenu={onMenu}
+        onOpenNotifications={onOpenNotifications}
+        onRefresh={onRefresh}
       />
     );
   }
