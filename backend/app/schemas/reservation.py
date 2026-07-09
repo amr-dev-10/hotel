@@ -71,7 +71,11 @@ class ReservationListItem(ReservationRead):
 
 
 class ReservationDetail(ReservationRead):
-    pass
+    guest_name: str | None = None
+    guest_phone: str | None = None
+    guest_whatsapp_phone: str | None = None
+    room_number: str | None = None
+    room_type: str | None = None
 
 
 class ReservationGuestNew(BaseModel):
@@ -88,6 +92,9 @@ class ReservationGuestRead(ORMModel):
     hotel_id: str
     reservation_id: str
     guest_id: str
+    guest_name: str | None = None
+    guest_phone: str | None = None
+    guest_whatsapp_phone: str | None = None
     is_primary: bool
     relationship: str | None = None
     added_at: datetime
@@ -98,9 +105,12 @@ class ReservationRoomTypeRead(ORMModel):
     hotel_id: str
     reservation_id: str
     room_type_id: str
+    room_type_name: str | None = None
     quantity: int
     rate_plan_id: str | None = None
     assigned_room_id: str | None = None
+    assigned_room_number: str | None = None
+    assigned_room_type: str | None = None
     assigned_at: datetime | None = None
 
 
@@ -124,6 +134,8 @@ class StayRecordRead(ORMModel):
     hotel_id: str
     reservation_id: str
     room_id: str | None = None
+    room_number: str | None = None
+    room_type: str | None = None
     actual_checkin: datetime | None = None
     actual_checkout: datetime | None = None
     notes: str | None = None

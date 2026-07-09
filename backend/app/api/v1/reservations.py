@@ -10,7 +10,7 @@ from app.core.exceptions import bad_request, not_found
 from app.core.responses import ok
 from app.models.base import utcnow
 from app.models.guest import Guest
-from app.models.room import Room
+from app.models.room import Room, RoomType
 from app.models.user import User
 from app.repositories.reservation_repository import (
     ReservationRepository,
@@ -114,7 +114,17 @@ def get_reservation(
     reservation = ReservationRepository(db).get_for_hotel(hotel_id, reservation_id)
     if not reservation:
         raise not_found("Reservation not found")
-    return ok(ReservationDetail.model_validate(reservation).model_dump())
+    data = ReservationDetail.model_validate(reservation).model_dump()
+    guest = _guest_context(db, hotel_id, [reservation.guest_id]).get(reservation.guest_id)
+    if guest:
+        data["guest_name"] = guest["name"]
+        data["guest_phone"] = guest["phone"]
+        data["guest_whatsapp_phone"] = guest["whatsapp_phone"]
+    room = _room_context(db, hotel_id, [reservation.room_id] if reservation.room_id else []).get(reservation.room_id)
+    if room:
+        data["room_number"] = room["room_number"]
+        data["room_type"] = room["room_type"]
+    return ok(data)
 
 
 @router.put("/{reservation_id}")
@@ -172,7 +182,17 @@ def list_reservation_guests(
     current_user: User = Depends(require_permission("guest.view")),
 ) -> dict:
     guests = ReservationService(db).list_guests(hotel_id, reservation_id)
-    return ok([ReservationGuestRead.model_validate(item).model_dump() for item in guests])
+    guest_context = _guest_context(db, hotel_id, [item.guest_id for item in guests])
+    items = []
+    for item in guests:
+        data = ReservationGuestRead.model_validate(item).model_dump()
+        guest = guest_context.get(item.guest_id)
+        if guest:
+            data["guest_name"] = guest["name"]
+            data["guest_phone"] = guest["phone"]
+            data["guest_whatsapp_phone"] = guest["whatsapp_phone"]
+        items.append(data)
+    return ok(items)
 
 
 @router.post("/{reservation_id}/guests")
@@ -295,7 +315,16 @@ def list_stay_records(
     current_user: User = Depends(require_permission("guest.view")),
 ) -> dict:
     stays = StayRecordRepository(db).list_for_reservation(hotel_id, reservation_id)
-    return ok([StayRecordRead.model_validate(item).model_dump() for item in stays])
+    room_context = _room_context(db, hotel_id, [item.room_id for item in stays if item.room_id])
+    items = []
+    for item in stays:
+        data = StayRecordRead.model_validate(item).model_dump()
+        room = room_context.get(item.room_id)
+        if room:
+            data["room_number"] = room["room_number"]
+            data["room_type"] = room["room_type"]
+        items.append(data)
+    return ok(items)
 
 
 @router.get("/{reservation_id}/room-types")
@@ -306,19 +335,39 @@ def list_reservation_room_types(
     current_user: User = Depends(require_permission("guest.view")),
 ) -> dict:
     rows = ReservationRoomTypeRepository(db).list_for_reservation(hotel_id, reservation_id)
-    return ok([ReservationRoomTypeRead.model_validate(item).model_dump() for item in rows])
+    room_type_context = _room_type_context(db, hotel_id, [item.room_type_id for item in rows])
+    assigned_room_context = _room_context(
+        db,
+        hotel_id,
+        [item.assigned_room_id for item in rows if item.assigned_room_id],
+    )
+    items = []
+    for item in rows:
+        data = ReservationRoomTypeRead.model_validate(item).model_dump()
+        room_type = room_type_context.get(item.room_type_id)
+        if room_type:
+            data["room_type_name"] = room_type
+        assigned_room = assigned_room_context.get(item.assigned_room_id)
+        if assigned_room:
+            data["assigned_room_number"] = assigned_room["room_number"]
+            data["assigned_room_type"] = assigned_room["room_type"]
+        items.append(data)
+    return ok(items)
 
 
 def _guest_context(db: Session, hotel_id: str, guest_ids: list[str]) -> dict[str, dict[str, str | None]]:
     if not guest_ids:
         return {}
     rows = db.execute(
-        select(Guest.id, Guest.name, Guest.phone).where(
+        select(Guest.id, Guest.name, Guest.phone, Guest.whatsapp_phone).where(
             Guest.hotel_id == hotel_id,
             Guest.id.in_(set(guest_ids)),
         )
     ).all()
-    return {guest_id: {"name": name, "phone": phone} for guest_id, name, phone in rows}
+    return {
+        guest_id: {"name": name, "phone": phone, "whatsapp_phone": whatsapp_phone}
+        for guest_id, name, phone, whatsapp_phone in rows
+    }
 
 
 def _room_context(db: Session, hotel_id: str, room_ids: list[str]) -> dict[str, dict[str, str | None]]:
@@ -334,3 +383,15 @@ def _room_context(db: Session, hotel_id: str, room_ids: list[str]) -> dict[str, 
         room_id: {"room_number": room_number, "room_type": room_type}
         for room_id, room_number, room_type in rows
     }
+
+
+def _room_type_context(db: Session, hotel_id: str, room_type_ids: list[str]) -> dict[str, str]:
+    if not room_type_ids:
+        return {}
+    rows = db.execute(
+        select(RoomType.id, RoomType.name).where(
+            RoomType.hotel_id == hotel_id,
+            RoomType.id.in_(set(room_type_ids)),
+        )
+    ).all()
+    return {room_type_id: name for room_type_id, name in rows}

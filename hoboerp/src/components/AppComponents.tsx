@@ -22,7 +22,6 @@ import {
   ChevronRight,
   Home,
   MoreHorizontal,
-  Phone,
   Plus,
   Search,
   User,
@@ -237,9 +236,6 @@ export function ReservationCard({
         <View style={styles.reservationSide}>
           <StatusBadge label={reservation.status} tone={statusTone(reservation.status)} />
           {actions ? <ActionMenu items={actions} /> : null}
-          <Pressable style={styles.callButton}>
-            <Phone color={blue} size={17} strokeWidth={2.2} />
-          </Pressable>
         </View>
       </View>
     </Pressable>
