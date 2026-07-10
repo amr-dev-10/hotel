@@ -21,6 +21,7 @@ import {
 import {appErrorDialog} from '../../../components/AppDialog';
 import {Send} from '../../../components/icons';
 import {firstRecordValue} from '../../../utils/dataUtils';
+import {colors} from '../../../theme/colors';
 import {blue,
   styles} from '../../../theme/styles';
 
@@ -240,8 +241,8 @@ export function WhatsAppConversationScreen({
           <TextInput
             multiline
             placeholder="Type a WhatsApp message..."
-            placeholderTextColor="#94A3B8"
-            style={[styles.popupComposerInput, styles.formInputMultiline]}
+            placeholderTextColor={colors.disabledText}
+            style={styles.popupComposerInput}
             value={message}
             onChangeText={setMessage}
           />

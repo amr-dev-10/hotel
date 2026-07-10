@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 
 import {Eye} from '../../../components/icons';
+import {colors} from '../../../theme/colors';
 
 type LoginProps = {
   email: string;
@@ -57,7 +58,7 @@ export function LoginScreen({
           autoComplete="email"
           keyboardType="email-address"
           placeholder="owner@admin.com"
-          placeholderTextColor="#8A94A6"
+          placeholderTextColor={colors.disabledText}
           style={styles.input}
         />
         <Text style={styles.label}>Password</Text>
@@ -68,14 +69,14 @@ export function LoginScreen({
             autoCapitalize="none"
             autoComplete="password"
             placeholder="Password"
-            placeholderTextColor="#8A94A6"
+            placeholderTextColor={colors.disabledText}
             secureTextEntry={!passwordVisible}
             style={styles.passwordInput}
           />
           <Pressable
             style={styles.eyeButton}
             onPress={() => setPasswordVisible(current => !current)}>
-            <Eye color="#64748B" size={19} strokeWidth={2} />
+            <Eye color={colors.textMuted} size={19} strokeWidth={2} />
           </Pressable>
         </View>
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -88,7 +89,7 @@ export function LoginScreen({
           onPress={onLogin}
           disabled={loading}>
           {loading ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color={colors.white} />
           ) : (
             <Text style={styles.primaryButtonText}>Sign in</Text>
           )}
@@ -105,8 +106,8 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   loginPanel: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#E2E8F0',
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
     borderRadius: 8,
     borderWidth: 1,
     padding: 20,
@@ -119,68 +120,68 @@ const styles = StyleSheet.create({
   },
   brandMark: {
     alignItems: 'center',
-    backgroundColor: '#2563EB',
+    backgroundColor: colors.primary,
     borderRadius: 8,
     height: 44,
     justifyContent: 'center',
     width: 44,
   },
   brandMarkText: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: 22,
     fontWeight: '800',
   },
   brandEyebrow: {
-    color: '#0F172A',
+    color: colors.textPrimary,
     fontSize: 13,
     fontWeight: '900',
     letterSpacing: 0,
   },
   brandSubhead: {
-    color: '#64748B',
+    color: colors.textMuted,
     fontSize: 12,
     marginTop: 2,
   },
   appName: {
-    color: '#0F172A',
+    color: colors.textPrimary,
     fontSize: 24,
     fontWeight: '700',
     letterSpacing: 0,
   },
   loginSubtitle: {
-    color: '#64748B',
+    color: colors.textMuted,
     fontSize: 14,
     lineHeight: 20,
     marginBottom: 16,
     marginTop: 8,
   },
   label: {
-    color: '#475569',
+    color: colors.textSecondary,
     fontSize: 13,
     fontWeight: '700',
     marginBottom: 8,
     marginTop: 14,
   },
   input: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#CBD5E1',
+    backgroundColor: colors.surface,
+    borderColor: colors.divider,
     borderRadius: 8,
     borderWidth: 1,
-    color: '#0F172A',
+    color: colors.textPrimary,
     fontSize: 16,
     minHeight: 50,
     paddingHorizontal: 14,
   },
   passwordRow: {
     alignItems: 'center',
-    borderColor: '#CBD5E1',
+    borderColor: colors.divider,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
     minHeight: 50,
   },
   passwordInput: {
-    color: '#0F172A',
+    color: colors.textPrimary,
     flex: 1,
     fontSize: 16,
     minHeight: 50,
@@ -194,14 +195,14 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#2563EB',
+    backgroundColor: colors.primary,
     borderRadius: 8,
     justifyContent: 'center',
     marginTop: 22,
     minHeight: 52,
   },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: 16,
     fontWeight: '800',
   },
@@ -212,7 +213,7 @@ const styles = StyleSheet.create({
     opacity: 0.86,
   },
   errorText: {
-    color: '#DC2626',
+    color: colors.danger,
     fontSize: 13,
     lineHeight: 18,
     marginTop: 12,

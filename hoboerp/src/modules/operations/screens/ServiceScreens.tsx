@@ -45,6 +45,7 @@ import {
   filterRecordsBySearch,
   isRecordTruthy
 } from '../../../utils/dataUtils';
+import {colors} from '../../../theme/colors';
 import {blue, styles} from '../../../theme/styles';
 
 import type {ActionHandler, ResourceKey} from '../types';
@@ -150,7 +151,7 @@ export function NotificationsScreen({
         return (
           <View style={styles.notificationCard}>
             <View style={styles.whatsappIcon}>
-              <Bell color="#FFFFFF" size={18} strokeWidth={2} />
+              <Bell color={colors.white} size={18} strokeWidth={2} />
             </View>
             <View style={styles.chatText}>
               <Text style={styles.cardTitle}>{title}</Text>
@@ -649,7 +650,7 @@ export function HousekeepingScreen({
           <ErrorNotice message={error || actionError} onRetry={onRefresh} />
           <View style={styles.housekeepingDetailHero}>
             <View style={styles.housekeepingDetailIcon}>
-              <ClipboardCheck color="#FFFFFF" size={23} strokeWidth={2.2} />
+              <ClipboardCheck color={colors.white} size={23} strokeWidth={2.2} />
             </View>
             <View style={styles.housekeepingDetailText}>
               <Text style={styles.captionUpper}>Room care</Text>
@@ -695,7 +696,7 @@ export function HousekeepingScreen({
           <Pressable
             style={styles.fullPrimaryButton}
             onPress={() => openEditTask(activeTask)}>
-            <ClipboardCheck color="#FFFFFF" size={18} strokeWidth={2.2} />
+            <ClipboardCheck color={colors.white} size={18} strokeWidth={2.2} />
             <Text style={styles.fullPrimaryButtonText}>Edit Task</Text>
           </Pressable>
 
@@ -722,7 +723,7 @@ export function HousekeepingScreen({
               <Text style={styles.captionUpper}>Checklist</Text>
               {checklist.map((item, index) => (
                 <View key={`${String(item)}-${index}`} style={styles.housekeepingChecklistRow}>
-                  <CheckCircle color="#16A34A" size={16} strokeWidth={2.2} />
+                  <CheckCircle color={colors.success} size={16} strokeWidth={2.2} />
                   <Text style={styles.housekeepingChecklistText}>
                     {housekeepingChecklistText(item)}
                   </Text>
@@ -769,7 +770,7 @@ export function HousekeepingScreen({
           <MetricTile label="Rooms" value={report.cleaningRooms} tone="red" />
         </View>
         <Pressable style={styles.housekeepingCreateButton} onPress={openCreateTask}>
-          <Plus color="#FFFFFF" size={18} strokeWidth={2.2} />
+          <Plus color={colors.white} size={18} strokeWidth={2.2} />
           <Text style={styles.housekeepingCreateText}>New Task</Text>
         </Pressable>
         <SearchBox
@@ -821,7 +822,7 @@ export function HousekeepingScreen({
                   </Text>
                 </View>
                 <View style={styles.housekeepingMetaPill}>
-                  <AlertCircle color="#F97316" size={14} strokeWidth={2.1} />
+                  <AlertCircle color={colors.priorityHigh} size={14} strokeWidth={2.1} />
                   <Text style={styles.housekeepingMetaText}>P{context.priority}</Text>
                 </View>
               </View>
@@ -921,7 +922,7 @@ function HousekeepingTaskFormSheet({
               <MenuFormField label="Date">
                 <TextInput
                   placeholder="YYYY-MM-DD"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={colors.disabledText}
                   style={styles.formInput}
                   value={form.scheduledDate}
                   onChangeText={value => onChange({scheduledDate: value})}
@@ -930,7 +931,7 @@ function HousekeepingTaskFormSheet({
               <MenuFormField label="Time">
                 <TextInput
                   placeholder="HH:mm"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={colors.disabledText}
                   style={styles.formInput}
                   value={form.scheduledTime}
                   onChangeText={value => onChange({scheduledTime: value})}
@@ -953,7 +954,7 @@ function HousekeepingTaskFormSheet({
               <TextInput
                 multiline
                 placeholder="Checklist, amenities, guest request..."
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={colors.disabledText}
                 style={[styles.formInput, styles.formInputMultiline]}
                 value={form.notes}
                 onChangeText={value => onChange({notes: value})}
@@ -1047,7 +1048,7 @@ function HousekeepingRelationField({
             <Text numberOfLines={1} style={styles.captionTiny}>{selectedSubtitle}</Text>
           ) : null}
         </View>
-        <ChevronRight color="#94A3B8" size={18} strokeWidth={2.2} />
+        <ChevronRight color={colors.disabledText} size={18} strokeWidth={2.2} />
       </Pressable>
       <Modal animationType="slide" transparent visible={open} onRequestClose={() => setOpen(false)}>
         <Pressable style={styles.relationPickerBackdrop} onPress={() => setOpen(false)}>
@@ -1062,7 +1063,7 @@ function HousekeepingRelationField({
             <TextInput
               autoFocus
               placeholder={placeholder}
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor={colors.disabledText}
               style={styles.formInput}
               value={relationQuery}
               onChangeText={setRelationQuery}
@@ -1607,7 +1608,7 @@ function FnbMenuManager({
           <>
             <View style={styles.menuActionRow}>
               <Pressable style={styles.menuPrimaryAction} onPress={openCreateItemForm}>
-                <Plus color="#FFFFFF" size={18} strokeWidth={2.2} />
+                <Plus color={colors.white} size={18} strokeWidth={2.2} />
                 <Text style={styles.menuPrimaryActionText}>Create Item</Text>
               </Pressable>
               <Pressable
@@ -1679,7 +1680,7 @@ function FnbMenuManager({
           <View>
             <View style={styles.menuActionRow}>
               <Pressable style={styles.menuPrimaryAction} onPress={openCreateCategoryForm}>
-                <Plus color="#FFFFFF" size={18} strokeWidth={2.2} />
+                <Plus color={colors.white} size={18} strokeWidth={2.2} />
                 <Text style={styles.menuPrimaryActionText}>Create Category</Text>
               </Pressable>
             </View>
@@ -1858,7 +1859,7 @@ function MenuItemFormSheet({
             <MenuFormField label="Item name">
               <TextInput
                 placeholder="Paneer tikka"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={colors.disabledText}
                 style={styles.formInput}
                 value={form.name}
                 onChangeText={value => onChange({name: value})}
@@ -1890,7 +1891,7 @@ function MenuItemFormSheet({
                 <TextInput
                   keyboardType="decimal-pad"
                   placeholder="0.00"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={colors.disabledText}
                   style={styles.formInput}
                   value={form.price}
                   onChangeText={value => onChange({price: value})}
@@ -1900,7 +1901,7 @@ function MenuItemFormSheet({
                 <TextInput
                   keyboardType="number-pad"
                   placeholder="15"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={colors.disabledText}
                   style={styles.formInput}
                   value={form.prepMinutes}
                   onChangeText={value => onChange({prepMinutes: value})}
@@ -1911,7 +1912,7 @@ function MenuItemFormSheet({
               <TextInput
                 autoCapitalize="none"
                 placeholder="https://..."
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={colors.disabledText}
                 style={styles.formInput}
                 value={form.imageUrl}
                 onChangeText={value => onChange({imageUrl: value})}
@@ -1921,7 +1922,7 @@ function MenuItemFormSheet({
               <TextInput
                 multiline
                 placeholder="Guest-facing item detail"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={colors.disabledText}
                 style={[styles.formInput, styles.formInputMultiline]}
                 value={form.descriptionShort}
                 onChangeText={value => onChange({descriptionShort: value})}
@@ -1932,7 +1933,7 @@ function MenuItemFormSheet({
                 <TextInput
                   keyboardType="number-pad"
                   placeholder="0"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={colors.disabledText}
                   style={styles.formInput}
                   value={form.displayOrder}
                   onChangeText={value => onChange({displayOrder: value})}
@@ -1994,7 +1995,7 @@ function MenuCategoryFormSheet({
             <MenuFormField label="Category name">
               <TextInput
                 placeholder="Main Course"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={colors.disabledText}
                 style={styles.formInput}
                 value={form.name}
                 onChangeText={value => onChange({name: value})}
@@ -2004,7 +2005,7 @@ function MenuCategoryFormSheet({
               <MenuFormField label="Type">
                 <TextInput
                   placeholder="food"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={colors.disabledText}
                   style={styles.formInput}
                   value={form.type}
                   onChangeText={value => onChange({type: value})}
@@ -2014,7 +2015,7 @@ function MenuCategoryFormSheet({
                 <TextInput
                   keyboardType="number-pad"
                   placeholder="0"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={colors.disabledText}
                   style={styles.formInput}
                   value={form.displayOrder}
                   onChangeText={value => onChange({displayOrder: value})}
@@ -3127,7 +3128,7 @@ function KitchenOrderDetailView({
         <View style={styles.kitchenSectionHeader}>
           <SectionTitle title="Items" badge={context.itemCount || String(items.length)} />
           <Pressable style={styles.kitchenAddItemButton} onPress={openAddItemForm}>
-            <Plus color="#FFFFFF" size={15} strokeWidth={2.2} />
+            <Plus color={colors.white} size={15} strokeWidth={2.2} />
             <Text style={styles.kitchenAddItemText}>Add Item</Text>
           </Pressable>
         </View>
@@ -3235,7 +3236,7 @@ function KitchenOrderFormSheet({
                 <TextInput
                   autoCapitalize="none"
                   placeholder="pos"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={colors.disabledText}
                   style={styles.formInput}
                   value={form.source}
                   onChangeText={value => onChange({source: value})}
@@ -3245,7 +3246,7 @@ function KitchenOrderFormSheet({
                 <TextInput
                   autoCapitalize="none"
                   placeholder="Table id"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={colors.disabledText}
                   style={styles.formInput}
                   value={form.tableId}
                   onChangeText={value => onChange({tableId: value})}
@@ -3282,7 +3283,7 @@ function KitchenOrderFormSheet({
               <TextInput
                 keyboardType="decimal-pad"
                 placeholder="0.00"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={colors.disabledText}
                 style={styles.formInput}
                 value={form.tax}
                 onChangeText={value => onChange({tax: value})}
@@ -3292,7 +3293,7 @@ function KitchenOrderFormSheet({
               <TextInput
                 multiline
                 placeholder="Kitchen notes"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={colors.disabledText}
                 style={[styles.formInput, styles.formInputMultiline]}
                 value={form.specialInstructions}
                 onChangeText={value => onChange({specialInstructions: value})}
@@ -3391,7 +3392,7 @@ function KitchenOrderItemFormSheet({
                     </Text>
                   ) : null}
                 </View>
-                <ChevronRight color="#94A3B8" size={18} strokeWidth={2.2} />
+                <ChevronRight color={colors.disabledText} size={18} strokeWidth={2.2} />
               </Pressable>
             </MenuFormField>
             <View style={styles.dualFieldRow}>
@@ -3399,7 +3400,7 @@ function KitchenOrderItemFormSheet({
                 <TextInput
                   keyboardType="number-pad"
                   placeholder="1"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={colors.disabledText}
                   style={styles.formInput}
                   value={form.quantity}
                   onChangeText={value => onChange({quantity: value})}
@@ -3409,7 +3410,7 @@ function KitchenOrderItemFormSheet({
                 <TextInput
                   keyboardType="decimal-pad"
                   placeholder="Menu price"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={colors.disabledText}
                   style={styles.formInput}
                   value={form.unitPrice}
                   onChangeText={value => onChange({unitPrice: value})}
@@ -3420,7 +3421,7 @@ function KitchenOrderItemFormSheet({
               <TextInput
                 multiline
                 placeholder="Preparation notes"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={colors.disabledText}
                 style={[styles.formInput, styles.formInputMultiline]}
                 value={form.notes}
                 onChangeText={value => onChange({notes: value})}
@@ -3491,7 +3492,7 @@ function MenuItemRelationPicker({
           <TextInput
             autoFocus
             placeholder="Type item name, price, category..."
-            placeholderTextColor="#94A3B8"
+            placeholderTextColor={colors.disabledText}
             style={styles.formInput}
             value={query}
             onChangeText={setQuery}
@@ -4091,7 +4092,7 @@ export function WhatsAppScreen({
               style={styles.whatsappConversationCard}
               onPress={() => onOpenChat(conversation)}>
               <View style={styles.whatsappIcon}>
-                <MessageCircle color="#FFFFFF" size={18} strokeWidth={2} />
+                <MessageCircle color={colors.white} size={18} strokeWidth={2} />
               </View>
               <View style={styles.chatText}>
                 <Text style={styles.cardTitle}>{name}</Text>

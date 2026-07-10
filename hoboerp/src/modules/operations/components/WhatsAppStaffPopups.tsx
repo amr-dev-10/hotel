@@ -15,6 +15,7 @@ import {Avatar, InfoLine} from '../../../components/AppComponents';
 import {type AppDialogRequest} from '../../../components/AppDialog';
 import {Send} from '../../../components/icons';
 import {firstRecordValue, isRecordTruthy} from '../../../utils/dataUtils';
+import {colors} from '../../../theme/colors';
 import {blue, styles} from '../../../theme/styles';
 
 import type {ResourceKey} from '../types';
@@ -171,7 +172,7 @@ export function WhatsAppChat({
       <View style={styles.popupComposer}>
         <TextInput
           placeholder="Type a message..."
-          placeholderTextColor="#94A3B8"
+          placeholderTextColor={colors.disabledText}
           style={styles.popupComposerInput}
           value={message}
           onChangeText={setMessage}

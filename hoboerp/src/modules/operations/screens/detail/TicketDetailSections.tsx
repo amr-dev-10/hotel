@@ -2,6 +2,7 @@ import {useEffect, useMemo, useState} from 'react';
 import {Pressable, ScrollView, Text, TextInput, View} from 'react-native';
 
 import {Send} from '../../../../components/icons';
+import {colors} from '../../../../theme/colors';
 import {blue, styles} from '../../../../theme/styles';
 import type {ArcadiaRecord} from '../../../../types/domain';
 import {firstRecordValue} from '../../../../utils/dataUtils';
@@ -57,8 +58,8 @@ export function ActivityTimeline({
         <TextInput
           multiline
           placeholder="Add an internal update..."
-          placeholderTextColor="#94A3B8"
-          style={[styles.popupComposerInput, styles.formInputMultiline]}
+          placeholderTextColor={colors.disabledText}
+          style={styles.popupComposerInput}
           value={note}
           onChangeText={onNoteChange}
         />
@@ -144,8 +145,8 @@ export function TicketGuestWhatsAppSection({
           <TextInput
             multiline
             placeholder="Type a WhatsApp message..."
-            placeholderTextColor="#94A3B8"
-            style={[styles.popupComposerInput, styles.formInputMultiline]}
+            placeholderTextColor={colors.disabledText}
+            style={styles.popupComposerInput}
             value={message}
             onChangeText={onMessageChange}
           />

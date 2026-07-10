@@ -12,6 +12,7 @@ import {
 } from '../../../../components/AppComponents';
 import {Bell, ChevronLeft, ChevronRight, Menu} from '../../../../components/icons';
 import {formatErrorDetails} from '../../../../services/api';
+import {colors} from '../../../../theme/colors';
 import {styles} from '../../../../theme/styles';
 import type {ArcadiaRecord} from '../../../../types/domain';
 import {firstRecordValue} from '../../../../utils/dataUtils';
@@ -109,7 +110,7 @@ export function CollapsibleDetailSection({
             styles.collapsibleSectionIcon,
             expanded && styles.collapsibleSectionIconOpen,
           ]}>
-          <ChevronRight color="#64748B" size={17} strokeWidth={2.2} />
+          <ChevronRight color={colors.textMuted} size={17} strokeWidth={2.2} />
         </View>
       </Pressable>
       {expanded ? <View style={styles.collapsibleSectionBody}>{children}</View> : null}
@@ -175,7 +176,7 @@ export function EditableField({
       <TextInput
         multiline={multiline}
         placeholder={placeholder}
-        placeholderTextColor="#94A3B8"
+        placeholderTextColor={colors.disabledText}
         style={[styles.formInput, multiline && styles.formInputMultiline]}
         value={value}
         onChangeText={onChangeText}
@@ -284,7 +285,7 @@ export function Many2OneField({
           ]}>
           {selectedTitle || placeholder}
         </Text>
-        <ChevronRight color="#94A3B8" size={18} strokeWidth={2.2} />
+        <ChevronRight color={colors.disabledText} size={18} strokeWidth={2.2} />
       </Pressable>
       <Modal
         animationType="slide"
@@ -303,7 +304,7 @@ export function Many2OneField({
             <TextInput
               autoFocus
               placeholder={placeholder}
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor={colors.disabledText}
               style={styles.formInput}
               value={query}
               onChangeText={setQuery}

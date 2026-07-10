@@ -26,6 +26,7 @@ import {
   User
 } from '../../../components/icons';
 
+import {colors} from '../../../theme/colors';
 import {blue, styles} from '../../../theme/styles';
 import type {ScreenAction} from '../../../navigation/types';
 import type {AppData} from '../../dashboard';
@@ -74,10 +75,10 @@ export function AssistantScreen({
       <View style={styles.composer}>
         <TextInput
           placeholder="Ask anything..."
-          placeholderTextColor="#94A3B8"
+          placeholderTextColor={colors.disabledText}
           style={styles.composerInput}
         />
-        <Mic color="#64748B" size={18} strokeWidth={2} />
+        <Mic color={colors.textMuted} size={18} strokeWidth={2} />
         <View style={styles.sendButton}>
           <Send color={blue} size={18} strokeWidth={2.2} />
         </View>
@@ -150,7 +151,7 @@ export function ProfileScreen({
             />
           ))}
           <Pressable style={styles.profileOption} onPress={onLogout}>
-            <LogOut color="#DC2626" size={19} strokeWidth={2} />
+            <LogOut color={colors.danger} size={19} strokeWidth={2} />
             <Text style={styles.logoutText}>Logout</Text>
           </Pressable>
         </View>

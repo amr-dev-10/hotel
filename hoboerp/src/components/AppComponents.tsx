@@ -16,6 +16,7 @@ import { priorityTone, statusTone } from '../modules/operations/utils';
 import { buildBottomTabs } from '../navigation/navigationConfig';
 import type { IconComponent, ScreenAction, ScreenKey } from '../navigation/types';
 import { canOpenScreen, canUseAction } from '../permissions/navigationGuard';
+import {colors} from '../theme/colors';
 import { blue, muted, styles, textColor } from '../theme/styles';
 import {
   CalendarDays,
@@ -126,7 +127,7 @@ export function BottomNav({
             onPress={() => (isFab ? onCreate() : onNavigate(tab.key))}>
             <View style={[isFab && styles.fabButton]}>
               <Icon
-                color={isFab ? '#FFFFFF' : active ? blue : textColor}
+                color={isFab ? colors.white : active ? blue : textColor}
                 size={isFab ? 24 : 21}
                 strokeWidth={2.2}
               />
@@ -298,7 +299,7 @@ export function SearchBox({
       <Search color={muted} size={17} strokeWidth={2} />
       <TextInput
         placeholder={placeholder}
-        placeholderTextColor="#64748B"
+        placeholderTextColor={colors.textMuted}
         style={styles.searchInput}
         value={value}
         onChangeText={onChangeText}
@@ -583,7 +584,7 @@ export function ProfileOption({
     <Pressable style={styles.profileOption} onPress={onPress}>
       <Icon color={textColor} size={19} strokeWidth={2} />
       <Text style={styles.profileOptionText}>{label}</Text>
-      <ChevronRight color="#94A3B8" size={18} strokeWidth={2} />
+      <ChevronRight color={colors.disabledText} size={18} strokeWidth={2} />
     </Pressable>
   );
 }
@@ -604,8 +605,8 @@ export function Avatar({label, size}: {label: string; size: number}) {
 function toneColor(tone: 'blue' | 'green' | 'orange' | 'red') {
   return {
     blue,
-    green: '#16A34A',
-    orange: '#F97316',
-    red: '#DC2626',
+    green: colors.success,
+    orange: colors.priorityHigh,
+    red: colors.danger,
   }[tone];
 }

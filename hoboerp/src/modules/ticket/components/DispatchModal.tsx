@@ -12,6 +12,7 @@ import {
   appErrorDialog,
   type AppDialogRequest,
 } from '../../../components/AppDialog';
+import {colors} from '../../../theme/colors';
 import {styles} from '../../../theme/styles';
 import {apiRequest, formatErrorDetails} from '../../../services/api';
 import {
@@ -196,7 +197,7 @@ export function DispatchModal({
                 multiline
                 onChangeText={setReason}
                 placeholder="Reason for rejection"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={colors.disabledText}
                 style={styles.dispatchReasonInput}
                 value={reason}
               />

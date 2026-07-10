@@ -38,6 +38,7 @@ import {
   firstRecordValue,
   filterRecordsBySearch
 } from '../../../utils/dataUtils';
+import {colors} from '../../../theme/colors';
 import {blue, muted, styles} from '../../../theme/styles';
 import type {IconComponent, ScreenAction} from '../../../navigation/types';
 import type {TicketView} from '../../dashboard';
@@ -606,7 +607,7 @@ function EscalationCard({
         <Pressable
           style={styles.escalationAcceptButton}
           onPress={() => onQuickRecordAction('tickets', ticketActionRecord, 'accept')}>
-          <CheckCircle color="#FFFFFF" size={18} strokeWidth={2.1} />
+          <CheckCircle color={colors.white} size={18} strokeWidth={2.1} />
           <Text style={styles.escalationAcceptText}>Accept</Text>
         </Pressable>
         <Pressable style={styles.escalationOpenButton} onPress={onOpenTicket}>
@@ -741,7 +742,7 @@ function EscalationDetailRow({
   return (
     <View style={[styles.escalationDetailRow, isLast && styles.escalationDetailRowLast]}>
       <View style={styles.escalationDetailIcon}>
-        <Icon color="#64748B" size={16} strokeWidth={2.1} />
+        <Icon color={colors.textMuted} size={16} strokeWidth={2.1} />
       </View>
       <Text style={styles.escalationDetailLabel}>{label}</Text>
       <Text numberOfLines={1} style={styles.escalationDetailValue}>

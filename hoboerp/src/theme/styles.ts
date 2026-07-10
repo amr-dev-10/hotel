@@ -1,24 +1,26 @@
 import { StyleSheet } from 'react-native';
 
-export const blue = '#2563EB';
-export const darkBlue = '#062B64';
-export const navy = '#031B3E';
-export const border = '#E2E8F0';
-export const muted = '#64748B';
-export const textColor = '#0F172A';
+import {colors} from './colors';
+
+export const blue = colors.primary;
+export const darkBlue = colors.primaryPressed;
+export const navy = colors.textPrimary;
+export const border = colors.border;
+export const muted = colors.textMuted;
+export const textColor = colors.textPrimary;
 
 export const styles = StyleSheet.create({
   safeArea: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
     flex: 1,
   },
   splashSafeArea: {
-    backgroundColor: '#0046D8',
+    backgroundColor: colors.splash,
     flex: 1,
   },
   splashScreen: {
     alignItems: 'center',
-    backgroundColor: '#0046D8',
+    backgroundColor: colors.splash,
     flex: 1,
     justifyContent: 'space-between',
     paddingBottom: 64,
@@ -39,15 +41,15 @@ export const styles = StyleSheet.create({
     width: 264,
   },
   splashGlowCircle: {
-    backgroundColor: 'rgba(37,99,235,0.28)',
-    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: colors.primaryGlow,
+    borderColor: colors.whiteAlpha12,
     borderRadius: 124,
     borderWidth: 1,
     height: 248,
     position: 'absolute',
     top: 8,
     left: 8,
-    shadowColor: '#FFFFFF',
+    shadowColor: colors.white,
     shadowOffset: {height: 0, width: 0},
     shadowOpacity: 0.24,
     shadowRadius: 24,
@@ -55,11 +57,11 @@ export const styles = StyleSheet.create({
     zIndex: 0,
   },
   splashRing: {
-    borderBottomColor: 'rgba(255,255,255,0.22)',
-    borderLeftColor: '#FFFFFF',
+    borderBottomColor: colors.whiteAlpha22,
+    borderLeftColor: colors.white,
     borderRadius: 114,
-    borderRightColor: 'rgba(255,255,255,0.22)',
-    borderTopColor: '#FFFFFF',
+    borderRightColor: colors.whiteAlpha22,
+    borderTopColor: colors.white,
     borderWidth: 4,
     height: 228,
     position: 'absolute',
@@ -69,13 +71,13 @@ export const styles = StyleSheet.create({
     zIndex: 2,
   },
   splashRingDot: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderRadius: 8,
     height: 16,
     left: '50%',
     marginLeft: -8,
     position: 'absolute',
-    shadowColor: '#FFFFFF',
+    shadowColor: colors.white,
     shadowOffset: {height: 0, width: 0},
     shadowOpacity: 0.8,
     shadowRadius: 10,
@@ -84,8 +86,8 @@ export const styles = StyleSheet.create({
   },
   splashLogoPlate: {
     alignItems: 'center',
-    backgroundColor: 'transparent',
-    borderColor: 'transparent',
+    backgroundColor: colors.transparent,
+    borderColor: colors.transparent,
     borderRadius: 86,
     borderWidth: 0,
     elevation: 0,
@@ -93,7 +95,7 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     left: 46,
     position: 'absolute',
-    shadowColor: '#FFFFFF',
+    shadowColor: colors.white,
     shadowOffset: {height: 0, width: 0},
     shadowOpacity: 0,
     shadowRadius: 0,
@@ -106,38 +108,38 @@ export const styles = StyleSheet.create({
     width: 156,
   },
   splashTitle: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: 42,
     fontWeight: '900',
     marginTop: 28,
     textAlign: 'center',
   },
   splashSubtitle: {
-    color: 'rgba(255,255,255,0.86)',
+    color: colors.whiteAlpha86,
     fontSize: 13,
     fontWeight: '700',
     marginTop: 12,
     textAlign: 'center',
   },
   splashLoadingText: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: 17,
     fontWeight: '900',
     marginBottom: 8,
     textAlign: 'center',
   },
   appShell: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
     flex: 1,
     flexDirection: 'row',
   },
   phoneSurface: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
     flex: 1,
     overflow: 'hidden',
   },
   screen: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
     flex: 1,
   },
   screenContent: {
@@ -178,7 +180,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   staticTopAppBar: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
     paddingHorizontal: 16,
     paddingTop: 10,
     zIndex: 30,
@@ -201,23 +203,23 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   overviewTitle: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: 16,
     fontWeight: '800',
   },
   overviewDate: {
-    color: 'rgba(255,255,255,0.86)',
+    color: colors.whiteAlpha86,
     fontSize: 12,
     marginTop: 6,
   },
   reportButton: {
-    backgroundColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: colors.whiteAlpha16,
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
   reportButtonText: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: 12,
     fontWeight: '800',
   },
@@ -226,30 +228,30 @@ export const styles = StyleSheet.create({
     marginTop: 22,
   },
   overviewStat: {
-    borderRightColor: 'rgba(255,255,255,0.18)',
+    borderRightColor: colors.whiteAlpha18,
     borderRightWidth: 1,
     flex: 1,
     minHeight: 68,
     paddingHorizontal: 7,
   },
   overviewValue: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: 24,
     fontWeight: '900',
   },
   overviewLabel: {
-    color: 'rgba(255,255,255,0.9)',
+    color: colors.whiteAlpha90,
     fontSize: 10,
     marginTop: 6,
   },
   overviewTrend: {
-    color: '#86EFAC',
+    color: colors.positiveAccent,
     fontSize: 11,
     fontWeight: '800',
     marginTop: 6,
   },
   dangerText: {
-    color: '#DC2626',
+    color: colors.danger,
   },
   sectionTitleRow: {
     alignItems: 'center',
@@ -269,7 +271,7 @@ export const styles = StyleSheet.create({
     fontWeight: '800',
   },
   smallBadge: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: colors.surfaceSecondary,
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -302,31 +304,31 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
   },
   blueTile: {
-    backgroundColor: '#DBEAFE',
+    backgroundColor: colors.primaryLight,
   },
   greenTile: {
-    backgroundColor: '#DCFCE7',
+    backgroundColor: colors.successBackground,
   },
   orangeTile: {
-    backgroundColor: '#FFEDD5',
+    backgroundColor: colors.warningBackground,
   },
   redTile: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: colors.dangerBackground,
   },
   blueText: {
     color: blue,
   },
   greenText: {
-    color: '#16A34A',
+    color: colors.success,
   },
   orangeText: {
-    color: '#F97316',
+    color: colors.priorityHigh,
   },
   redText: {
-    color: '#DC2626',
+    color: colors.danger,
   },
   grayText: {
-    color: '#64748B',
+    color: colors.textMuted,
   },
   cardStack: {
     gap: 10,
@@ -334,7 +336,7 @@ export const styles = StyleSheet.create({
   },
   departmentRow: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderColor: border,
     borderRadius: 14,
     borderWidth: 1,
@@ -343,7 +345,7 @@ export const styles = StyleSheet.create({
     gap: 12,
     minHeight: 58,
     paddingHorizontal: 14,
-    shadowColor: '#0F172A',
+    shadowColor: colors.textPrimary,
     shadowOffset: {height: 4, width: 0},
     shadowOpacity: 0.05,
     shadowRadius: 12,
@@ -367,12 +369,12 @@ export const styles = StyleSheet.create({
     fontWeight: '700',
   },
   trendIcon: {
-    color: '#16A34A',
+    color: colors.success,
     fontSize: 14,
     fontWeight: '900',
   },
   quickGrid: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderColor: border,
     borderRadius: 14,
     borderWidth: 1,
@@ -380,7 +382,7 @@ export const styles = StyleSheet.create({
     marginTop: 18,
     overflow: 'hidden',
     paddingBottom: 8,
-    shadowColor: '#0F172A',
+    shadowColor: colors.textPrimary,
     shadowOffset: {height: 8, width: 0},
     shadowOpacity: 0.08,
     shadowRadius: 18,
@@ -421,7 +423,7 @@ export const styles = StyleSheet.create({
   },
   quickAction: {
     alignItems: 'center',
-    backgroundColor: 'transparent',
+    backgroundColor: colors.transparent,
     borderRadius: 0,
     flexDirection: 'row',
     gap: 10,
@@ -441,12 +443,12 @@ export const styles = StyleSheet.create({
     fontWeight: '800',
   },
   quickDrawerBackdrop: {
-    backgroundColor: 'rgba(15,23,42,0.46)',
+    backgroundColor: colors.overlaySoft,
     flex: 1,
     justifyContent: 'flex-end',
   },
   quickDrawerSheet: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
     maxHeight: '72%',
@@ -456,7 +458,7 @@ export const styles = StyleSheet.create({
   },
   quickDrawerHandle: {
     alignSelf: 'center',
-    backgroundColor: '#CBD5E1',
+    backgroundColor: colors.divider,
     borderRadius: 99,
     height: 4,
     marginBottom: 14,
@@ -469,7 +471,7 @@ export const styles = StyleSheet.create({
     marginBottom: 12,
   },
   quickDrawerSection: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
     borderColor: border,
     borderRadius: 12,
     borderWidth: 1,
@@ -480,7 +482,7 @@ export const styles = StyleSheet.create({
   },
   searchBox: {
     alignItems: 'center',
-    backgroundColor: '#F1F5F9',
+    backgroundColor: colors.surfaceSecondary,
     borderRadius: 14,
     flexDirection: 'row',
     gap: 8,
@@ -500,7 +502,7 @@ export const styles = StyleSheet.create({
   },
   chip: {
     alignItems: 'center',
-    backgroundColor: '#F1F5F9',
+    backgroundColor: colors.surfaceSecondary,
     borderRadius: 8,
     justifyContent: 'center',
     minHeight: 30,
@@ -516,17 +518,17 @@ export const styles = StyleSheet.create({
     fontWeight: '800',
   },
   activeChipText: {
-    color: '#FFFFFF',
+    color: colors.white,
   },
   reservationCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderColor: border,
     borderRadius: 16,
     borderWidth: 1,
     elevation: 2,
     marginBottom: 10,
     padding: 14,
-    shadowColor: '#0F172A',
+    shadowColor: colors.textPrimary,
     shadowOffset: {height: 5, width: 0},
     shadowOpacity: 0.05,
     shadowRadius: 14,
@@ -578,7 +580,7 @@ export const styles = StyleSheet.create({
   },
   callButton: {
     alignItems: 'center',
-    backgroundColor: '#EFF6FF',
+    backgroundColor: colors.primarySubtle,
     borderRadius: 16,
     height: 34,
     justifyContent: 'center',
@@ -609,7 +611,7 @@ export const styles = StyleSheet.create({
     color: blue,
   },
   roomHero: {
-    backgroundColor: '#E2E8F0',
+    backgroundColor: colors.border,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     height: 190,
@@ -617,7 +619,7 @@ export const styles = StyleSheet.create({
   },
   roomHeroPlaceholder: {
     alignItems: 'center',
-    backgroundColor: '#EFF6FF',
+    backgroundColor: colors.primarySubtle,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     gap: 8,
@@ -626,7 +628,7 @@ export const styles = StyleSheet.create({
     width: '100%',
   },
   roomInfoCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderColor: border,
     borderBottomLeftRadius: 16,
     borderBottomRightRadius: 16,
@@ -635,7 +637,7 @@ export const styles = StyleSheet.create({
   },
   roomListCard: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderColor: border,
     borderRadius: 16,
     borderWidth: 1,
@@ -646,7 +648,7 @@ export const styles = StyleSheet.create({
   },
   roomListIcon: {
     alignItems: 'center',
-    backgroundColor: '#EFF6FF',
+    backgroundColor: colors.primarySubtle,
     borderRadius: 12,
     height: 44,
     justifyContent: 'center',
@@ -700,7 +702,7 @@ export const styles = StyleSheet.create({
   },
   escalationMetricTile: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderColor: border,
     borderRadius: 10,
     borderWidth: 1,
@@ -710,7 +712,7 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 12,
     paddingVertical: 12,
-    shadowColor: '#0F172A',
+    shadowColor: colors.textPrimary,
     shadowOffset: {height: 5, width: 0},
     shadowOpacity: 0.05,
     shadowRadius: 14,
@@ -736,13 +738,13 @@ export const styles = StyleSheet.create({
     backgroundColor: blue,
   },
   escalationMetricBarOrange: {
-    backgroundColor: '#F97316',
+    backgroundColor: colors.priorityHigh,
   },
   escalationMetricBarRed: {
-    backgroundColor: '#DC2626',
+    backgroundColor: colors.danger,
   },
   escalationScopeTabs: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderColor: border,
     borderRadius: 8,
     borderWidth: 1,
@@ -769,7 +771,7 @@ export const styles = StyleSheet.create({
     fontWeight: '800',
   },
   escalationScopeTabTextActive: {
-    color: '#FFFFFF',
+    color: colors.white,
   },
   escalationFilterRow: {
     gap: 9,
@@ -778,7 +780,7 @@ export const styles = StyleSheet.create({
   },
   escalationFilterPill: {
     alignItems: 'center',
-    backgroundColor: '#F1F5F9',
+    backgroundColor: colors.surfaceSecondary,
     borderRadius: 8,
     justifyContent: 'center',
     minHeight: 30,
@@ -794,11 +796,11 @@ export const styles = StyleSheet.create({
     fontWeight: '800',
   },
   escalationFilterPillTextActive: {
-    color: '#FFFFFF',
+    color: colors.white,
   },
   staffCard: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderColor: border,
     borderRadius: 16,
     borderWidth: 1,
@@ -811,7 +813,7 @@ export const styles = StyleSheet.create({
   },
   roomAction: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderColor: border,
     borderRadius: 14,
     borderWidth: 1,
@@ -828,20 +830,20 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
   },
   ticketCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderColor: border,
     borderRadius: 16,
     borderWidth: 1,
     elevation: 2,
     marginBottom: 12,
     padding: 16,
-    shadowColor: '#0F172A',
+    shadowColor: colors.textPrimary,
     shadowOffset: {height: 5, width: 0},
     shadowOpacity: 0.05,
     shadowRadius: 14,
   },
   escalationCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderColor: border,
     borderRadius: 12,
     borderWidth: 1,
@@ -850,13 +852,13 @@ export const styles = StyleSheet.create({
     overflow: 'hidden',
     padding: 14,
     paddingLeft: 16,
-    shadowColor: '#0F172A',
+    shadowColor: colors.textPrimary,
     shadowOffset: {height: 6, width: 0},
     shadowOpacity: 0.07,
     shadowRadius: 16,
   },
   escalationCardAccent: {
-    backgroundColor: '#F97316',
+    backgroundColor: colors.priorityHigh,
     bottom: 0,
     left: 0,
     position: 'absolute',
@@ -870,7 +872,7 @@ export const styles = StyleSheet.create({
   },
   escalationTicketIcon: {
     alignItems: 'center',
-    backgroundColor: '#DBEAFE',
+    backgroundColor: colors.primaryLight,
     borderRadius: 16,
     height: 32,
     justifyContent: 'center',
@@ -931,13 +933,13 @@ export const styles = StyleSheet.create({
     minHeight: 40,
   },
   escalationAcceptText: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: 12,
     fontWeight: '900',
   },
   escalationOpenButton: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderColor: border,
     borderRadius: 8,
     borderWidth: 1,
@@ -968,7 +970,7 @@ export const styles = StyleSheet.create({
   },
   escalationDetailIcon: {
     alignItems: 'center',
-    backgroundColor: '#F1F5F9',
+    backgroundColor: colors.surfaceSecondary,
     borderRadius: 14,
     height: 28,
     justifyContent: 'center',
@@ -988,7 +990,7 @@ export const styles = StyleSheet.create({
     textAlign: 'right',
   },
   kitchenOrderCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderColor: border,
     borderRadius: 16,
     borderWidth: 1,
@@ -1006,7 +1008,7 @@ export const styles = StyleSheet.create({
     marginTop: 10,
   },
   kitchenMetaTile: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
     borderColor: border,
     borderRadius: 12,
     borderWidth: 1,
@@ -1048,26 +1050,26 @@ export const styles = StyleSheet.create({
     backgroundColor: blue,
   },
   kitchenQuickButtonGreen: {
-    backgroundColor: '#16A34A',
+    backgroundColor: colors.success,
   },
   kitchenQuickButtonOrange: {
-    backgroundColor: '#F97316',
+    backgroundColor: colors.priorityHigh,
   },
   kitchenQuickButtonRed: {
-    backgroundColor: '#DC2626',
+    backgroundColor: colors.danger,
   },
   kitchenQuickButtonGray: {
-    backgroundColor: '#475569',
+    backgroundColor: colors.textSecondary,
   },
   kitchenQuickButtonText: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: 12,
     fontWeight: '900',
     textAlign: 'center',
   },
   kitchenSecondaryButton: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderColor: border,
     borderRadius: 12,
     borderWidth: 1,
@@ -1078,8 +1080,8 @@ export const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   kitchenDetailButton: {
-    backgroundColor: '#EFF6FF',
-    borderColor: '#BFDBFE',
+    backgroundColor: colors.primarySubtle,
+    borderColor: colors.primaryBorder,
   },
   kitchenSecondaryButtonText: {
     color: textColor,
@@ -1091,7 +1093,7 @@ export const styles = StyleSheet.create({
     color: blue,
   },
   kitchenDetailHeader: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderColor: border,
     borderRadius: 16,
     borderWidth: 1,
@@ -1113,7 +1115,7 @@ export const styles = StyleSheet.create({
     marginTop: 12,
   },
   kitchenDetailCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderColor: border,
     borderRadius: 16,
     borderWidth: 1,
@@ -1136,7 +1138,7 @@ export const styles = StyleSheet.create({
   },
   kitchenAddItemButton: {
     alignItems: 'center',
-    backgroundColor: '#16A34A',
+    backgroundColor: colors.success,
     borderRadius: 10,
     flexDirection: 'row',
     gap: 6,
@@ -1144,7 +1146,7 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   kitchenAddItemText: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: 12,
     fontWeight: '900',
   },
@@ -1196,23 +1198,23 @@ export const styles = StyleSheet.create({
     fontWeight: '900',
   },
   greenBadge: {
-    backgroundColor: '#DCFCE7',
+    backgroundColor: colors.successBackground,
   },
   blueBadge: {
-    backgroundColor: '#DBEAFE',
+    backgroundColor: colors.primaryLight,
   },
   orangeBadge: {
-    backgroundColor: '#FFEDD5',
+    backgroundColor: colors.warningBackground,
   },
   redBadge: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: colors.dangerBackground,
   },
   grayBadge: {
-    backgroundColor: '#E2E8F0',
+    backgroundColor: colors.border,
   },
   taskCard: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderColor: border,
     borderRadius: 16,
     borderWidth: 1,
@@ -1228,7 +1230,7 @@ export const styles = StyleSheet.create({
   },
   housekeepingCreateButton: {
     alignItems: 'center',
-    backgroundColor: '#16A34A',
+    backgroundColor: colors.success,
     borderRadius: 12,
     flexDirection: 'row',
     gap: 8,
@@ -1237,18 +1239,18 @@ export const styles = StyleSheet.create({
     minHeight: 48,
   },
   housekeepingCreateText: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: 14,
     fontWeight: '900',
   },
   housekeepingTaskCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderColor: border,
     borderRadius: 16,
     borderWidth: 1,
     elevation: 2,
     padding: 14,
-    shadowColor: '#0F172A',
+    shadowColor: colors.textPrimary,
     shadowOffset: {height: 5, width: 0},
     shadowOpacity: 0.05,
     shadowRadius: 14,
@@ -1265,7 +1267,7 @@ export const styles = StyleSheet.create({
   },
   housekeepingMetaPill: {
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
     borderColor: border,
     borderRadius: 12,
     borderWidth: 1,
@@ -1299,23 +1301,23 @@ export const styles = StyleSheet.create({
     backgroundColor: blue,
   },
   housekeepingStatusButtonGreen: {
-    backgroundColor: '#16A34A',
+    backgroundColor: colors.success,
   },
   housekeepingStatusButtonOrange: {
-    backgroundColor: '#F97316',
+    backgroundColor: colors.priorityHigh,
   },
   housekeepingStatusButtonRed: {
-    backgroundColor: '#DC2626',
+    backgroundColor: colors.danger,
   },
   housekeepingStatusButtonText: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: 12,
     fontWeight: '900',
     textAlign: 'center',
   },
   housekeepingDetailHero: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderColor: border,
     borderRadius: 16,
     borderWidth: 1,
@@ -1367,7 +1369,7 @@ export const styles = StyleSheet.create({
     minHeight: 54,
   },
   fullPrimaryButtonText: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: 14,
     fontWeight: '900',
   },
@@ -1386,7 +1388,7 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   activeCategoryItem: {
-    backgroundColor: '#DBEAFE',
+    backgroundColor: colors.primaryLight,
   },
   categoryText: {
     color: textColor,
@@ -1402,7 +1404,7 @@ export const styles = StyleSheet.create({
   },
   foodCard: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderColor: border,
     borderRadius: 14,
     borderWidth: 1,
@@ -1417,7 +1419,7 @@ export const styles = StyleSheet.create({
   },
   foodImagePlaceholder: {
     alignItems: 'center',
-    backgroundColor: '#EFF6FF',
+    backgroundColor: colors.primarySubtle,
     borderRadius: 10,
     height: 56,
     justifyContent: 'center',
@@ -1434,7 +1436,7 @@ export const styles = StyleSheet.create({
   },
   addMiniButton: {
     alignItems: 'center',
-    backgroundColor: '#EFF6FF',
+    backgroundColor: colors.primarySubtle,
     borderRadius: 15,
     height: 30,
     justifyContent: 'center',
@@ -1454,7 +1456,7 @@ export const styles = StyleSheet.create({
     right: 16,
   },
   cartText: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: 13,
     fontWeight: '900',
   },
@@ -1475,13 +1477,13 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   menuPrimaryActionText: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: 13,
     fontWeight: '900',
   },
   menuSecondaryAction: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderColor: border,
     borderRadius: 10,
     borderWidth: 1,
@@ -1503,7 +1505,7 @@ export const styles = StyleSheet.create({
     marginTop: 10,
   },
   menuItemCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderColor: border,
     borderRadius: 14,
     borderWidth: 1,
@@ -1513,14 +1515,14 @@ export const styles = StyleSheet.create({
     width: '48%',
   },
   menuItemImage: {
-    backgroundColor: '#E2E8F0',
+    backgroundColor: colors.border,
     borderRadius: 10,
     height: 92,
     width: '100%',
   },
   menuItemImagePlaceholder: {
     alignItems: 'center',
-    backgroundColor: '#EFF6FF',
+    backgroundColor: colors.primarySubtle,
     borderRadius: 10,
     height: 92,
     justifyContent: 'center',
@@ -1561,7 +1563,7 @@ export const styles = StyleSheet.create({
   },
   categoryManageCard: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderColor: border,
     borderRadius: 14,
     borderWidth: 1,
@@ -1575,7 +1577,7 @@ export const styles = StyleSheet.create({
     minWidth: 0,
   },
   menuFormSheet: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
     maxHeight: '88%',
@@ -1590,7 +1592,7 @@ export const styles = StyleSheet.create({
   },
   menuFormSecondaryButton: {
     alignItems: 'center',
-    backgroundColor: '#EFF6FF',
+    backgroundColor: colors.primarySubtle,
     borderRadius: 12,
     flex: 1,
     justifyContent: 'center',
@@ -1612,13 +1614,13 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   menuFormPrimaryText: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: 13,
     fontWeight: '900',
   },
   menuToggle: {
     alignItems: 'center',
-    backgroundColor: '#F1F5F9',
+    backgroundColor: colors.surfaceSecondary,
     borderColor: border,
     borderRadius: 12,
     borderWidth: 1,
@@ -1628,11 +1630,11 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   menuToggleActive: {
-    backgroundColor: '#EFF6FF',
-    borderColor: '#BFDBFE',
+    backgroundColor: colors.primarySubtle,
+    borderColor: colors.primaryBorder,
   },
   menuToggleDot: {
-    backgroundColor: '#94A3B8',
+    backgroundColor: colors.disabledText,
     borderRadius: 6,
     height: 12,
     width: 12,
@@ -1650,7 +1652,7 @@ export const styles = StyleSheet.create({
   },
   chatRow: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderColor: border,
     borderRadius: 14,
     borderWidth: 1,
@@ -1660,7 +1662,7 @@ export const styles = StyleSheet.create({
   },
   whatsappConversationCard: {
     alignItems: 'flex-start',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderColor: border,
     borderRadius: 14,
     borderWidth: 1,
@@ -1671,7 +1673,7 @@ export const styles = StyleSheet.create({
   },
   whatsappIcon: {
     alignItems: 'center',
-    backgroundColor: '#16A34A',
+    backgroundColor: colors.success,
     borderRadius: 18,
     height: 36,
     justifyContent: 'center',
@@ -1706,15 +1708,15 @@ export const styles = StyleSheet.create({
     marginTop: 2,
   },
   hierarchyNodeCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderColor: border,
     borderRadius: 14,
     borderWidth: 1,
     padding: 14,
   },
   hierarchyManagerCard: {
-    backgroundColor: '#EFF6FF',
-    borderColor: '#BFDBFE',
+    backgroundColor: colors.primarySubtle,
+    borderColor: colors.primaryBorder,
   },
   hierarchyNodeHeader: {
     alignItems: 'center',
@@ -1737,7 +1739,7 @@ export const styles = StyleSheet.create({
   },
   hierarchyChildRow: {
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
     borderRadius: 12,
     flexDirection: 'row',
     gap: 10,
@@ -1754,14 +1756,14 @@ export const styles = StyleSheet.create({
   },
   unreadDot: {
     alignItems: 'center',
-    backgroundColor: '#DC2626',
+    backgroundColor: colors.danger,
     borderRadius: 10,
     height: 20,
     justifyContent: 'center',
     width: 20,
   },
   unreadText: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: 10,
     fontWeight: '900',
   },
@@ -1775,19 +1777,19 @@ export const styles = StyleSheet.create({
     padding: 14,
   },
   userBubbleText: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: 14,
     lineHeight: 20,
   },
   bubbleTime: {
-    color: 'rgba(255,255,255,0.7)',
+    color: colors.whiteAlpha70,
     fontSize: 10,
     marginTop: 8,
     textAlign: 'right',
   },
   aiBubble: {
     alignSelf: 'flex-start',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderColor: border,
     borderRadius: 16,
     borderBottomLeftRadius: 4,
@@ -1809,7 +1811,7 @@ export const styles = StyleSheet.create({
   },
   aiReportButton: {
     alignItems: 'center',
-    backgroundColor: '#DBEAFE',
+    backgroundColor: colors.primaryLight,
     borderRadius: 12,
     marginTop: 14,
     paddingVertical: 10,
@@ -1821,7 +1823,7 @@ export const styles = StyleSheet.create({
   },
   composer: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderColor: border,
     borderRadius: 18,
     borderWidth: 1,
@@ -1829,8 +1831,9 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     left: 16,
-    minHeight: 54,
-    paddingHorizontal: 14,
+    minHeight: 58,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     position: 'absolute',
     right: 16,
   },
@@ -1838,20 +1841,22 @@ export const styles = StyleSheet.create({
     color: textColor,
     flex: 1,
     fontSize: 13,
-    minHeight: 48,
+    minHeight: 44,
     padding: 0,
+    paddingVertical: 8,
+    textAlignVertical: 'center',
   },
   sendButton: {
     alignItems: 'center',
-    backgroundColor: '#DBEAFE',
-    borderRadius: 16,
-    height: 32,
+    backgroundColor: colors.primaryLight,
+    borderRadius: 20,
+    height: 40,
     justifyContent: 'center',
-    width: 32,
+    width: 40,
   },
   profileHeader: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderColor: border,
     borderRadius: 18,
     borderWidth: 1,
@@ -1893,7 +1898,7 @@ export const styles = StyleSheet.create({
     fontWeight: '700',
   },
   logoutText: {
-    color: '#DC2626',
+    color: colors.danger,
     flex: 1,
     fontSize: 14,
     fontWeight: '800',
@@ -1919,12 +1924,12 @@ export const styles = StyleSheet.create({
     width: 48,
   },
   drawerBrandTitle: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: 20,
     fontWeight: '900',
   },
   drawerBrandSub: {
-    color: 'rgba(255,255,255,0.75)',
+    color: colors.whiteAlpha75,
     fontSize: 13,
     marginTop: 3,
   },
@@ -1935,12 +1940,12 @@ export const styles = StyleSheet.create({
     marginBottom: 24,
   },
   drawerUserName: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: 14,
     fontWeight: '900',
   },
   drawerUserRole: {
-    color: 'rgba(255,255,255,0.74)',
+    color: colors.whiteAlpha74,
     fontSize: 12,
     marginTop: 5,
   },
@@ -1960,14 +1965,14 @@ export const styles = StyleSheet.create({
     backgroundColor: blue,
   },
   drawerNavText: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: 14,
     fontWeight: '700',
   },
   drawerHotel: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.09)',
-    borderColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: colors.whiteAlpha09,
+    borderColor: colors.whiteAlpha18,
     borderRadius: 14,
     borderWidth: 1,
     flexDirection: 'row',
@@ -1977,7 +1982,7 @@ export const styles = StyleSheet.create({
   },
   drawerHotelIcon: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: colors.whiteAlpha16,
     borderRadius: 10,
     height: 44,
     justifyContent: 'center',
@@ -1987,17 +1992,17 @@ export const styles = StyleSheet.create({
     flex: 1,
   },
   drawerHotelLabel: {
-    color: 'rgba(255,255,255,0.72)',
+    color: colors.whiteAlpha72,
     fontSize: 11,
   },
   drawerHotelName: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: 13,
     fontWeight: '800',
     marginTop: 5,
   },
   drawerBackdrop: {
-    backgroundColor: 'rgba(15,23,42,0.42)',
+    backgroundColor: colors.overlayMuted,
     flex: 1,
     flexDirection: 'row',
   },
@@ -2007,34 +2012,34 @@ export const styles = StyleSheet.create({
   },
   popupBackdrop: {
     alignItems: 'center',
-    backgroundColor: 'rgba(15,23,42,0.46)',
+    backgroundColor: colors.overlaySoft,
     flex: 1,
     justifyContent: 'center',
     padding: 18,
   },
   appDialogBackdrop: {
     alignItems: 'center',
-    backgroundColor: 'rgba(15,23,42,0.46)',
+    backgroundColor: colors.overlaySoft,
     flex: 1,
     justifyContent: 'center',
     padding: 18,
   },
   appDialogCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderColor: border,
     borderRadius: 18,
     borderWidth: 1,
     maxWidth: 430,
     overflow: 'hidden',
     padding: 18,
-    shadowColor: '#0F172A',
+    shadowColor: colors.textPrimary,
     shadowOffset: {height: 12, width: 0},
     shadowOpacity: 0.2,
     shadowRadius: 26,
     width: '100%',
   },
   appDialogAccent: {
-    backgroundColor: '#DC2626',
+    backgroundColor: colors.danger,
     height: 4,
     left: 0,
     position: 'absolute',
@@ -2042,7 +2047,7 @@ export const styles = StyleSheet.create({
     top: 0,
   },
   appDialogAccentSuccess: {
-    backgroundColor: '#16A34A',
+    backgroundColor: colors.success,
   },
   appDialogAccentInfo: {
     backgroundColor: blue,
@@ -2055,7 +2060,7 @@ export const styles = StyleSheet.create({
     marginTop: 6,
   },
   appDialogMessage: {
-    color: '#334155',
+    color: colors.iconPrimary,
     fontSize: 14,
     lineHeight: 21,
     marginTop: 10,
@@ -2071,7 +2076,7 @@ export const styles = StyleSheet.create({
     fontWeight: '900',
   },
   appDialogDetailsBox: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
     borderColor: border,
     borderRadius: 12,
     borderWidth: 1,
@@ -2080,7 +2085,7 @@ export const styles = StyleSheet.create({
     padding: 12,
   },
   appDialogDetailsText: {
-    color: '#475569',
+    color: colors.textSecondary,
     fontSize: 12,
     lineHeight: 18,
   },
@@ -2099,10 +2104,10 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   appDialogSecondaryButton: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: colors.primarySubtle,
   },
   appDialogActionText: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: 13,
     fontWeight: '900',
     textAlign: 'center',
@@ -2111,14 +2116,14 @@ export const styles = StyleSheet.create({
     color: blue,
   },
   popupCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderColor: border,
     borderRadius: 18,
     borderWidth: 1,
     maxHeight: '82%',
     maxWidth: 430,
     padding: 16,
-    shadowColor: '#0F172A',
+    shadowColor: colors.textPrimary,
     shadowOffset: {height: 12, width: 0},
     shadowOpacity: 0.2,
     shadowRadius: 26,
@@ -2137,7 +2142,7 @@ export const styles = StyleSheet.create({
   },
   popupCloseButton: {
     alignItems: 'center',
-    backgroundColor: '#F1F5F9',
+    backgroundColor: colors.surfaceSecondary,
     borderRadius: 16,
     height: 32,
     justifyContent: 'center',
@@ -2157,8 +2162,8 @@ export const styles = StyleSheet.create({
     marginBottom: 8,
   },
   reservationGuestNameBox: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#BFDBFE',
+    backgroundColor: colors.white,
+    borderColor: colors.primaryBorder,
     borderRadius: 12,
     borderWidth: 1,
     marginBottom: 10,
@@ -2177,15 +2182,15 @@ export const styles = StyleSheet.create({
     marginTop: 4,
   },
   reservationNotesBox: {
-    backgroundColor: '#FFFBEB',
-    borderColor: '#FDE68A',
+    backgroundColor: colors.warningPanel,
+    borderColor: colors.warningBorder,
     borderRadius: 12,
     borderWidth: 1,
     marginBottom: 12,
     padding: 12,
   },
   reservationNotesText: {
-    color: '#78350F',
+    color: colors.warningTextStrong,
     fontSize: 13,
     fontWeight: '700',
     lineHeight: 19,
@@ -2216,22 +2221,22 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   secondaryActionButton: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: colors.primarySubtle,
   },
   successActionButton: {
-    backgroundColor: '#16A34A',
+    backgroundColor: colors.success,
   },
   warningActionButton: {
-    backgroundColor: '#F97316',
+    backgroundColor: colors.priorityHigh,
   },
   dangerActionButton: {
-    backgroundColor: '#DC2626',
+    backgroundColor: colors.danger,
   },
   disabledActionButton: {
     opacity: 0.58,
   },
   popupActionText: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: 13,
     fontWeight: '900',
     textAlign: 'center',
@@ -2240,7 +2245,7 @@ export const styles = StyleSheet.create({
     color: blue,
   },
   warningActionText: {
-    color: '#FFFFFF',
+    color: colors.white,
   },
   formField: {
     flex: 1,
@@ -2254,7 +2259,7 @@ export const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   formInput: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
     borderColor: border,
     borderRadius: 12,
     borderWidth: 1,
@@ -2270,7 +2275,7 @@ export const styles = StyleSheet.create({
   },
   passwordInputRow: {
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
     borderColor: border,
     borderRadius: 12,
     borderWidth: 1,
@@ -2291,7 +2296,7 @@ export const styles = StyleSheet.create({
     width: 44,
   },
   lookupList: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderColor: border,
     borderRadius: 12,
     borderWidth: 1,
@@ -2300,7 +2305,7 @@ export const styles = StyleSheet.create({
   },
   lookupInputButton: {
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
     borderColor: border,
     borderRadius: 12,
     borderWidth: 1,
@@ -2319,13 +2324,13 @@ export const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   lookupPlaceholderText: {
-    color: '#94A3B8',
+    color: colors.disabledText,
     fontWeight: '500',
   },
   lookupSmartAction: {
     alignItems: 'center',
-    backgroundColor: '#EFF6FF',
-    borderColor: '#BFDBFE',
+    backgroundColor: colors.primarySubtle,
+    borderColor: colors.primaryBorder,
     borderRadius: 12,
     borderWidth: 1,
     justifyContent: 'center',
@@ -2345,7 +2350,7 @@ export const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   activeRelationOption: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: colors.primarySubtle,
   },
   lookupTitle: {
     color: textColor,
@@ -2359,8 +2364,8 @@ export const styles = StyleSheet.create({
   },
   selectedLookupRow: {
     alignItems: 'center',
-    backgroundColor: '#EFF6FF',
-    borderColor: '#BFDBFE',
+    backgroundColor: colors.primarySubtle,
+    borderColor: colors.primaryBorder,
     borderRadius: 12,
     borderWidth: 1,
     flexDirection: 'row',
@@ -2370,12 +2375,12 @@ export const styles = StyleSheet.create({
     paddingVertical: 9,
   },
   relationPickerBackdrop: {
-    backgroundColor: 'rgba(15,23,42,0.46)',
+    backgroundColor: colors.overlaySoft,
     flex: 1,
     justifyContent: 'flex-end',
   },
   relationPickerSheet: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
     maxHeight: '86%',
@@ -2408,7 +2413,7 @@ export const styles = StyleSheet.create({
     gap: 8,
   },
   optionPill: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: colors.surfaceSecondary,
     borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -2422,33 +2427,33 @@ export const styles = StyleSheet.create({
     fontWeight: '800',
   },
   activeOptionPillText: {
-    color: '#FFFFFF',
+    color: colors.white,
   },
   dualFieldRow: {
     flexDirection: 'row',
     gap: 10,
   },
   formErrorBox: {
-    backgroundColor: '#FEF2F2',
-    borderColor: '#FCA5A5',
+    backgroundColor: colors.dangerSubtle,
+    borderColor: colors.dangerBorder,
     borderRadius: 12,
     borderWidth: 1,
     marginBottom: 12,
     padding: 12,
   },
   formErrorTitle: {
-    color: '#991B1B',
+    color: colors.dangerText,
     fontSize: 12,
     fontWeight: '900',
   },
   formErrorText: {
-    color: '#7F1D1D',
+    color: colors.dangerTextStrong,
     fontSize: 11,
     lineHeight: 16,
     marginTop: 4,
   },
   contextBanner: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
     borderColor: border,
     borderRadius: 12,
     borderWidth: 1,
@@ -2480,7 +2485,7 @@ export const styles = StyleSheet.create({
     transform: [{rotate: '90deg'}],
   },
   collapsibleSectionBody: {
-    borderTopColor: '#F1F5F9',
+    borderTopColor: colors.surfaceSecondary,
     borderTopWidth: 1,
     marginTop: 10,
   },
@@ -2491,7 +2496,7 @@ export const styles = StyleSheet.create({
     marginTop: 12,
   },
   stagePill: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: colors.surfaceSecondary,
     borderRadius: 14,
     paddingHorizontal: 10,
     paddingVertical: 7,
@@ -2505,7 +2510,7 @@ export const styles = StyleSheet.create({
     fontWeight: '800',
   },
   activeStageText: {
-    color: '#FFFFFF',
+    color: colors.white,
   },
   inlineLinkButton: {
     alignItems: 'center',
@@ -2535,7 +2540,7 @@ export const styles = StyleSheet.create({
   },
   chatMessageGuest: {
     alignSelf: 'flex-start',
-    backgroundColor: '#F1F5F9',
+    backgroundColor: colors.surfaceSecondary,
     borderRadius: 14,
     color: textColor,
     maxWidth: '82%',
@@ -2545,13 +2550,13 @@ export const styles = StyleSheet.create({
     alignSelf: 'flex-end',
     backgroundColor: blue,
     borderRadius: 14,
-    color: '#FFFFFF',
+    color: colors.white,
     maxWidth: '82%',
     padding: 12,
   },
   chatBubbleGuest: {
     alignSelf: 'flex-start',
-    backgroundColor: '#F1F5F9',
+    backgroundColor: colors.surfaceSecondary,
     borderRadius: 14,
     gap: 4,
     maxWidth: '82%',
@@ -2571,38 +2576,42 @@ export const styles = StyleSheet.create({
     lineHeight: 18,
   },
   chatBubbleAgentText: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: 13,
     lineHeight: 18,
   },
   chatBubbleAgentMeta: {
-    color: 'rgba(255,255,255,0.78)',
+    color: colors.whiteAlpha78,
   },
   popupComposer: {
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
     borderColor: border,
     borderRadius: 14,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 8,
     marginTop: 14,
-    paddingHorizontal: 12,
+    minHeight: 56,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   popupComposerInput: {
     color: textColor,
     flex: 1,
     fontSize: 13,
-    minHeight: 46,
+    minHeight: 42,
     padding: 0,
+    paddingVertical: 8,
+    textAlignVertical: 'center',
   },
   popupSendButton: {
     alignItems: 'center',
-    backgroundColor: '#DBEAFE',
-    borderRadius: 16,
-    height: 32,
+    backgroundColor: colors.primaryLight,
+    borderRadius: 20,
+    height: 40,
     justifyContent: 'center',
-    width: 32,
+    width: 40,
   },
   activityTimelineList: {
     gap: 10,
@@ -2627,10 +2636,10 @@ export const styles = StyleSheet.create({
     backgroundColor: blue,
   },
   activityTimelineDotNote: {
-    backgroundColor: '#16A34A',
+    backgroundColor: colors.success,
   },
   activityTimelineText: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderColor: border,
     borderRadius: 12,
     borderWidth: 1,
@@ -2646,7 +2655,7 @@ export const styles = StyleSheet.create({
   },
   bottomNav: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderColor: border,
     borderRadius: 0,
     borderTopWidth: 1,
@@ -2658,7 +2667,7 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 8,
     position: 'absolute',
     right: 0,
-    shadowColor: '#0F172A',
+    shadowColor: colors.textPrimary,
     shadowOffset: {height: -8, width: 0},
     shadowOpacity: 0.08,
     shadowRadius: 18,
@@ -2695,7 +2704,7 @@ export const styles = StyleSheet.create({
   },
   emptyState: {
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
     borderColor: border,
     borderRadius: 14,
     borderWidth: 1,
@@ -2716,8 +2725,8 @@ export const styles = StyleSheet.create({
   },
   errorNotice: {
     alignItems: 'flex-start',
-    backgroundColor: '#FEF2F2',
-    borderColor: '#FCA5A5',
+    backgroundColor: colors.dangerSubtle,
+    borderColor: colors.dangerBorder,
     borderRadius: 14,
     borderWidth: 1,
     flexDirection: 'row',
@@ -2730,39 +2739,39 @@ export const styles = StyleSheet.create({
     flex: 1,
   },
   errorNoticeTitle: {
-    color: '#991B1B',
+    color: colors.dangerText,
     fontSize: 12,
     fontWeight: '900',
   },
   errorNoticeMessage: {
-    color: '#7F1D1D',
+    color: colors.dangerTextStrong,
     fontSize: 11,
     lineHeight: 16,
     marginTop: 4,
   },
   errorRetryButton: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#FCA5A5',
+    backgroundColor: colors.white,
+    borderColor: colors.dangerBorder,
     borderRadius: 10,
     borderWidth: 1,
     paddingHorizontal: 10,
     paddingVertical: 7,
   },
   errorRetryText: {
-    color: '#991B1B',
+    color: colors.dangerText,
     fontSize: 11,
     fontWeight: '900',
   },
   loadingProcessCard: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#BFDBFE',
+    backgroundColor: colors.white,
+    borderColor: colors.primaryBorder,
     borderRadius: 14,
     borderWidth: 1,
     elevation: 2,
     marginBottom: 12,
     marginTop: 8,
     padding: 12,
-    shadowColor: '#2563EB',
+    shadowColor: colors.primary,
     shadowOffset: {height: 6, width: 0},
     shadowOpacity: 0.08,
     shadowRadius: 14,
@@ -2802,8 +2811,8 @@ export const styles = StyleSheet.create({
     marginTop: 10,
   },
   loadingProcessPill: {
-    backgroundColor: '#EFF6FF',
-    borderColor: '#DBEAFE',
+    backgroundColor: colors.primarySubtle,
+    borderColor: colors.primaryLight,
     borderRadius: 12,
     borderWidth: 1,
     paddingHorizontal: 10,
@@ -2816,7 +2825,7 @@ export const styles = StyleSheet.create({
   },
   avatar: {
     alignItems: 'center',
-    backgroundColor: '#E0F2FE',
+    backgroundColor: colors.infoSubtle,
     justifyContent: 'center',
   },
   avatarText: {
@@ -2825,8 +2834,8 @@ export const styles = StyleSheet.create({
     fontWeight: '900',
   },
   onlineDot: {
-    backgroundColor: '#16A34A',
-    borderColor: '#FFFFFF',
+    backgroundColor: colors.success,
+    borderColor: colors.white,
     borderRadius: 6,
     borderWidth: 2,
     bottom: 1,
@@ -2846,7 +2855,7 @@ export const styles = StyleSheet.create({
   },
   actionMenuButton: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderColor: border,
     borderRadius: 10,
     borderWidth: 1,
@@ -2864,7 +2873,7 @@ export const styles = StyleSheet.create({
     zIndex: 999,
   },
   actionMenuBackdrop: {
-    backgroundColor: 'rgba(15, 23, 42, 0.06)',
+    backgroundColor: colors.overlayFaint,
     bottom: 0,
     left: 0,
     position: 'absolute',
@@ -2872,7 +2881,7 @@ export const styles = StyleSheet.create({
     top: 0,
   },
   actionMenuPanel: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderColor: border,
     borderRadius: 12,
     borderWidth: 1,
@@ -2881,7 +2890,7 @@ export const styles = StyleSheet.create({
     opacity: 1,
     paddingVertical: 6,
     position: 'absolute',
-    shadowColor: '#0F172A',
+    shadowColor: colors.textPrimary,
     shadowOffset: {height: 14, width: 0},
     shadowOpacity: 0.22,
     shadowRadius: 24,
@@ -2898,11 +2907,11 @@ export const styles = StyleSheet.create({
     fontWeight: '800',
   },
   actionMenuDangerText: {
-    color: '#DC2626',
+    color: colors.danger,
   },
   notificationCard: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderColor: border,
     borderRadius: 12,
     borderWidth: 1,
@@ -2912,7 +2921,7 @@ export const styles = StyleSheet.create({
     marginBottom: 10,
     minHeight: 64,
     padding: 12,
-    shadowColor: '#0F172A',
+    shadowColor: colors.textPrimary,
     shadowOffset: {height: 4, width: 0},
     shadowOpacity: 0.05,
     shadowRadius: 12,
@@ -2929,7 +2938,7 @@ export const styles = StyleSheet.create({
   },
   permissionEmptyState: {
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
     borderColor: border,
     borderRadius: 14,
     borderWidth: 1,
@@ -2951,20 +2960,20 @@ export const styles = StyleSheet.create({
   },
   dispatchBackdrop: {
     alignItems: 'center',
-    backgroundColor: 'rgba(15, 23, 42, 0.56)',
+    backgroundColor: colors.overlay,
     flex: 1,
     justifyContent: 'center',
     padding: 18,
   },
   dispatchCard: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#BFDBFE',
+    backgroundColor: colors.white,
+    borderColor: colors.primaryBorder,
     borderRadius: 18,
     borderWidth: 1,
     elevation: 18,
     maxWidth: 430,
     padding: 18,
-    shadowColor: '#0F172A',
+    shadowColor: colors.textPrimary,
     shadowOffset: {height: 16, width: 0},
     shadowOpacity: 0.22,
     shadowRadius: 26,
@@ -2977,7 +2986,7 @@ export const styles = StyleSheet.create({
   },
   dispatchPulse: {
     alignItems: 'center',
-    backgroundColor: '#DBEAFE',
+    backgroundColor: colors.primaryLight,
     borderRadius: 22,
     height: 44,
     justifyContent: 'center',
@@ -2990,14 +2999,14 @@ export const styles = StyleSheet.create({
   },
   escalationAlertPulse: {
     alignItems: 'center',
-    backgroundColor: '#FEE2E2',
+    backgroundColor: colors.dangerBackground,
     borderRadius: 22,
     height: 44,
     justifyContent: 'center',
     width: 44,
   },
   escalationAlertPulseText: {
-    color: '#DC2626',
+    color: colors.danger,
     fontSize: 24,
     fontWeight: '900',
   },
@@ -3043,7 +3052,7 @@ export const styles = StyleSheet.create({
     marginTop: 14,
   },
   dispatchInfoBox: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
     borderColor: border,
     borderRadius: 12,
     borderWidth: 1,
@@ -3064,15 +3073,15 @@ export const styles = StyleSheet.create({
     marginTop: 4,
   },
   dispatchTimer: {
-    backgroundColor: '#FFF7ED',
-    borderColor: '#FDBA74',
+    backgroundColor: colors.warningSubtle,
+    borderColor: colors.warningBorderSoft,
     borderRadius: 12,
     borderWidth: 1,
     marginTop: 14,
     padding: 11,
   },
   dispatchTimerText: {
-    color: '#C2410C',
+    color: colors.priorityHigh,
     fontSize: 13,
     fontWeight: '900',
     textAlign: 'center',
@@ -3081,7 +3090,7 @@ export const styles = StyleSheet.create({
     marginTop: 12,
   },
   dispatchReasonInput: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
     borderColor: border,
     borderRadius: 12,
     borderWidth: 1,
@@ -3098,7 +3107,7 @@ export const styles = StyleSheet.create({
     marginTop: 10,
   },
   dispatchReasonChip: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: colors.primarySubtle,
     borderRadius: 14,
     paddingHorizontal: 10,
     paddingVertical: 7,
@@ -3124,12 +3133,12 @@ export const styles = StyleSheet.create({
     backgroundColor: blue,
   },
   dispatchRejectButton: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
     borderColor: border,
     borderWidth: 1,
   },
   dispatchAcceptText: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: 14,
     fontWeight: '900',
   },

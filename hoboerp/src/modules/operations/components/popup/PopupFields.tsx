@@ -2,6 +2,7 @@ import {useMemo, useState} from 'react';
 import {Pressable, Text, TextInput, View} from 'react-native';
 
 import {Eye} from '../../../../components/icons';
+import {colors} from '../../../../theme/colors';
 import {styles} from '../../../../theme/styles';
 import type {ArcadiaRecord} from '../../../../types/domain';
 import {firstRecordValue} from '../../../../utils/dataUtils';
@@ -24,14 +25,14 @@ export function PasswordField({
         <TextInput
           autoCapitalize="none"
           placeholder={label}
-          placeholderTextColor="#94A3B8"
+          placeholderTextColor={colors.disabledText}
           secureTextEntry={!visible}
           style={styles.passwordInput}
           value={value}
           onChangeText={setValue}
         />
         <Pressable style={styles.passwordEyeButton} onPress={onToggleVisible}>
-          <Eye color="#64748B" size={18} strokeWidth={2.1} />
+          <Eye color={colors.textMuted} size={18} strokeWidth={2.1} />
         </Pressable>
       </View>
     </View>
@@ -57,7 +58,7 @@ export function EditableField({
       <TextInput
         multiline={multiline}
         placeholder={placeholder}
-        placeholderTextColor="#94A3B8"
+        placeholderTextColor={colors.disabledText}
         style={[styles.formInput, multiline && styles.formInputMultiline]}
         value={value}
         onChangeText={onChangeText}
@@ -110,7 +111,7 @@ export function LookupField({
       ) : null}
       <TextInput
         placeholder={selectedTitle || placeholder}
-        placeholderTextColor="#94A3B8"
+        placeholderTextColor={colors.disabledText}
         style={styles.formInput}
         value={query}
         onChangeText={setQuery}

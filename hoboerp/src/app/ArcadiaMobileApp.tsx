@@ -68,6 +68,7 @@ import {
   unregisterEscalationPushNotifications,
 } from '../services/pushNotifications';
 import { styles } from '../theme/styles';
+import {colors} from '../theme/colors';
 import type { PopupKey, ScreenAction, ScreenKey } from '../navigation/types';
 
 
@@ -604,7 +605,7 @@ function App(): React.JSX.Element {
   if (!session) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
+        <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
         <LoginScreen
           email={email}
           password={password}
@@ -757,7 +758,7 @@ function SplashLoadingScreen() {
 
   return (
     <SafeAreaView style={styles.splashSafeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#0046D8" />
+      <StatusBar barStyle="light-content" backgroundColor={colors.splash} />
       <View style={styles.splashScreen}>
         <View style={styles.splashCenter}>
           <View style={styles.splashLogoOrbit}>
@@ -798,7 +799,7 @@ function SideDrawer({
     <View style={styles.sideDrawer}>
       <View style={styles.drawerBrand}>
         <View style={styles.drawerBrandIcon}>
-          <Hotel color="#FFFFFF" size={25} strokeWidth={2.2} />
+          <Hotel color={colors.white} size={25} strokeWidth={2.2} />
         </View>
         <View>
           <Text style={styles.drawerBrandTitle}>Arcadia Hotel</Text>
@@ -814,7 +815,7 @@ function SideDrawer({
               key={`${item.key}-${item.label}`}
               style={[styles.drawerNavItem, active && styles.activeDrawerNavItem]}
               onPress={() => onNavigate(item.key)}>
-              <Icon color="#FFFFFF" size={19} strokeWidth={2} />
+              <Icon color={colors.white} size={19} strokeWidth={2} />
               <Text style={styles.drawerNavText}>{item.label}</Text>
             </Pressable>
           );
@@ -822,13 +823,13 @@ function SideDrawer({
       </ScrollView>
       <View style={styles.drawerHotel}>
         <View style={styles.drawerHotelIcon}>
-          <Hotel color="#FFFFFF" size={24} strokeWidth={2} />
+          <Hotel color={colors.white} size={24} strokeWidth={2} />
         </View>
         <View style={styles.drawerHotelText}>
           <Text style={styles.drawerHotelLabel}>Current Hotel</Text>
           <Text style={styles.drawerHotelName}>{hotelName}</Text>
         </View>
-        <ChevronRight color="#FFFFFF" size={16} strokeWidth={2} />
+        <ChevronRight color={colors.white} size={16} strokeWidth={2} />
       </View>
     </View>
   );
