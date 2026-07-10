@@ -1,97 +1,99 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# HoboERP Mobile
 
-# Getting Started
+HoboERP Mobile is the React Native application for hotel operations in the
+Arcadia platform. It supports hotel staff workflows for authentication,
+dashboard monitoring, tickets, escalations, guests, reservations, rooms, F&B,
+kitchen orders, housekeeping, staff, hierarchy, WhatsApp conversations, and
+notifications.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+The app currently targets Android first and includes iOS project scaffolding for
+future use.
 
-## Step 1: Start Metro
-
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
-
-To start the Metro dev server, run the following command from the root of your React Native project:
+## Quick Start
 
 ```sh
-# Using npm
+npm install
 npm start
-
-# OR using Yarn
-yarn start
-```
-
-## Step 2: Build and run your app
-
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
-
-### Android
-
-```sh
-# Using npm
 npm run android
-
-# OR using Yarn
-yarn android
 ```
 
-### iOS
+Run commands from the `hoboerp/` directory.
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
+## Core Stack
 
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
+| Area | Technology |
+| --- | --- |
+| App framework | React Native 0.86.0 |
+| Language | TypeScript |
+| React | 19.2.3 |
+| Server state | TanStack React Query |
+| Client state | Zustand |
+| Navigation | Local app-shell navigation with React Navigation dependencies available |
+| API transport | Fetch wrapper in `src/services/api/client.ts` |
+| Realtime | WebSocket notifications |
+| Push | Firebase Cloud Messaging |
+| Tests | Jest, React Native Testing Library, Maestro |
+| Package manager | npm |
 
-```sh
-bundle install
+## Main Documentation
+
+Start here:
+
+- [Documentation home](docs/README.md)
+- [Development environment](docs/setup/development-environment.md)
+- [Project structure](docs/setup/project-structure.md)
+- [Architecture](docs/development/architecture.md)
+- [Debugging guide](docs/debugging/debugging-guide.md)
+- [Release build](docs/build/release-build.md)
+- [Feature map](docs/features/README.md)
+
+## Common Commands
+
+| Task | Command |
+| --- | --- |
+| Start Metro | `npm start` |
+| Run Android | `npm run android` |
+| Run iOS | `npm run ios` |
+| Run unit tests | `npm run test:unit` |
+| Run all Jest tests | `npm test` |
+| Run E2E flows | `npm run test:e2e` |
+| Lint | `npm run lint` |
+| Typecheck | `npm run typecheck` |
+| Generate API types from live backend | `npm run api:types:live` |
+
+## Backend Target
+
+The mobile app points to the staging backend:
+
+```ts
+API_BASE_URL = 'https://arcadia-backend-staging-v3dj3lwhfa-em.a.run.app'
 ```
 
-Then, and every time you update your native dependencies, run:
+The value is defined in `src/config/api.ts`.
 
-```sh
-bundle exec pod install
-```
+## Android Build Facts
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
+| Setting | Value |
+| --- | --- |
+| Package/application ID | `com.hoboerp` |
+| Minimum SDK | 24 |
+| Target SDK | 36 |
+| Compile SDK | 36 |
+| Build tools | 36.0.0 |
+| Version code | 1 |
+| Version name | 1.0 |
 
-```sh
-# Using npm
-npm run ios
+Release builds currently use the debug signing config in
+`android/app/build.gradle`. Create a production keystore before distributing a
+real release.
 
-# OR using Yarn
-yarn ios
-```
+## Documentation Policy
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+When adding or changing a feature, update the nearest document in `docs/`.
+Prefer short, practical notes that answer:
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
-
-## Step 3: Modify your app
-
-Now that you have successfully run the app, let's make changes!
-
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
-
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
-
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
-
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+- Where is the feature located?
+- What APIs does it use?
+- How is state loaded and refreshed?
+- How do developers debug it?
+- What should be tested before release?

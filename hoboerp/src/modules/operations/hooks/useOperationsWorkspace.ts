@@ -1,3 +1,4 @@
+import {useQueries, useQueryClient} from '@tanstack/react-query';
 import {useCallback, useMemo, useState} from 'react';
 
 import {formatErrorDetails} from '../../../services/api';
@@ -5,12 +6,13 @@ import type {ApiEnvelope} from '../../../types/api';
 import type {ArcadiaRecord, Session} from '../../../types/domain';
 import {moveOrderToStatus} from '../../food/services/order.service';
 import {runTicketWorkflowAction} from '../../ticket/services/ticket.service';
+import {resourceKeys, resourceLabels} from '../constants';
 import {
-  initialResources,
-  resourceLabels,
-  resourcePaths,
-} from '../constants';
-import type {ActionHandler, ResourceKey} from '../types';
+  fetchOperationsResource,
+  operationsQueryKeys,
+  type OperationsResourcePayload,
+} from '../queries';
+import type {ActionHandler, ResourceKey, ResourceState} from '../types';
 import {filterRecords} from '../utils';
 
 type RequestFn = <T>(
@@ -36,63 +38,80 @@ export function useOperationsWorkspace(
   session: Session | null,
   showDialog?: (dialog: DialogRequest) => void,
 ) {
+  const queryClient = useQueryClient();
   const [activeResource, setActiveResource] = useState<ResourceKey>('tickets');
-  const [resources, setResources] = useState(initialResources);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedRecordId, setExpandedRecordId] = useState<string | null>(null);
+  const accessToken = session?.accessToken;
+  const hotelId = session?.user.hotel_id;
+
+  const resourceQueries = useQueries({
+    queries: resourceKeys.map(resource => ({
+      enabled: Boolean(accessToken && hotelId),
+      queryFn: () =>
+        fetchOperationsResource(
+          resource,
+          request,
+          accessToken ?? '',
+          hotelId ?? '',
+        ),
+      queryKey: operationsQueryKeys.resource(hotelId ?? 'pending-hotel', resource),
+    })),
+  });
+
+  const resources = useMemo(
+    () =>
+      resourceKeys.reduce((current, resource, index) => {
+        const query = resourceQueries[index];
+        const data = query.data as OperationsResourcePayload | undefined;
+
+        current[resource] = {
+          error: query.error
+            ? formatErrorDetails(
+                query.error,
+                `Unable to load ${resourceLabels[resource].toLowerCase()}.`,
+              )
+            : null,
+          items: data?.items ?? [],
+          loading: query.isLoading || query.isFetching,
+          total: data?.total,
+        };
+
+        return current;
+      }, {} as Record<ResourceKey, ResourceState>),
+    [resourceQueries],
+  );
 
   const loadResource = useCallback(
     async (
       resource: ResourceKey,
-      token = session?.accessToken,
-      hotelId = session?.user.hotel_id,
+      token = accessToken,
+      activeHotelId = hotelId,
     ) => {
-      if (!token || !hotelId) {
+      if (!token || !activeHotelId) {
         return;
       }
 
-      setResources(current => ({
-        ...current,
-        [resource]: {...current[resource], loading: true, error: null},
-      }));
-
       try {
-        const payload = await request<ArcadiaRecord[]>(
-          resourcePaths[resource](hotelId),
-          {},
-          token,
-        );
-        const items = Array.isArray(payload.data) ? payload.data : [];
-        setResources(current => ({
-          ...current,
-          [resource]: {
-            loading: false,
-            error: null,
-            items,
-            total: payload.meta?.total ?? items.length,
-          },
-        }));
-      } catch (error) {
-        setResources(current => ({
-          ...current,
-          [resource]: {
-            ...current[resource],
-            loading: false,
-            error: formatErrorDetails(error, 'Unable to load data.'),
-          },
-        }));
+        await queryClient.fetchQuery({
+          queryFn: () =>
+            fetchOperationsResource(resource, request, token, activeHotelId),
+          queryKey: operationsQueryKeys.resource(activeHotelId, resource),
+          staleTime: 0,
+        });
+      } catch {
+        // React Query stores the error state for the UI; callers keep their
+        // previous fire-and-forget refresh semantics.
       }
     },
-    [request, session?.accessToken, session?.user.hotel_id],
+    [accessToken, hotelId, queryClient, request],
   );
 
   const loadAllResources = useCallback(
-    async (token: string, hotelId: string) => {
+    async (token: string, activeHotelId: string) => {
       await Promise.all(
-        (Object.keys(resourceLabels) as ResourceKey[]).map(resource =>
-          loadResource(resource, token, hotelId),
-        ),
+        resourceKeys.map(resource => loadResource(resource, token, activeHotelId)),
       );
     },
     [loadResource],
@@ -100,17 +119,27 @@ export function useOperationsWorkspace(
 
   const replaceResourceItem = useCallback(
     (resource: ResourceKey, item: ArcadiaRecord) => {
-      setResources(current => ({
-        ...current,
-        [resource]: {
-          ...current[resource],
-          items: current[resource].items.map(existing =>
-            existing.id === item.id ? item : existing,
-          ),
+      if (!hotelId) {
+        return;
+      }
+
+      queryClient.setQueryData<OperationsResourcePayload>(
+        operationsQueryKeys.resource(hotelId, resource),
+        current => {
+          if (!current) {
+            return current;
+          }
+
+          return {
+            ...current,
+            items: current.items.map(existing =>
+              existing.id === item.id ? item : existing,
+            ),
+          };
         },
-      }));
+      );
     },
-    [],
+    [hotelId, queryClient],
   );
 
   const runTicketAction = useCallback(
@@ -143,7 +172,13 @@ export function useOperationsWorkspace(
         setActionLoading(null);
       }
     },
-    [loadResource, replaceResourceItem, session?.accessToken, session?.user.hotel_id, showDialog],
+    [
+      loadResource,
+      replaceResourceItem,
+      session?.accessToken,
+      session?.user.hotel_id,
+      showDialog,
+    ],
   );
 
   const runOrderAction = useCallback(
@@ -172,7 +207,12 @@ export function useOperationsWorkspace(
         setActionLoading(null);
       }
     },
-    [replaceResourceItem, session?.accessToken, session?.user.hotel_id, showDialog],
+    [
+      replaceResourceItem,
+      session?.accessToken,
+      session?.user.hotel_id,
+      showDialog,
+    ],
   );
 
   const handleAction = useCallback<ActionHandler>(
@@ -215,11 +255,11 @@ export function useOperationsWorkspace(
   );
 
   const resetWorkspace = useCallback(() => {
-    setResources(initialResources);
+    queryClient.removeQueries({queryKey: operationsQueryKeys.all});
     setActiveResource('tickets');
     setSearchQuery('');
     setExpandedRecordId(null);
-  }, []);
+  }, [queryClient]);
 
   const activeState = resources[activeResource];
   const filteredItems = useMemo(

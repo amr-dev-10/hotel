@@ -13,6 +13,8 @@ export const resourceLabels: Record<ResourceKey, string> = {
   whatsapp: 'WhatsApp',
 };
 
+export const resourceKeys = Object.keys(resourceLabels) as ResourceKey[];
+
 export const resourceNavItems: ResourceNavItem[] = [
   {key: 'tickets', label: 'Tickets', helper: 'Requests', icon: 'T'},
   {key: 'escalations', label: 'Escalations', helper: 'Priority', icon: 'E'},
