@@ -12,13 +12,10 @@ import { useNavigation } from '@react-navigation/native';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { collection, onSnapshot, doc, query, where } from 'firebase/firestore';
-import { onValue, ref as dbRef } from 'firebase/database';
-import { db, rtdb } from '../../services/firebaseConfig';
 import { RootStackParamList, JobRole } from '../../types';
 import { useAuthStore } from '../../store/useAuthStore';
-import { TenantManager } from '../../services/tenant';
 import { UserAvatar } from '../../components/common/UserAvatar';
+import { ChatService, UsersService } from '../../services/backend';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -89,41 +86,30 @@ export function ChatListScreen() {
 
   useEffect(() => {
     if (activeTab === 'Guests') {
-      const guestRef = dbRef(rtdb, TenantManager.rtdbPath('Tickets/AllChatsTest/Guest'));
-      const unsubGuest = onValue(guestRef, (snap) => {
-        const val = snap.val() ?? {};
-        const keys = Object.keys(val);
-        const list = keys.map((key) => ({
-          id: key,
-          name: key,
-          subtitle: 'Last Message',
+      return ChatService.subscribeToGuestThreads((threads) => {
+        const list = threads.map((thread) => ({
+          id: thread.userId,
+          name: thread.name,
+          subtitle: thread.lastMessage || 'Last Message',
           role: 'Manager' as JobRole,
           showSendSms: true,
         }));
         setContacts(list);
       });
 
-      return () => unsubGuest();
     }
 
-    const unsub = onSnapshot(collection(db, 'users'), (snap) => {
-      const hotelId = TenantManager.getHotelId();
-      const usersQ = TenantManager.isValidHotelId(hotelId)
-        ? query(collection(db, 'users'), where('hotel_id', '==', hotelId))
-        : query(collection(db, 'users'), where('hotel_id', '==', '__NO_HOTEL__'));
-
-      return onSnapshot(usersQ, (snap) => {
+    const unsub = UsersService.subscribeToAllEmployees((users) => {
       const allowedRoles = TAB_ROLE_MATCHERS[activeTab];
-      const people = snap.docs
-        .map((d) => {
-          const raw = d.data() as Record<string, unknown>;
+      const people = users
+        .map((raw: any) => {
           const role = (raw.Jobrole ?? raw.JobRole ?? raw.jobrole ?? raw.jobRole ?? 'Attendent') as JobRole;
           const dept = (raw.Department ?? raw.department ?? '').toString();
           const subtitle = dept ? `${role === 'Attendent' ? 'Attendant' : role} · ${dept.replace(/_/g, ' ')}` : (role === 'Attendent' ? 'Attendant' : role);
           const status = raw.Status ?? raw.status;
           const online = typeof status === 'boolean' ? status : normalize(status) === 'true';
           return {
-            id: d.id,
+            id: (raw.EmployeeId ?? '').toString(),
             name: (raw.Name ?? raw.name ?? '').toString(),
             subtitle,
             role,
@@ -137,8 +123,7 @@ export function ChatListScreen() {
           return allowedRoles.includes(role);
         });
       setContacts(people);
-      });
-    }) as unknown as () => void;
+    });
     return unsub;
   }, [activeTab, employeeId]);
 
@@ -146,8 +131,7 @@ export function ChatListScreen() {
   // contact whose count just grew bubbles to the top.
   useEffect(() => {
     if (!employeeId) return;
-    const unsub = onSnapshot(doc(db, 'users', employeeId), (snap) => {
-      const data = snap.data();
+    const unsub = UsersService.subscribeToUser(employeeId, (data) => {
       const unseenMessages: any[] = data?.UnseenMessages ?? [];
       const map: Record<string, number> = {};
       unseenMessages.forEach((m: any) => { map[m.UserId] = m.Count; });

@@ -8,7 +8,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as ImagePicker from 'expo-image-picker';
 import { RootStackParamList } from '../../types';
 import { useAuthStore } from '../../store/useAuthStore';
-import { UsersService } from '../../services/firebase';
+import { UsersService } from '../../services/backend';
 import { AVATARS, isAvatarKey } from '../../components/common/UserAvatar';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SetupProfile'>;

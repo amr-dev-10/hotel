@@ -10,16 +10,13 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { db } from '../../services/firebaseConfig';
-import { COLLECTIONS } from '../../utils/constants';
-import { UsersService } from '../../services/firebase';
+import { UsersService } from '../../services/backend';
 import { useAuthStore } from '../../store/useAuthStore';
 import { UserAvatar } from './UserAvatar';
 import { navigate, getCurrentRouteName, getCurrentRouteParams } from '../../navigation/navigationRef';
 import type { JobRole, User } from '../../types';
 
-// Detects increases in the current user's UnseenMessages array (Firestore) and
+// Detects increases in the current user's UnseenMessages array and
 // shows a top-bar banner with the sender's name + role/department. Tap → opens
 // ChatRoom for that contact. Suppressed while the user is already viewing the
 // matching ChatRoom.
@@ -62,10 +59,9 @@ export function MessageBanner() {
       return;
     }
 
-    const userRef = doc(db, COLLECTIONS.USERS, employeeId);
-    const unsub = onSnapshot(userRef, async (snap) => {
-      const data = snap.data() ?? {};
-      const list: UnseenEntry[] = Array.isArray(data.UnseenMessages) ? data.UnseenMessages : [];
+    const unsub = UsersService.subscribeToUser(employeeId, async (data) => {
+      const userData = (data ?? {}) as Partial<User>;
+      const list: UnseenEntry[] = Array.isArray(userData.UnseenMessages) ? userData.UnseenMessages : [];
 
       // First snapshot after login: seed the baseline so existing unread counts
       // don't fire a banner. Only later increases will surface.

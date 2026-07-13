@@ -2,7 +2,7 @@
 export type JobRole = 'Owner' | 'Manager' | 'Attendent' | 'Front_desk';
 
 // Department is now a dynamic string — each hotel defines its own departments
-// via the Admin Dashboard (stored in Firestore hotels/{hotelId}/departments).
+// via the Admin Dashboard/backend.
 // 'ALL' is a reserved value meaning "no department filter".
 export type Department = string;
 

@@ -45,9 +45,9 @@ class FCMClient:
                             android=messaging.AndroidConfig(
                                 priority="high",
                                 notification=messaging.AndroidNotification(
-                                    channel_id="escalations",
+                                    channel_id="tasks-high",
                                     priority="high",
-                                    sound="default",
+                                    sound="ringtone",
                                 ),
                             ),
                             apns=messaging.APNSConfig(

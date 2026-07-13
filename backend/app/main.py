@@ -1,8 +1,10 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.router import api_router
 from app.api.v1.webhooks import router as whatsapp_webhook_router
@@ -38,6 +40,9 @@ app.add_middleware(
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(PerformanceMetricsMiddleware)
 register_error_handlers(app)
+MOBILE_MEDIA_DIR = Path(__file__).resolve().parent.parent / "media" / "mobile"
+MOBILE_MEDIA_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/media/mobile", StaticFiles(directory=str(MOBILE_MEDIA_DIR)), name="mobile-media")
 
 
 @app.get("/health", tags=["system"])

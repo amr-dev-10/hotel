@@ -1,6 +1,5 @@
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from './firebaseConfig';
 import { slaForDepartment } from '../utils/constants';
+import { apiGet } from './apiClient';
 
 export interface HotelDepartment {
   id: string;
@@ -17,7 +16,7 @@ const cache: Record<string, { ts: number; departments: HotelDepartment[] }> = {}
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 /**
- * Fetch this hotel's department configuration from Firestore.
+ * Fetch this hotel's department configuration from the backend API.
  * Results are cached for 5 minutes to avoid redundant reads.
  */
 export async function fetchHotelDepartments(hotelId: string): Promise<HotelDepartment[]> {
@@ -26,9 +25,7 @@ export async function fetchHotelDepartments(hotelId: string): Promise<HotelDepar
   if (cached && Date.now() - cached.ts < CACHE_TTL_MS) return cached.departments;
 
   try {
-    const snap = await getDocs(collection(db, 'hotels', hotelId, 'departments'));
-    const list: HotelDepartment[] = [];
-    snap.forEach((d) => list.push({ id: d.id, ...(d.data() as Omit<HotelDepartment, 'id'>) }));
+    const list = await apiGet<HotelDepartment[]>(`/hotels/${hotelId}/departments`);
     list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     cache[hotelId] = { ts: Date.now(), departments: list };
     return list;
@@ -165,7 +162,7 @@ export function getDepartmentOptions(
 }
 
 /**
- * Sanitize a raw department value (e.g. from Firestore user doc) against the
+ * Sanitize a raw department value (e.g. from backend user data) against the
  * hotel's department list. Falls back to 'ALL' if no match found.
  */
 export function sanitizeDepartment(raw: unknown, departments: HotelDepartment[]): string {

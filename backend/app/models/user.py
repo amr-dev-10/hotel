@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, JSON, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -10,9 +10,13 @@ from app.models.rbac import user_roles
 
 class User(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     __tablename__ = "users"
-    __table_args__ = (UniqueConstraint("hotel_id", "email", name="uq_users_hotel_email"),)
+    __table_args__ = (
+        UniqueConstraint("hotel_id", "email", name="uq_users_hotel_email"),
+        UniqueConstraint("hotel_id", "employee_code", name="uq_users_hotel_employee_code"),
+    )
 
     hotel_id: Mapped[str] = mapped_column(ForeignKey("hotels.id"), index=True)
+    employee_code: Mapped[str | None] = mapped_column(String(40), index=True)
     department_id: Mapped[str | None] = mapped_column(ForeignKey("departments.id"))
     reports_to: Mapped[str | None] = mapped_column(ForeignKey("users.id"), index=True)
     user_type: Mapped[str] = mapped_column(String(30), default="HOTEL_EMPLOYEE", index=True)
@@ -25,6 +29,9 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     is_hotel_owner: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_on_duty: Mapped[bool] = mapped_column(Boolean, default=False)
+    online_for_chat: Mapped[bool] = mapped_column(Boolean, default=False)
+    unseen_messages: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    deactivated_by: Mapped[str | None] = mapped_column(String(40))
     roles: Mapped[list["Role"]] = relationship(
         "Role",
         secondary=user_roles,

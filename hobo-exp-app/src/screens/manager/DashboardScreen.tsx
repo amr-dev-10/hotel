@@ -21,7 +21,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { Task, RootStackParamList, Department } from '../../types';
-import { TasksService, UsersService, NotificationsService, ClaimNotification } from '../../services/firebase';
+import { TasksService, UsersService, NotificationsService, ClaimNotification } from '../../services/backend';
 import { COLORS, slaForDepartment } from '../../utils/constants';
 import { fetchHotelDepartments, getDepartmentOptions } from '../../services/departmentService';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -107,7 +107,7 @@ export function ManagerDashboardScreen() {
   useEffect(() => { return TasksService.subscribeToAllTasks(setTasks); }, []);
   useEffect(() => { return UsersService.subscribeToAllEmployees(setEmployees); }, []);
 
-  // Real-time listener on this user's own Firestore doc so admin-initiated
+  // Live listener on this user's backend profile so admin-initiated
   // status changes are reflected immediately in the toggle.
   useEffect(() => {
     if (!employeeId) return;

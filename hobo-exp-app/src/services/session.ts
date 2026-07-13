@@ -106,6 +106,21 @@ export const SessionManager = {
     return val === 'true';
   },
 
+  async setTokens(accessToken: string, refreshToken?: string | null) {
+    await AsyncStorage.setItem(SESSION_KEYS.ACCESS_TOKEN, accessToken);
+    if (refreshToken) {
+      await AsyncStorage.setItem(SESSION_KEYS.REFRESH_TOKEN, refreshToken);
+    }
+  },
+
+  async getAccessToken(): Promise<string | null> {
+    return AsyncStorage.getItem(SESSION_KEYS.ACCESS_TOKEN);
+  },
+
+  async getRefreshToken(): Promise<string | null> {
+    return AsyncStorage.getItem(SESSION_KEYS.REFRESH_TOKEN);
+  },
+
   async logout() {
     await AsyncStorage.clear();
   },

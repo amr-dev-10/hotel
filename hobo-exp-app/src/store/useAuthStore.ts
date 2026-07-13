@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { JobRole, Department, User } from '../types';
 import { SessionManager } from '../services/session';
-import { FirebaseAuth } from '../services/firebase';
+import { BackendAuth } from '../services/backend';
 import { TenantManager } from '../services/tenant';
 import { registerPushToken } from '../services/notifications';
 
@@ -32,6 +32,8 @@ interface AuthState {
     hotelName: string;
     profilePicUrl?: string;
     status: boolean;
+    accessToken?: string;
+    refreshToken?: string | null;
   }) => Promise<void>;
   logout: () => Promise<void>;
   setStatus: (status: boolean) => Promise<void>;
@@ -103,6 +105,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     hotelName,
     profilePicUrl,
     status,
+    accessToken,
+    refreshToken,
   }) {
     await SessionManager.saveLoginDetails(phoneNumber, employeeId);
     await SessionManager.setName(name);
@@ -113,6 +117,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     await SessionManager.setStatus(status);
     await SessionManager.setHotelId(hotelId);
     await SessionManager.setHotelName(hotelName);
+    if (accessToken) await SessionManager.setTokens(accessToken, refreshToken);
     if (profilePicUrl) await SessionManager.setProfilePictureUrl(profilePicUrl);
     TenantManager.setTenant(hotelId, hotelName);
     void registerPushToken(employeeId).catch(() => undefined);
@@ -133,7 +138,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   async logout() {
     await SessionManager.logout();
-    await FirebaseAuth.signOut();
+    await BackendAuth.signOut();
     TenantManager.clearTenant();
     set({
       isLoggedIn: false,

@@ -11,7 +11,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { UsersService } from '../../services/firebase';
+import { UsersService } from '../../services/backend';
 import { ProfileDetails, JobRole, Department, RootStackParamList } from '../../types';
 import { COLORS } from '../../utils/constants';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -76,7 +76,7 @@ export function ProfileScreen() {
 
   useEffect(() => { return UsersService.subscribeToAllEmployees(setEmployees); }, []);
 
-  // Real-time listener on this user's own Firestore doc so admin-initiated
+  // Live listener on this user's backend profile so admin-initiated
   // status changes are reflected immediately in the toggle.
   useEffect(() => {
     if (!employeeId) return;

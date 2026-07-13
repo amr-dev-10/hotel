@@ -1,8 +1,7 @@
 /**
  * Read-only view of the hotel's rooms + maintenance blocks.
  *
- * Rooms live in Firestore `rooms/{hotelId}___{roomNo}` (managed from the
- * Arcadia dashboard). A room can carry:
+ * Rooms are served by the backend API. A room can carry:
  *   • `maintenance: { active, reason, since, clearedAt }` — the legacy
  *     open-ended "out of order" flag (covers every date while active).
  *   • `maintenanceBlocks: [{ id, from, to, reason, createdBy, createdByName,
@@ -12,8 +11,7 @@
  * The mobile app is read-only here — scheduling/clearing happens on the
  * dashboard. This service mirrors the dashboard's roomUtils helpers.
  */
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
-import { db } from './firebaseConfig';
+import { apiGet } from './apiClient';
 
 export interface MaintenanceBlock {
   id: string;
@@ -75,21 +73,23 @@ export function subscribeToRooms(
     callback([]);
     return () => undefined;
   }
-  const q = query(collection(db, 'rooms'), where('hotel_id', '==', hotelId));
-  const unsub = onSnapshot(
-    q,
-    (snap) => {
-      const rooms: RoomDoc[] = [];
-      snap.forEach((d) => rooms.push({ id: d.id, ...(d.data() as Omit<RoomDoc, 'id'>) }));
-      rooms.sort((a, b) =>
-        String(a.roomNo).localeCompare(String(b.roomNo), undefined, { numeric: true }),
-      );
-      callback(rooms);
-    },
-    (err) => {
+  let active = true;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const tick = async () => {
+    try {
+      const rooms = await apiGet<RoomDoc[]>(`/hotels/${hotelId}/rooms`);
+      rooms.sort((a, b) => String(a.roomNo).localeCompare(String(b.roomNo), undefined, { numeric: true }));
+      if (active) callback(rooms);
+    } catch (err) {
       console.warn('[roomsService] subscribeToRooms error:', err);
-      callback([]);
-    },
-  );
-  return () => unsub();
+      if (active) callback([]);
+    } finally {
+      if (active) timer = setTimeout(tick, 5000);
+    }
+  };
+  void tick();
+  return () => {
+    active = false;
+    if (timer) clearTimeout(timer);
+  };
 }

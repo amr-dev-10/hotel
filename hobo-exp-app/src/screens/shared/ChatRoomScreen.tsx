@@ -13,7 +13,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList, ChatMessage, User } from '../../types';
-import { ChatService, UsersService } from '../../services/firebase';
+import { ChatService, UsersService } from '../../services/backend';
 import { useAuthStore } from '../../store/useAuthStore';
 import { UserAvatar } from '../../components/common/UserAvatar';
 
@@ -85,9 +85,11 @@ export function ChatRoomScreen({ navigation, route }: Props) {
     const text = input.trim();
     setInput('');
     await ChatService.sendMessage(employeeId, otherUserId, text, chatType);
-    const recipientUser = await UsersService.getUser(otherUserId);
-    if (!recipientUser?.OnlineForChat) {
-      await ChatService.updateUnreadCount(otherUserId, employeeId, '', true);
+    if (chatType !== 'GUEST') {
+      const recipientUser = await UsersService.getUser(otherUserId);
+      if (!recipientUser?.OnlineForChat) {
+        await ChatService.updateUnreadCount(otherUserId, employeeId, '', true);
+      }
     }
   }
 

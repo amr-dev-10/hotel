@@ -9,7 +9,7 @@ import { ScreenHeader } from '../../components/common/ScreenHeader';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { Priority, Department, AddOn, RootStackParamList } from '../../types';
-import { TasksService } from '../../services/firebase';
+import { TasksService } from '../../services/backend';
 import { LoadingOverlay } from '../../components/common/LoadingOverlay';
 import { useAuthStore } from '../../store/useAuthStore';
 import { fetchHotelDepartments, getDepartmentOptions } from '../../services/departmentService';

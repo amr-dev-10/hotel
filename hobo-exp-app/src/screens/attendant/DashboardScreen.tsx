@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Task, RootStackParamList } from '../../types';
-import { TasksService, UsersService } from '../../services/firebase';
+import { TasksService, UsersService } from '../../services/backend';
 import { COLORS, slaForDepartment } from '../../utils/constants';
 import { useAuthStore } from '../../store/useAuthStore';
 import { startTaskAlert, stopTaskAlert, subscribeToTaskAlert } from '../../services/taskAlert';
@@ -49,7 +49,7 @@ export function AttendantDashboardScreen() {
 
   useEffect(() => subscribeToTaskAlert(setAlertActive), []);
 
-  // Real-time listener on the current user's Firestore document.
+  // Live listener on the current user's backend profile.
   // Catches external status changes (e.g. admin deactivates from the
   // dashboard) and syncs them into the local Zustand store instantly.
   useEffect(() => {

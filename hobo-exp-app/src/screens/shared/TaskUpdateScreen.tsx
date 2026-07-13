@@ -17,7 +17,7 @@ import {
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as ImagePicker from 'expo-image-picker';
 import { RootStackParamList } from '../../types';
-import { TasksService } from '../../services/firebase';
+import { TasksService } from '../../services/backend';
 import { LoadingOverlay } from '../../components/common/LoadingOverlay';
 import { COLORS } from '../../utils/constants';
 

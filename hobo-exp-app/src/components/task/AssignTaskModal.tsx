@@ -3,7 +3,7 @@
  * - Only attendants whose Status==true (online) are shown
  * - Filtered by task department (ALL shows everyone)
  * - Shows green online dot, task count badge, sorted by least busy first
- * - Real-time Firestore listener so online status stays live while modal is open
+ * - Live backend listener so online status stays fresh while modal is open
  */
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -15,13 +15,9 @@ import {
   StyleSheet,
   Alert,
 } from 'react-native';
-import { collection, onSnapshot, Unsubscribe, query, where } from 'firebase/firestore';
-import { get, ref as dbRef } from 'firebase/database';
-import { db, rtdb } from '../../services/firebaseConfig';
-import { TasksService } from '../../services/firebase';
-import { COLORS, COLLECTIONS } from '../../utils/constants';
+import { TasksService, UsersService } from '../../services/backend';
+import { COLORS } from '../../utils/constants';
 import { LoadingOverlay } from '../common/LoadingOverlay';
-import { TenantManager } from '../../services/tenant';
 import { useAuthStore } from '../../store/useAuthStore';
 
 interface Props {
@@ -37,7 +33,7 @@ export function AssignTaskModal({ visible, taskId, department, onClose, onAssign
   const [taskCounts, setTaskCounts] = useState<Record<string, number>>({});
   const [selected, setSelected] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
-  const unsubRef = useRef<Unsubscribe | null>(null);
+  const unsubRef = useRef<(() => void) | null>(null);
   const { employeeId, name, jobRole } = useAuthStore();
   const normalizedRole = (jobRole ?? '').toLowerCase().replace(/[\s_-]+/g, '');
   const isManager = normalizedRole === 'manager' || normalizedRole === 'frontdesk';
@@ -58,30 +54,20 @@ export function AssignTaskModal({ visible, taskId, department, onClose, onAssign
     const isAllDept = !department || deptNorm === 'all';
 
     // Fetch task counts once on open
-    get(dbRef(rtdb, TenantManager.rtdbPath('Tickets/Created'))).then((taskSnap) => {
+    const unsubTasks = TasksService.subscribeToAllTasks((tasks) => {
       const counts: Record<string, number> = {};
-      if (taskSnap.exists()) {
-        taskSnap.forEach((child) => {
-          const t = child.val();
-          const stage = (t?.Stage ?? '').toLowerCase();
-          const assignedId = t?.AssignedToID ?? '';
-          if (assignedId && (stage === 'created' || stage === 'assigned' || stage === 'executed')) {
-            counts[assignedId] = (counts[assignedId] ?? 0) + 1;
-          }
-        });
-      }
+      tasks.forEach((t) => {
+        const stage = (t?.Stage ?? '').toLowerCase();
+        const assignedId = t?.AssignedToID ?? '';
+        if (assignedId && (stage === 'created' || stage === 'assigned' || stage === 'executed')) {
+          counts[assignedId] = (counts[assignedId] ?? 0) + 1;
+        }
+      });
       setTaskCounts(counts);
     });
 
     // Real-time listener on users — only online attendants, same dept
-    const hotelId = TenantManager.getHotelId();
-    const usersQ = TenantManager.isValidHotelId(hotelId)
-      ? query(collection(db, 'users'), where('hotel_id', '==', hotelId))
-      : query(collection(db, 'users'), where('hotel_id', '==', '__NO_HOTEL__'));
-
-    unsubRef.current = onSnapshot(usersQ, (snap) => {
-      const allUsers = snap.docs.map((d) => ({ EmployeeId: d.id, ...d.data() } as any));
-
+    unsubRef.current = UsersService.subscribeToAllEmployees((allUsers: any[]) => {
       const filtered = allUsers.filter((u) => {
         // Must be an attendant
         const role = normalize(u.Jobrole ?? u.JobRole ?? u.jobrole ?? '');
@@ -115,6 +101,7 @@ export function AssignTaskModal({ visible, taskId, department, onClose, onAssign
     setSelected(null);
 
     return () => {
+      unsubTasks();
       unsubRef.current?.();
       unsubRef.current = null;
     };

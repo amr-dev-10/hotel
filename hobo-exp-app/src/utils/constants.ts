@@ -1,17 +1,3 @@
-export const COLLECTIONS = {
-  USERS: 'users',
-  TASKS: 'Tickets/Created',
-  ACTIVE_ATTENDANTS: 'ActiveAttendants',
-  CHATS: 'Tickets/Chats',
-  DELETED_TASKS: 'Tickets/Deleted_Tasks',
-  INVENTORY: 'Inventory',
-};
-
-export const STORAGE_PATHS = {
-  TASK_IMAGES: 'TaskImages',
-  PROFILE_PICTURES: 'ProfilePictures',
-};
-
 export const ROLES = {
   MANAGER: 'Manager' as const,
   ATTENDENT: 'Attendent' as const,
@@ -62,7 +48,7 @@ export const STAGE_LABELS: Record<string, string> = {
 
 export const SESSION_KEYS = {
   IS_LOGGED_IN: 'is_logged_in',
-  EMPLOYEE_ID: 'document_id_firebase',
+  EMPLOYEE_ID: 'employee_id',
   PHONE_NUMBER: 'phone_number',
   USER_NAME: 'user_name',
   USER_EMAIL: 'user_email',
@@ -74,6 +60,8 @@ export const SESSION_KEYS = {
   HOTEL_NAME: 'hotel_name',
   ACTIVE_TAB: 'active_tab',
   USER_IS_OWNER: 'user_is_owner',
+  ACCESS_TOKEN: 'access_token',
+  REFRESH_TOKEN: 'refresh_token',
 };
 
 export const COLORS = {

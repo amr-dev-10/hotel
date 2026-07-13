@@ -27,7 +27,7 @@ import { COLORS } from '../../utils/constants';
 import { RootStackParamList, EscalationNotification, Task } from '../../types';
 import { useAuthStore } from '../../store/useAuthStore';
 import { subscribeToEscalations } from '../../services/escalationService';
-import { TasksService } from '../../services/firebase';
+import { TasksService } from '../../services/backend';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 

@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "HoBo Experience",
-    "slug": "royal-hotel-app",
+    "slug": "hobo",
     "version": "1.0.7",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -75,10 +75,10 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "03b3ddcc-5e0f-4aaf-a1df-c9bae28144f4"
+        "projectId": "ffab835f-4183-4d28-b61b-800a0a468904"
       }
     },
-    "owner": "hobopmss-organization",
+    "owner": "amrendrayadav",
     "runtimeVersion": {
       "policy": "appVersion"
     },

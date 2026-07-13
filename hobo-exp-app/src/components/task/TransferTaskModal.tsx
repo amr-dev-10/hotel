@@ -20,13 +20,10 @@ import {
   StyleSheet,
   Alert,
 } from 'react-native';
-import { collection, onSnapshot, Unsubscribe, query, where } from 'firebase/firestore';
-import { get, ref as dbRef } from 'firebase/database';
-import { db, rtdb } from '../../services/firebaseConfig';
 import { LoadingOverlay } from '../common/LoadingOverlay';
 import { TenantManager } from '../../services/tenant';
 import { fetchHotelDepartments, getDepartmentOptions } from '../../services/departmentService';
-import { TasksService } from '../../services/firebase';
+import { TasksService, UsersService } from '../../services/backend';
 import { useAuthStore } from '../../store/useAuthStore';
 
 interface Props {
@@ -76,7 +73,7 @@ export function TransferTaskModal({
   const [assignTo, setAssignTo] = useState<string>('auto'); // 'auto' | EmployeeId
   const [loadingStaff, setLoadingStaff] = useState(false);
   const [saving, setSaving] = useState(false);
-  const unsubRef = useRef<Unsubscribe | null>(null);
+  const unsubRef = useRef<(() => void) | null>(null);
 
   // Departments + default selection
   useEffect(() => {
@@ -104,37 +101,27 @@ export function TransferTaskModal({
       setTaskCounts({});
       return;
     }
-    const hotelId = TenantManager.getHotelId();
     setLoadingStaff(true);
 
-    // Open-ticket count per staffer
-    get(dbRef(rtdb, TenantManager.rtdbPath('Tickets/Created'))).then((snap) => {
+    const unsubTasks = TasksService.subscribeToAllTasks((tasks) => {
       const counts: Record<string, number> = {};
-      if (snap.exists()) {
-        snap.forEach((child) => {
-          const t = child.val();
-          const stage = asText(t?.Stage).toLowerCase();
-          if (['completed', 'delivered', 'cancelled', 'closed'].includes(stage)) return;
-          const id = asText(t?.AssignedToID);
-          if (id) counts[id] = (counts[id] ?? 0) + 1;
-        });
-      }
+      tasks.forEach((t) => {
+        const stage = asText(t?.Stage).toLowerCase();
+        if (['completed', 'delivered', 'cancelled', 'closed'].includes(stage)) return;
+        const id = asText(t?.AssignedToID);
+        if (id) counts[id] = (counts[id] ?? 0) + 1;
+      });
       setTaskCounts(counts);
     });
 
-    const usersQ = TenantManager.isValidHotelId(hotelId)
-      ? query(collection(db, 'users'), where('hotel_id', '==', hotelId))
-      : query(collection(db, 'users'), where('hotel_id', '==', '__NO_HOTEL__'));
-
-    unsubRef.current = onSnapshot(usersQ, (snap) => {
+    unsubRef.current = UsersService.subscribeToAllEmployees((employees: any[]) => {
       const list: Staff[] = [];
-      snap.docs.forEach((d) => {
-        const v = d.data() as Record<string, any>;
+      employees.forEach((v: any) => {
         if (v.isHotelOwner === true) return; // owners not assignable
         const role = normaliseRole(v.Jobrole ?? v.JobRole ?? v.jobrole);
         if (role !== 'attendant' && role !== 'manager' && role !== 'frontdesk') return;
         list.push({
-          EmployeeId: asText(v.EmployeeId) || d.id,
+          EmployeeId: asText(v.EmployeeId),
           Name: asText(v.Name),
           Department: asText(v.Department ?? v.department),
           Jobrole: asText(v.Jobrole ?? v.JobRole ?? v.jobrole),
@@ -143,9 +130,10 @@ export function TransferTaskModal({
       });
       setStaff(list);
       setLoadingStaff(false);
-    }, () => setLoadingStaff(false));
+    });
 
     return () => {
+      unsubTasks();
       unsubRef.current?.();
       unsubRef.current = null;
     };

@@ -2,10 +2,8 @@
  * On-device notification setup.
  *
  * REMOTE pushes (so notifications + ringtone arrive when the app is CLOSED) are
- * now sent server-side by Cloud Functions (see /functions) on the Firebase
- * project — they trigger on the same RTDB writes the app/bot already make and
- * deliver via FCM through the loud `tasks-high` channel below. The old
- * client-side relay (arcadiaapi.club) is gone; the app no longer sends pushes.
+ * sent server-side by the backend. The app registers this device token and the
+ * backend delivers via FCM through the loud `tasks-high` channel below.
  *
  * This file keeps only what must live on the device:
  *   • ensureTasksChannel        — the loud Android channel (sound/vibration)
@@ -15,13 +13,12 @@
  */
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
-import { ref as dbRef, set } from 'firebase/database';
-import { rtdb } from './firebaseConfig';
 import { TenantManager } from './tenant';
+import { apiPost } from './apiClient';
 
 // Android needs a dedicated channel with MAX importance, vibration, and a
 // custom loud sound for new-task pushes to ring the way the user expects.
-// The Cloud Function targets this exact channel id so a closed app rings.
+// The backend push sender targets this exact channel id so a closed app rings.
 // On iOS, "criticalAlert" needs an Apple entitlement; without it iOS plays
 // the standard tone — that's a deploy-config concern, not code.
 const TASKS_CHANNEL_ID = 'tasks-high';
@@ -47,7 +44,7 @@ async function ensureTasksChannel(): Promise<void> {
 /**
  * Show a local (on-device) notification immediately — used for escalation
  * alerts while the app is in the FOREGROUND. (Closed-app alerts come from the
- * server-side Cloud Function via FCM.) Routed through the loud `tasks-high`
+ * backend push sender via FCM.) Routed through the loud `tasks-high`
  * channel so it carries the ringtone + vibration treatment.
  */
 export async function presentLocalEscalationNotification(
@@ -113,8 +110,8 @@ export function setupNotificationHandlers(onTaskEvent?: (payload: TaskNotificati
 }
 
 /**
- * Register THIS device's native FCM token so the server-side Cloud Function can
- * push to it. Stored at {hotelId}/FcmToken/{employeeId}. Requires the build to
+ * Register THIS device's native FCM token so the backend can push to it.
+ * Requires the build to
  * carry google-services.json (FCM config) — without it getDevicePushTokenAsync
  * throws and no token is stored.
  */
@@ -137,9 +134,14 @@ export async function registerPushToken(employeeId: string) {
     return null;
   }
 
-  await set(dbRef(rtdb, `${TenantManager.rtdbPath('FcmToken')}/${employeeId}`), {
-    FcmToken: pushToken,
-  });
+  const hotelId = TenantManager.getHotelId();
+  if (TenantManager.isValidHotelId(hotelId)) {
+    await apiPost(`/hotels/${hotelId}/fcm-token`, {
+      employeeId,
+      token: pushToken,
+      platform: Platform.OS,
+    });
+  }
 
   return pushToken;
 }

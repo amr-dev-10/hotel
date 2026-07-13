@@ -17,7 +17,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Task, RootStackParamList } from '../../types';
-import { TasksService } from '../../services/firebase';
+import { TasksService } from '../../services/backend';
 import { useAuthStore } from '../../store/useAuthStore';
 import { TransferTaskModal } from '../../components/task/TransferTaskModal';
 import { COLORS } from '../../utils/constants';

@@ -14,15 +14,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../../services/firebaseConfig';
 import { RootStackParamList, JobRole } from '../../types';
 import { useAuthStore } from '../../store/useAuthStore';
 import { LoadingOverlay } from '../../components/common/LoadingOverlay';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../utils/constants';
 import { TenantManager } from '../../services/tenant';
-import { fetchHotelDepartments, sanitizeDepartment as sanitizeDeptDynamic } from '../../services/departmentService';
+import { apiPost } from '../../services/apiClient';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
@@ -41,23 +39,19 @@ export function LoginScreen({ navigation, route }: Props) {
     if (!isReady) return;
     setLoading(true);
     try {
-      const docSnap = await getDoc(doc(db, 'users', employeeId.trim()));
-      if (!docSnap.exists()) {
-        Alert.alert('Error', 'Contact Admin');
-        return;
-      }
-      const data = docSnap.data()!;
-      if (!data.Password) {
-        Alert.alert('Error', 'Contact Admin');
-        return;
-      }
+      const result = await apiPost<any>('/auth/login', {
+        employeeId: employeeId.trim(),
+        password: password.trim(),
+        userType,
+      }, { skipAuth: true });
+      const data = result.user ?? {};
       // Normalize role comparison — handle Front_desk / front_desk variants
       const normalizeRole = (r: string) => (r ?? '').trim().toLowerCase().replace(/[\s_-]+/g, '');
       const storedRole = normalizeRole(data.Jobrole ?? '');
       const storedDept = normalizeRole(data.Department ?? '');
       const selectedRole = normalizeRole(userType);
 
-      // In Firestore, "Front_desk" is a Department, not a Jobrole.
+      // In legacy data, "Front_desk" is a Department, not a Jobrole.
       // Jobrole is only "Manager" or "Attendent". For front-desk login,
       // validate against the Department field instead.
       const FRONT_DESK_DEPTS = new Set([
@@ -72,50 +66,37 @@ export function LoginScreen({ navigation, route }: Props) {
         roleMatch = storedRole === selectedRole;
       }
 
-      if (
-        data.Password.toLowerCase() !== password.trim().toLowerCase() ||
-        !roleMatch
-      ) {
+      if (!roleMatch) {
         Alert.alert('Error', 'Incorrect Credentials');
         return;
       }
 
-      const hotelId = (data.hotel_id ?? data.HOTEL_ID ?? '').toString();
+      const hotelId = (data.hotel_id ?? result.hotel?.hotel_id ?? result.hotel?.id ?? '').toString();
       if (!TenantManager.isValidHotelId(hotelId)) {
         Alert.alert('Error', 'Account not linked to a hotel. Contact Admin.');
         return;
       }
 
-      const hotelSnap = await getDoc(doc(db, 'hotels', hotelId));
-      let hotelName = '';
-      if (hotelSnap.exists()) {
-        const hotelData = hotelSnap.data() as Record<string, unknown>;
-        const status = (hotelData.status ?? hotelData.Status ?? '').toString();
-        if (status.toLowerCase() === 'suspended') {
-          Alert.alert('Error', 'Hotel is suspended. Contact Admin.');
-          return;
-        }
-        hotelName =
-          (hotelData.name ?? hotelData.Name ?? hotelData.hotelName ?? hotelData.hotel_name ?? '').toString();
-      }
+      const hotelName = (result.hotel?.name ?? result.hotel?.hotelName ?? '').toString();
 
-      const hotelDepts = await fetchHotelDepartments(hotelId);
       const profileImage = (data.ProfileImage ?? '').toString().trim();
       // When user logs in as Front Desk, store 'Front_desk' as the jobRole
       // so navigation grants them the full 6-tab manager layout.
       const effectiveRole = selectedRole === 'frontdesk' ? 'Front_desk' : data.Jobrole;
       await login({
-        employeeId: docSnap.id,
+        employeeId: data.EmployeeId ?? employeeId.trim(),
         phoneNumber: '',
         name: data.Name ?? '',
         email: data.Email ?? '',
         jobRole: effectiveRole as JobRole,
-        department: sanitizeDeptDynamic(data.Department, hotelDepts),
+        department: data.Department || 'ALL',
         isHotelOwner: data.isHotelOwner === true,
         hotelId,
         hotelName,
         profilePicUrl: profileImage || undefined,
         status: data.Status ?? false,
+        accessToken: result.access_token,
+        refreshToken: result.refresh_token,
       });
       navigation.reset({
         index: 0,

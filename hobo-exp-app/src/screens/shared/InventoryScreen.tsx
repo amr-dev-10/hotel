@@ -13,7 +13,7 @@ import {
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { InventoryService } from '../../services/firebase';
+import { InventoryService } from '../../services/backend';
 import { InventoryItem } from '../../types';
 import { COLORS } from '../../utils/constants';
 import { useAuthStore } from '../../store/useAuthStore';

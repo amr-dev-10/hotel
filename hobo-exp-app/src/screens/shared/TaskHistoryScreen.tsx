@@ -15,7 +15,7 @@ import { ScreenHeader } from '../../components/common/ScreenHeader';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { Task, RootStackParamList } from '../../types';
-import { TasksService, DeletedTasksService } from '../../services/firebase';
+import { TasksService, DeletedTasksService } from '../../services/backend';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type FilterOption = 'None' | 'DateRange' | 'RecentToOldest' | 'OldestToRecent' | 'Completed' | 'Cancelled';
