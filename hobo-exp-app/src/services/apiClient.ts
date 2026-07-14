@@ -12,7 +12,7 @@ function normalizeMobileApiBase(rawUrl: string | undefined): string {
 }
 
 export const MOBILE_API_BASE_URL = normalizeMobileApiBase(
-  typeof process !== 'undefined' ? process?.env?.EXPO_PUBLIC_API_BASE_URL : undefined,
+  process.env.EXPO_PUBLIC_API_BASE_URL
 );
 
 type ApiEnvelope<T> = {
@@ -29,7 +29,23 @@ type RequestOptions = RequestInit & {
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const token = options.skipAuth ? null : options.token ?? await SessionManager.getAccessToken();
-  const response = await fetch(`${MOBILE_API_BASE_URL}${path}`, {
+  const url = `${MOBILE_API_BASE_URL}${path}`;
+  const method = options.method || 'GET';
+  
+  if (__DEV__) {
+    console.log(`🚀 [API REQ] ${method} ${url}`);
+    if (options.body && typeof options.body === 'string') {
+      try {
+        console.log(`📦 [API BODY]`, JSON.parse(options.body));
+      } catch (e) {
+        console.log(`📦 [API BODY]`, options.body);
+      }
+    } else if (options.body instanceof FormData) {
+      console.log(`📦 [API BODY] FormData`);
+    }
+  }
+
+  const response = await fetch(url, {
     ...options,
     headers: {
       Accept: 'application/json',
@@ -39,7 +55,16 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     },
   });
   const payload = await parsePayload<T>(response);
+  
+  if (__DEV__) {
+    console.log(`✅ [API RES] ${method} ${url} -> Status: ${response.status}`);
+    console.log(`📄 [API PAYLOAD]`, payload);
+  }
+
   if (!response.ok || payload.success === false) {
+    if (__DEV__) {
+      console.error(`❌ [API ERR] ${method} ${url} ->`, errorMessage(payload, response.status));
+    }
     throw new Error(errorMessage(payload, response.status));
   }
   return payload.data;

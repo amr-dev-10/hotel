@@ -1,26 +1,12 @@
 /**
  * On-device notification setup.
  *
- * REMOTE pushes (so notifications + ringtone arrive when the app is CLOSED) are
- * sent server-side by the backend. The app registers this device token and the
- * backend delivers via FCM through the loud `tasks-high` channel below.
- *
- * This file keeps only what must live on the device:
- *   • ensureTasksChannel        — the loud Android channel (sound/vibration)
- *   • setupNotificationHandlers — foreground display + tap routing
- *   • registerPushToken         — store this device's FCM token for the server
- *   • presentLocalEscalationNotification — foreground-only local alert
+ * The app is fully REST API backed. This file only manages local notification
+ * behavior for alerts shown while the app is running.
  */
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
-import { TenantManager } from './tenant';
-import { apiPost } from './apiClient';
 
-// Android needs a dedicated channel with MAX importance, vibration, and a
-// custom loud sound for new-task pushes to ring the way the user expects.
-// The backend push sender targets this exact channel id so a closed app rings.
-// On iOS, "criticalAlert" needs an Apple entitlement; without it iOS plays
-// the standard tone — that's a deploy-config concern, not code.
 const TASKS_CHANNEL_ID = 'tasks-high';
 
 async function ensureTasksChannel(): Promise<void> {
@@ -28,11 +14,11 @@ async function ensureTasksChannel(): Promise<void> {
   try {
     await Notifications.setNotificationChannelAsync(TASKS_CHANNEL_ID, {
       name: 'New Tasks',
-      description: 'Loud ringtone for new task assignments',
+      description: 'Loud ringtone for local task alerts',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 700, 400, 700, 400],
       lightColor: '#0052CC',
-      sound: 'ringtone',  // strips extension; must match assets/sounds/ringtone.mp3 wired via expo-notifications plugin
+      sound: 'ringtone',
       enableVibrate: true,
       bypassDnd: false,
     });
@@ -41,12 +27,6 @@ async function ensureTasksChannel(): Promise<void> {
   }
 }
 
-/**
- * Show a local (on-device) notification immediately — used for escalation
- * alerts while the app is in the FOREGROUND. (Closed-app alerts come from the
- * backend push sender via FCM.) Routed through the loud `tasks-high`
- * channel so it carries the ringtone + vibration treatment.
- */
 export async function presentLocalEscalationNotification(
   title: string,
   body: string,
@@ -57,12 +37,10 @@ export async function presentLocalEscalationNotification(
       content: {
         title,
         body,
-        sound: 'ringtone', // channel also carries vibration + light treatment
+        sound: 'ringtone',
         priority: Notifications.AndroidNotificationPriority.MAX,
         data: { event: 'escalation' },
       },
-      // On Android, deliver immediately on the loud "tasks-high" channel.
-      // On iOS there are no channels — `null` delivers now.
       trigger: Platform.OS === 'android' ? { channelId: TASKS_CHANNEL_ID } : null,
     });
   } catch (e) {
@@ -76,7 +54,6 @@ type TaskNotificationPayload = {
 };
 
 export function setupNotificationHandlers(onTaskEvent?: (payload: TaskNotificationPayload) => void) {
-  // Fire-and-forget — channel registration is idempotent and non-fatal.
   void ensureTasksChannel();
 
   Notifications.setNotificationHandler({
@@ -107,41 +84,4 @@ export function setupNotificationHandlers(onTaskEvent?: (payload: TaskNotificati
     receivedSub.remove();
     responseSub.remove();
   };
-}
-
-/**
- * Register THIS device's native FCM token so the backend can push to it.
- * Requires the build to
- * carry google-services.json (FCM config) — without it getDevicePushTokenAsync
- * throws and no token is stored.
- */
-export async function registerPushToken(employeeId: string) {
-  const permission = await Notifications.getPermissionsAsync();
-  let status = permission.status;
-
-  if (status !== 'granted') {
-    const requested = await Notifications.requestPermissionsAsync();
-    status = requested.status;
-  }
-
-  if (status !== 'granted') {
-    return null;
-  }
-
-  const token = await Notifications.getDevicePushTokenAsync();
-  const pushToken = token?.data ?? null;
-  if (!pushToken) {
-    return null;
-  }
-
-  const hotelId = TenantManager.getHotelId();
-  if (TenantManager.isValidHotelId(hotelId)) {
-    await apiPost(`/hotels/${hotelId}/fcm-token`, {
-      employeeId,
-      token: pushToken,
-      platform: Platform.OS,
-    });
-  }
-
-  return pushToken;
 }

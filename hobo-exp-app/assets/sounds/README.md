@@ -11,7 +11,7 @@ Place a loopable ringtone at `ringtone.mp3` in this folder.
 **Where it's used**
 
 - `src/services/taskAlert.ts` plays it in foreground via `expo-audio`.
-- Android push channel `tasks-high` (set in `src/services/notifications.ts`) references the same file via `expo-notifications` config so background pushes ring the same tone. To wire that, add to `app.json`:
+- Android local notification channel `tasks-high` (set in `src/services/notifications.ts`) references the same file via `expo-notifications` config for in-app alerts. To wire that, add to `app.json`:
 
 ```json
 {

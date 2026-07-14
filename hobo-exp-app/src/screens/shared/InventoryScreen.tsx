@@ -30,7 +30,7 @@ function showToast(msg: string) {
 export function InventoryScreen() {
   const insets = useSafeAreaInsets();
   const { jobRole } = useAuthStore();
-  const normalizeRole = (r?: string) => (r ?? '').toString().trim().toLowerCase().replace(/[\s_-]+/g, '');
+  const normalizeRole = (r?: string | null) => (r ?? '').toString().trim().toLowerCase().replace(/[\s_-]+/g, '');
   const isManager = normalizeRole(jobRole) === 'manager' || normalizeRole(jobRole) === 'owner' || normalizeRole(jobRole) === 'frontdesk';
 
   if (!isManager) {

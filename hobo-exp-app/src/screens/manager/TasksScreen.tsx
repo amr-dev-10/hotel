@@ -66,7 +66,7 @@ export function ManagerTasksScreen() {
 
   // If user is Manager, only show tickets belonging to their department (or ALL)
   const normalize = (v: any) => (v == null ? '' : String(v).trim().toLowerCase().replace(/[\s_-]+/g, '_'));
-  const normalizeRole = (r?: string) => (r ?? '').toString().trim().toLowerCase();
+  const normalizeRole = (r?: string | null) => (r ?? '').toString().trim().toLowerCase();
   const isVisibleToManager = (t: Task) => {
     // Owner sees everything
     if (isHotelOwner) return true;

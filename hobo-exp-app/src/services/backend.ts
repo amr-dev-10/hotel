@@ -43,6 +43,88 @@ function subscribePoll<T>(
   };
 }
 
+type SharedPollEntry<T> = {
+  callbacks: Set<(value: T) => void>;
+  latest?: T;
+  hasLatest: boolean;
+  active: boolean;
+  inFlight: boolean;
+  timer: ReturnType<typeof setTimeout> | null;
+};
+
+const DEFAULT_POLL_INTERVAL_MS = 8000;
+const USER_POLL_INTERVAL_MS = 8000;
+const TASK_POLL_INTERVAL_MS = 10000;
+const SLOW_POLL_INTERVAL_MS = 15000;
+const sharedPollers = new Map<string, SharedPollEntry<any>>();
+
+function subscribeSharedPoll<T>(
+  key: string,
+  fetcher: () => Promise<T>,
+  callback: (value: T) => void,
+  intervalMs = DEFAULT_POLL_INTERVAL_MS,
+): () => void {
+  let entry = sharedPollers.get(key) as SharedPollEntry<T> | undefined;
+
+  if (!entry) {
+    entry = {
+      callbacks: new Set(),
+      hasLatest: false,
+      active: true,
+      inFlight: false,
+      timer: null,
+    };
+    sharedPollers.set(key, entry);
+
+    const tick = async () => {
+      if (!entry?.active || entry.inFlight) return;
+      entry.inFlight = true;
+      try {
+        const value = await fetcher();
+        entry.latest = value;
+        entry.hasLatest = true;
+        for (const listener of entry.callbacks) {
+          try {
+            listener(value);
+          } catch {}
+        }
+      } catch (e) {
+        console.warn('[api subscribe] polling failed:', e);
+      } finally {
+        if (entry) {
+          entry.inFlight = false;
+          if (entry.active) entry.timer = setTimeout(tick, intervalMs);
+        }
+      }
+    };
+
+    void tick();
+  }
+
+  entry.callbacks.add(callback);
+  if (entry.hasLatest) callback(entry.latest as T);
+
+  return () => {
+    const current = sharedPollers.get(key) as SharedPollEntry<T> | undefined;
+    if (!current) return;
+    current.callbacks.delete(callback);
+    if (current.callbacks.size === 0) {
+      current.active = false;
+      if (current.timer) clearTimeout(current.timer);
+      sharedPollers.delete(key);
+    }
+  };
+}
+
+function subscribeToSharedUserPoll(employeeId: string, callback: (user: User | null) => void): () => void {
+  return subscribeSharedPoll(
+    `user:${hotelId()}:${employeeId}`,
+    () => UsersService.getUser(employeeId),
+    callback,
+    USER_POLL_INTERVAL_MS,
+  );
+}
+
 // Kept as a small logout hook. Authentication now uses backend JWTs.
 export const BackendAuth = {
   getCurrentUser() {
@@ -67,7 +149,12 @@ export const UsersService = {
   },
 
   subscribeToAllEmployees(callback: (employees: ProfileDetails[]) => void): () => void {
-    return subscribePoll(() => UsersService.getAllEmployees(), callback);
+    return subscribeSharedPoll(
+      `users:${hotelId()}`,
+      () => UsersService.getAllEmployees(),
+      callback,
+      SLOW_POLL_INTERVAL_MS,
+    );
   },
 
   async getEmployeesByDepartment(department: Department): Promise<ProfileDetails[]> {
@@ -81,7 +168,7 @@ export const UsersService = {
   },
 
   subscribeToUser(employeeId: string, callback: (user: User | null) => void) {
-    return subscribePoll(() => UsersService.getUser(employeeId), callback, 2500);
+    return subscribeToSharedUserPoll(employeeId, callback);
   },
 
   async setActiveStatus(employeeId: string, name: string, department: string, active: boolean) {
@@ -163,28 +250,38 @@ export const TasksService = {
   },
 
   subscribeToAllTasks(callback: (tasks: Task[]) => void) {
-    return subscribePoll(() => apiGet<Task[]>(`/hotels/${hotelId()}/tasks`), callback);
+    return subscribeSharedPoll(
+      `tasks:${hotelId()}:all`,
+      () => apiGet<Task[]>(`/hotels/${hotelId()}/tasks`),
+      callback,
+      TASK_POLL_INTERVAL_MS,
+    );
   },
 
   subscribeToTasksByStage(stage: string, callback: (tasks: Task[]) => void) {
-    return subscribePoll(
+    return subscribeSharedPoll(
+      `tasks:${hotelId()}:stage:${stage}`,
       () => apiGet<Task[]>(`/hotels/${hotelId()}/tasks${q({ stage })}`),
       callback,
+      TASK_POLL_INTERVAL_MS,
     );
   },
 
   subscribeToTasksForAttendant(employeeId: string, callback: (tasks: Task[]) => void) {
-    return subscribePoll(
+    return subscribeSharedPoll(
+      `tasks:${hotelId()}:attendant:${employeeId}`,
       () => apiGet<Task[]>(`/hotels/${hotelId()}/tasks${q({ assigned_to: employeeId })}`),
       callback,
+      TASK_POLL_INTERVAL_MS,
     );
   },
 
   subscribeToTask(taskId: string, callback: (task: Task | null) => void) {
-    return subscribePoll(
+    return subscribeSharedPoll(
+      `task:${hotelId()}:${taskId}`,
       () => TasksService.getTask(taskId),
       callback,
-      2500,
+      USER_POLL_INTERVAL_MS,
     );
   },
 
@@ -254,7 +351,12 @@ export const ChatService = {
 
 export const DeletedTasksService = {
   subscribeToDeletedTasks(callback: (tasks: Task[]) => void) {
-    return subscribePoll(() => apiGet<Task[]>(`/hotels/${hotelId()}/deleted-tasks`), callback);
+    return subscribeSharedPoll(
+      `deleted-tasks:${hotelId()}`,
+      () => apiGet<Task[]>(`/hotels/${hotelId()}/deleted-tasks`),
+      callback,
+      SLOW_POLL_INTERVAL_MS,
+    );
   },
 };
 
@@ -274,7 +376,12 @@ export const NotificationsService = {
   subscribeToClaimNotifications(
     callback: (notifications: ClaimNotification[]) => void,
   ): () => void {
-    return subscribePoll(() => apiGet<ClaimNotification[]>(`/hotels/${hotelId()}/notifications/claims`), callback);
+    return subscribeSharedPoll(
+      `claim-notifications:${hotelId()}`,
+      () => apiGet<ClaimNotification[]>(`/hotels/${hotelId()}/notifications/claims`),
+      callback,
+      SLOW_POLL_INTERVAL_MS,
+    );
   },
 
   async markRead(notificationId: string, employeeId: string) {
@@ -284,7 +391,12 @@ export const NotificationsService = {
 
 export const InventoryService = {
   subscribeToInventory(callback: (items: InventoryItem[]) => void) {
-    return subscribePoll(() => apiGet<InventoryItem[]>(`/hotels/${hotelId()}/inventory`), callback);
+    return subscribeSharedPoll(
+      `inventory:${hotelId()}`,
+      () => apiGet<InventoryItem[]>(`/hotels/${hotelId()}/inventory`),
+      callback,
+      SLOW_POLL_INTERVAL_MS,
+    );
   },
 
   async addInventoryItem(name: string): Promise<string> {

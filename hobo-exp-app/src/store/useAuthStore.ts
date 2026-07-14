@@ -3,7 +3,6 @@ import { JobRole, Department, User } from '../types';
 import { SessionManager } from '../services/session';
 import { BackendAuth } from '../services/backend';
 import { TenantManager } from '../services/tenant';
-import { registerPushToken } from '../services/notifications';
 
 interface AuthState {
   isLoggedIn: boolean;
@@ -85,9 +84,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         hotelId,
         hotelName,
       });
-      if (loggedIn && employeeId && hotelId) {
-        void registerPushToken(employeeId).catch(() => undefined);
-      }
     } finally {
       set({ isLoading: false });
     }
@@ -120,7 +116,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (accessToken) await SessionManager.setTokens(accessToken, refreshToken);
     if (profilePicUrl) await SessionManager.setProfilePictureUrl(profilePicUrl);
     TenantManager.setTenant(hotelId, hotelName);
-    void registerPushToken(employeeId).catch(() => undefined);
     set({
       isLoggedIn: true,
       employeeId,

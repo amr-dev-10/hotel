@@ -11,7 +11,13 @@
     },
     "preview": {
       "distribution": "internal",
-      "channel": "preview"
+      "channel": "preview",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://f5d1-2402-3a80-3dd-c4c6-8d91-ac5f-5b72-b08a.ngrok-free.app/api/v1/mobile"
+      }
     },
     "production": {
       "autoIncrement": true,

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import os
+import base64
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -10,7 +10,6 @@ from fastapi import UploadFile
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
 from app.core.exceptions import bad_request, forbidden, not_found
 from app.core.security import verify_password
 from app.models.availability import RoomBlock
@@ -1233,14 +1232,11 @@ class MobileCompatService:
 
     # ----- media -----
     async def save_upload(self, hotel_id: str, uploaded: UploadFile, current_user: User | None = None) -> dict[str, Any]:
-        root = Path(os.getenv("MOBILE_MEDIA_ROOT") or Path(__file__).resolve().parents[2] / "media" / "mobile").resolve()
-        target_dir = root / hotel_id
-        target_dir.mkdir(parents=True, exist_ok=True)
         suffix = Path(uploaded.filename or "").suffix or ".jpg"
         filename = f"{uuid4().hex}{suffix}"
-        path = target_dir / filename
         content = await uploaded.read()
-        path.write_bytes(content)
+        if not content:
+            raise bad_request("Uploaded file is empty")
         url = f"/media/mobile/{hotel_id}/{filename}"
         media = MediaFile(
             hotel_id=hotel_id,
@@ -1248,7 +1244,8 @@ class MobileCompatService:
             file_type=uploaded.content_type or "application/octet-stream",
             file_name=uploaded.filename,
             file_size_bytes=len(content),
-            storage_provider=settings.media_storage_backend or "local",
+            storage_provider="database",
+            file_data_base64=base64.b64encode(content).decode("ascii"),
             uploaded_by=current_user.id if current_user else None,
             created_at=utcnow(),
         )

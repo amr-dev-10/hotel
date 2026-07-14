@@ -521,3 +521,11 @@ After the account is created:
 4. Disable or rotate the bootstrap account if it was only meant for first access.
 
 The command is idempotent for the configured email. If the platform admin already exists, it prints that the account exists and does not overwrite the password.
+
+# DEMO RECORDS CREDENTIAL
+- App Role	Employee ID	Email	Password
+- Manager / Owner	MGR001	owner@arcadia.demo	DemoPass123!
+- Manager	ENG001	engineering@arcadia.demo	DemoPass123!
+- Manager	HKM001	housekeeping@arcadia.demo	DemoPass123!
+- Front Desk	FD001	frontdesk@arcadia.demo	DemoPass123!
+- Attendant	ATT001	attendant@arcadia.demo	DemoPass123!

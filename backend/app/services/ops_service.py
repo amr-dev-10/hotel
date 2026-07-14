@@ -1,5 +1,11 @@
+import base64
+import binascii
+from pathlib import Path
+from uuid import uuid4
+
 from sqlalchemy.orm import Session
 
+from app.core.exceptions import bad_request
 from app.models.base import utcnow
 from app.models.ops import Invoice, MediaFile, Notification, Subscription
 from app.repositories.ops_repository import InvoiceRepository, MediaFileRepository, NotificationRepository, SubscriptionRepository
@@ -91,13 +97,26 @@ class MediaService:
         payload: MediaFileCreate,
         uploaded_by: str | None,
     ) -> MediaFile:
+        decoded_size = payload.file_size_bytes
+        if payload.file_data_base64:
+            try:
+                decoded_size = len(base64.b64decode(payload.file_data_base64.encode("ascii"), validate=True))
+            except (UnicodeEncodeError, binascii.Error, ValueError) as exc:
+                raise bad_request("file_data_base64 must be valid base64") from exc
+        file_url = payload.file_url
+        if not file_url and payload.file_data_base64:
+            suffix = Path(payload.file_name or "").suffix or _suffix_for_media_type(payload.file_type)
+            file_url = f"/media/mobile/{hotel_id}/{uuid4().hex}{suffix}"
+        if not file_url:
+            raise bad_request("file_url is required when media data is not provided")
         media = MediaFile(
             hotel_id=hotel_id,
-            file_url=payload.file_url,
+            file_url=file_url,
             file_type=payload.file_type,
             file_name=payload.file_name,
-            file_size_bytes=payload.file_size_bytes,
-            storage_provider=payload.storage_provider,
+            file_size_bytes=decoded_size,
+            storage_provider="database" if payload.file_data_base64 else payload.storage_provider,
+            file_data_base64=payload.file_data_base64,
             uploaded_by=uploaded_by,
             created_at=utcnow(),
         )
@@ -105,6 +124,16 @@ class MediaService:
         self.db.commit()
         self.db.refresh(media)
         return media
+
+
+def _suffix_for_media_type(media_type: str) -> str:
+    if media_type == "image/png":
+        return ".png"
+    if media_type == "image/webp":
+        return ".webp"
+    if media_type == "image/gif":
+        return ".gif"
+    return ".jpg"
 
 
 class BillingService:

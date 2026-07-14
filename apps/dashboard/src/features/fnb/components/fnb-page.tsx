@@ -65,6 +65,7 @@ import {
   useUpdateRestaurantOrder,
   useUpdateOrderStatus,
   useUpdateTaxConfig,
+  useUploadMedia,
 } from "@/features/fnb/hooks/useFnb";
 import { useGuests } from "@/features/guests/hooks/useGuests";
 import { useRooms } from "@/features/rooms/hooks/useRooms";
@@ -111,6 +112,7 @@ export function FnBPage({ hotelId }: { hotelId: string }) {
   const deleteCategory = useDeleteMenuCategory(hotelId);
   const createItem = useCreateMenuItem(hotelId);
   const updateItem = useUpdateMenuItem(hotelId);
+  const uploadMedia = useUploadMedia(hotelId);
   const deleteItem = useDeleteMenuItem(hotelId);
   const createTax = useCreateTaxConfig(hotelId);
   const updateTax = useUpdateTaxConfig(hotelId);
@@ -335,6 +337,7 @@ export function FnBPage({ hotelId }: { hotelId: string }) {
         onClose={() => setItemDrawer(null)}
         taxes={taxes.data ?? []}
         updateItem={(itemId, payload) => updateItem.mutateAsync({ itemId, payload })}
+        uploadMedia={(file) => uploadMedia.mutateAsync(file)}
       />
       <CategoryDialog
         createCategory={createCategory.mutateAsync}
@@ -668,6 +671,7 @@ function ItemDrawer({
   onClose,
   taxes,
   updateItem,
+  uploadMedia,
 }: {
   categories: MenuCategory[];
   createItem: (payload: MenuItemPayload) => Promise<unknown>;
@@ -675,8 +679,11 @@ function ItemDrawer({
   onClose: () => void;
   taxes: TaxConfig[];
   updateItem: (itemId: string, payload: Partial<MenuItemPayload>) => Promise<unknown>;
+  uploadMedia: (file: File) => Promise<string>;
 }) {
   const [form, setForm] = useState<MenuItemForm>(emptyItemForm());
+  const [imageUploading, setImageUploading] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!drawer) {
@@ -719,6 +726,24 @@ function ItemDrawer({
     onClose();
   }
 
+  async function uploadImage(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+    setImageUploading(true);
+    try {
+      const imageUrl = await uploadMedia(file);
+      setForm((current) => ({ ...current, image_url: imageUrl }));
+      toast.success("Image uploaded");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Image upload failed");
+    } finally {
+      setImageUploading(false);
+      event.target.value = "";
+    }
+  }
+
   return (
     <>
       <button aria-label="Close item drawer" className="fixed inset-0 z-40 bg-slate-950/30" type="button" onClick={onClose} />
@@ -743,7 +768,14 @@ function ItemDrawer({
           </div>
 
           <Field label="Image URL">
-            <Input value={form.image_url} onChange={(event) => setFormField(setForm, "image_url", event.target.value)} />
+            <div className="flex gap-2">
+              <Input value={form.image_url} onChange={(event) => setFormField(setForm, "image_url", event.target.value)} />
+              <Button disabled={imageUploading} type="button" variant="secondary" onClick={() => imageInputRef.current?.click()}>
+                <FileUp />
+                {imageUploading ? "Uploading" : "Upload"}
+              </Button>
+            </div>
+            <input ref={imageInputRef} accept="image/*" className="hidden" type="file" onChange={uploadImage} />
           </Field>
           <Field label="Name">
             <Input required value={form.name} onChange={(event) => setFormField(setForm, "name", event.target.value)} />

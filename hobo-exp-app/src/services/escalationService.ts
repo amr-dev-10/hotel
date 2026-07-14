@@ -10,8 +10,20 @@ const GRACE_MS = 60 * 1000;
 const CHECK_INTERVAL_MS = 60 * 1000;
 const ALERT_ARM_DELAY_MS = 3500;
 const CLOSED_STAGES = new Set(['completed', 'delivered', 'cancelled', 'closed']);
+const ESCALATION_POLL_INTERVAL_MS = 15000;
 
 let intervalId: ReturnType<typeof setInterval> | null = null;
+
+type EscalationPollEntry = {
+  callbacks: Set<(list: EscalationNotification[]) => void>;
+  latest: EscalationNotification[];
+  hasLatest: boolean;
+  active: boolean;
+  inFlight: boolean;
+  timer: ReturnType<typeof setTimeout> | null;
+};
+
+const escalationPollers = new Map<string, EscalationPollEntry>();
 
 function normDept(v: unknown) {
   return (v ?? '').toString().trim().toLowerCase().replace(/[\s_-]+/g, '');
@@ -101,23 +113,56 @@ export function subscribeToEscalations(
     callback([]);
     return () => undefined;
   }
-  let active = true;
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  const tick = async () => {
-    try {
-      const list = await fetchEscalations(hotelId, opts);
-      if (active) callback(list);
-    } catch (e) {
-      console.warn('[escalation] subscribe failed:', e);
-      if (active) callback([]);
-    } finally {
-      if (active) timer = setTimeout(tick, 5000);
-    }
-  };
-  void tick();
+  const key = `${hotelId}:${opts.isOwner ? 'owner' : normDept(opts.department)}`;
+  let entry = escalationPollers.get(key);
+
+  if (!entry) {
+    entry = {
+      callbacks: new Set(),
+      latest: [],
+      hasLatest: false,
+      active: true,
+      inFlight: false,
+      timer: null,
+    };
+    escalationPollers.set(key, entry);
+
+    const tick = async () => {
+      if (!entry?.active || entry.inFlight) return;
+      entry.inFlight = true;
+      try {
+        const list = await fetchEscalations(hotelId, opts);
+        entry.latest = list;
+        entry.hasLatest = true;
+        for (const listener of entry.callbacks) {
+          try {
+            listener(list);
+          } catch {}
+        }
+      } catch (e) {
+        console.warn('[escalation] subscribe failed:', e);
+      } finally {
+        if (entry) {
+          entry.inFlight = false;
+          if (entry.active) entry.timer = setTimeout(tick, ESCALATION_POLL_INTERVAL_MS);
+        }
+      }
+    };
+    void tick();
+  }
+
+  entry.callbacks.add(callback);
+  if (entry.hasLatest) callback(entry.latest);
+
   return () => {
-    active = false;
-    if (timer) clearTimeout(timer);
+    const current = escalationPollers.get(key);
+    if (!current) return;
+    current.callbacks.delete(callback);
+    if (current.callbacks.size === 0) {
+      current.active = false;
+      if (current.timer) clearTimeout(current.timer);
+      escalationPollers.delete(key);
+    }
   };
 }
 
