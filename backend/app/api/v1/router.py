@@ -23,6 +23,7 @@ from app.api.v1 import (
     lost_found,
     maintenance,
     menu,
+    mobile,
     ops,
     organizations,
     platform,
@@ -46,6 +47,7 @@ from app.api.v1 import (
 )
 
 api_router = APIRouter()
+api_router.include_router(mobile.router, prefix="/mobile", tags=["mobile-compat"])
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(guest_portal.router, prefix="/guest-portal", tags=["guest-portal"])
 api_router.include_router(guest_portal_chat.router, prefix="/guest-portal", tags=["guest-portal-chat"])

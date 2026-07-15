@@ -54,7 +54,7 @@ from app.models.routing_rule import RoutingRule
 from app.models.room import Room, RoomType
 from app.models.saas import Feature, PlanFeature, UsageLimit
 from app.models.staff import EmployeeShift
-from app.models.ticket import Ticket, TicketEvent, TicketMessage, ticket_menu_items
+from app.models.ticket import MobileChatMessage, Ticket, TicketEvent, TicketMessage, ticket_menu_items
 from app.models.ticket_category import TicketCategory
 from app.models.task_type_sla import TaskTypeSLA
 from app.models.ticket_acceptance import TicketAcceptance
@@ -118,6 +118,7 @@ __all__ = [
     "MediaFile",
     "MenuCategory",
     "MenuItem",
+    "MobileChatMessage",
     "Notification",
     "Organization",
     "OrganizationHotel",

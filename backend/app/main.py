@@ -1,17 +1,23 @@
+import base64
+import binascii
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
+from sqlalchemy import select
 
 from app.api.v1.router import api_router
 from app.api.v1.webhooks import router as whatsapp_webhook_router
 from app.api.ws.routes import router as websocket_router
 from app.core.config import settings
-from app.core.database import init_db
+from app.core.database import SessionLocal, init_db
 from app.core.error_handlers import register_error_handlers
 from app.core.performance import PerformanceMetricsMiddleware
 from app.core.rate_limiter import RateLimitMiddleware
+from app.models.ops import MediaFile
 
 
 @asynccontextmanager
@@ -38,6 +44,48 @@ app.add_middleware(
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(PerformanceMetricsMiddleware)
 register_error_handlers(app)
+MOBILE_MEDIA_DIR = Path(__file__).resolve().parent.parent / "media" / "mobile"
+
+
+@app.get("/media/mobile/{hotel_id}/{filename}", include_in_schema=False)
+def mobile_media(hotel_id: str, filename: str) -> Response:
+    file_url = f"/media/mobile/{hotel_id}/{filename}"
+    media: MediaFile | None = None
+    db = SessionLocal()
+    try:
+        media = db.execute(
+            select(MediaFile).where(
+                MediaFile.hotel_id == hotel_id,
+                MediaFile.file_url == file_url,
+            )
+        ).scalars().first()
+        if media and media.file_data_base64:
+            try:
+                content = base64.b64decode(media.file_data_base64.encode("ascii"), validate=True)
+            except (binascii.Error, ValueError) as exc:
+                raise HTTPException(status_code=500, detail="Stored media is corrupted") from exc
+            return Response(
+                content=content,
+                media_type=media.file_type or "application/octet-stream",
+                headers={"Cache-Control": "public, max-age=31536000, immutable"},
+            )
+    finally:
+        db.close()
+
+    legacy_path = (MOBILE_MEDIA_DIR / hotel_id / filename).resolve()
+    try:
+        legacy_path.relative_to(MOBILE_MEDIA_DIR.resolve())
+        is_legacy_media = legacy_path.is_file()
+    except ValueError:
+        is_legacy_media = False
+
+    if is_legacy_media:
+        return Response(
+            content=legacy_path.read_bytes(),
+            media_type=(media.file_type if media else None) or "application/octet-stream",
+            headers={"Cache-Control": "public, max-age=31536000, immutable"},
+        )
+    raise HTTPException(status_code=404, detail="Media not found")
 
 
 @app.get("/health", tags=["system"])

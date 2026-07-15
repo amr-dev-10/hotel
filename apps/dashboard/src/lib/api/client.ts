@@ -2,7 +2,7 @@ import axios, { type AxiosRequestConfig } from "axios";
 
 import type { ApiEnvelope } from "@/types/domain";
 
-const apiBaseURL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api/v1";
+export const apiBaseURL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api/v1";
 export const ACCESS_DENIED_EVENT = "arcadia:access-denied";
 
 export interface AccessDeniedEventDetail {
@@ -108,6 +108,20 @@ export async function apiPatch<T, TPayload = unknown>(
 export async function apiDelete<T>(url: string, config?: AxiosRequestConfig) {
   const response = await api.delete<ApiEnvelope<T>>(url, config);
   return response.data.data;
+}
+
+export function absolutizeBackendUrl(url: string | null | undefined) {
+  if (!url) {
+    return "";
+  }
+  if (/^https?:\/\//i.test(url)) {
+    return url;
+  }
+  if (apiBaseURL.startsWith("/")) {
+    return url.startsWith("/") ? url : `/${url}`;
+  }
+  const origin = apiBaseURL.replace(/\/api\/v1.*$/, "");
+  return `${origin}${url.startsWith("/") ? "" : "/"}${url}`;
 }
 
 export function apiErrorMessage(error: unknown) {

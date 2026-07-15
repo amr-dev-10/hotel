@@ -40,6 +40,8 @@ class Settings(BaseSettings):
     default_ai_provider: str = "local"
     ai_fallback_providers: str = "local"
     fcm_enabled: bool = False
+    fcm_credentials_file: str = ""
+    fcm_project_id: str = ""
     default_timezone: str = "UTC"
 
     stripe_secret_key: str = ""

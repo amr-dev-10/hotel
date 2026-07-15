@@ -33,6 +33,7 @@ class InventoryItem(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     cost_per_unit: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=0)
     default_vendor_id: Mapped[str | None] = mapped_column(ForeignKey("vendors.id"))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    mobile_available: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class InventoryTransaction(UUIDPrimaryKeyMixin, Base):

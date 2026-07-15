@@ -78,6 +78,7 @@ class MediaFile(UUIDPrimaryKeyMixin, Base):
     file_name: Mapped[str | None] = mapped_column(String(255))
     file_size_bytes: Mapped[int | None] = mapped_column(Integer)
     storage_provider: Mapped[str] = mapped_column(String(80), default="local")
+    file_data_base64: Mapped[str | None] = mapped_column(Text)
     uploaded_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 

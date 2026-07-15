@@ -11,8 +11,11 @@ from app.repositories.ops_repository import (
     MediaFileRepository,
     NotificationRepository,
 )
+from app.repositories.user_repository import FCMTokenRepository
 from app.schemas.ops import (
     AuditLogRead,
+    FCMTokenRead,
+    FCMTokenRegister,
     InvoiceCreate,
     InvoiceRead,
     MediaFileCreate,
@@ -116,6 +119,35 @@ def mark_notification_read_post(
         current_user.id,
     )
     return ok(NotificationRead.model_validate(notification).model_dump())
+
+
+@router.post("/notifications/fcm-token")
+def register_fcm_token(
+    hotel_id: str,
+    payload: FCMTokenRegister,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    ensure_hotel_access(hotel_id, current_user)
+    token = FCMTokenRepository(db).upsert(
+        hotel_id,
+        current_user.id,
+        payload.token,
+        payload.platform.lower(),
+    )
+    return ok(FCMTokenRead.model_validate(token).model_dump())
+
+
+@router.delete("/notifications/fcm-token")
+def unregister_fcm_token(
+    hotel_id: str,
+    token: str = Query(min_length=20),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    ensure_hotel_access(hotel_id, current_user)
+    deleted = FCMTokenRepository(db).delete_for_user(current_user.id, token)
+    return ok({"deleted": deleted})
 
 
 @router.get("/media")

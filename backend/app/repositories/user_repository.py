@@ -1,10 +1,11 @@
 from collections.abc import Sequence
 from datetime import datetime
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.models.user import User, UserSession
+from app.models.base import utcnow
+from app.models.user import FCMToken, User, UserSession
 from app.repositories.base import BaseRepository
 
 
@@ -138,6 +139,57 @@ class UserRepository(BaseRepository[User]):
         if department_id:
             statement = statement.where(User.department_id == department_id)
         return self.db.execute(statement.order_by(User.updated_at)).scalars().first()
+
+
+class FCMTokenRepository(BaseRepository[FCMToken]):
+    def __init__(self, db: Session) -> None:
+        super().__init__(db, FCMToken)
+
+    def upsert(
+        self,
+        hotel_id: str,
+        user_id: str,
+        token: str,
+        platform: str,
+    ) -> FCMToken:
+        row = self.db.execute(
+            select(FCMToken).where(
+                FCMToken.user_id == user_id,
+                FCMToken.token == token,
+            )
+        ).scalar_one_or_none()
+        if row:
+            row.hotel_id = hotel_id
+            row.platform = platform
+            row.updated_at = utcnow()
+        else:
+            row = FCMToken(
+                hotel_id=hotel_id,
+                user_id=user_id,
+                token=token,
+                platform=platform,
+                updated_at=utcnow(),
+            )
+            self.db.add(row)
+
+        self.db.commit()
+        self.db.refresh(row)
+        return row
+
+    def list_for_user(self, user_id: str) -> Sequence[FCMToken]:
+        return self.db.execute(
+            select(FCMToken).where(FCMToken.user_id == user_id)
+        ).scalars().all()
+
+    def delete_for_user(self, user_id: str, token: str) -> int:
+        result = self.db.execute(
+            delete(FCMToken).where(
+                FCMToken.user_id == user_id,
+                FCMToken.token == token,
+            )
+        )
+        self.db.commit()
+        return result.rowcount or 0
 
 
 class UserSessionRepository(BaseRepository[UserSession]):

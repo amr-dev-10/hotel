@@ -253,7 +253,14 @@ class EscalationService:
                     message=f"{ticket.ticket_code}: {ticket.item_description}",
                     notification_type="escalation",
                     reference_id=ticket.id,
-                    metadata={"ticket_id": ticket.id, "reason": reason},
+                    metadata={
+                        "event": "ticket_escalated",
+                        "priority": ticket.priority,
+                        "reason": reason,
+                        "room_id": ticket.room_id,
+                        "ticket_code": ticket.ticket_code,
+                        "ticket_id": ticket.id,
+                    },
                 ),
                 commit=False,
             )

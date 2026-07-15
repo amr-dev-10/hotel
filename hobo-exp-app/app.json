@@ -1,0 +1,89 @@
+{
+  "expo": {
+    "name": "HoBo Experience",
+    "slug": "hobo",
+    "version": "1.0.7",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1565C0"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.hobostays.hoboexp",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Camera is needed to capture task photos and scan QR codes.",
+        "NSPhotoLibraryUsageDescription": "Photo library is needed to upload task photos.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "buildNumber": "1"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1565C0"
+      },
+      "package": "com.hobostays.hoboexp",
+      "versionCode": 25,
+      "newArchEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.VIBRATE",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Camera is needed to capture task photos and scan QR codes."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app accesses your photos to attach task images.",
+          "cameraPermission": "The app uses camera to capture task photos."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#1565C0",
+          "sounds": [
+            "./assets/sounds/ringtone.mp3"
+          ]
+        }
+      ],
+      "expo-audio",
+      "@react-native-community/datetimepicker",
+      "expo-asset"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "ffab835f-4183-4d28-b61b-800a0a468904"
+      }
+    },
+    "owner": "amrendrayadav",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/03b3ddcc-5e0f-4aaf-a1df-c9bae28144f4"
+    }
+  }
+}

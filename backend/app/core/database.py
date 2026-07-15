@@ -18,15 +18,18 @@ _query_stats: ContextVar[dict[str, float]] = ContextVar(
 )
 
 
-def _connect_args() -> dict[str, object]:
-    if settings.database_url.startswith("sqlite"):
+def db_connect_args(database_url: str | None = None) -> dict[str, object]:
+    url = database_url or settings.database_url
+    if url.startswith("sqlite"):
         return {"check_same_thread": False}
+    if "pooler.supabase.com:6543" in url:
+        return {"prepare_threshold": None}
     return {}
 
 
 engine = create_engine(
     settings.database_url,
-    connect_args=_connect_args(),
+    connect_args=db_connect_args(),
     pool_pre_ping=not settings.database_url.startswith("sqlite"),
 )
 

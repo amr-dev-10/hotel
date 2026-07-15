@@ -1,0 +1,18 @@
+appId: com.hoboerp
+---
+- launchApp:
+    clearState: true
+- tapOn: "Email"
+- inputText: "owner@admin.com"
+- tapOn: "Password"
+- inputText: "admin@123"
+- tapOn: "Sign in"
+- assertVisible: "Quick Actions"
+- tapOn: "Create Ticket"
+- assertVisible: "Issue"
+- tapOn: "Describe the guest or operations issue"
+- inputText: "Leaking sink in room 204"
+- tapOn: "housekeeping, maintenance, request..."
+- inputText: "maintenance"
+- tapOn: "Create Ticket"
+- assertVisible: "Ticket created"

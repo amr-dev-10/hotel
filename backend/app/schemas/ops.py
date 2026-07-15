@@ -45,12 +45,27 @@ class NotificationRead(ORMModel):
     created_at: datetime
 
 
+class FCMTokenRegister(BaseModel):
+    token: str = Field(min_length=20, max_length=500)
+    platform: str = Field(default="android", min_length=2, max_length=40)
+
+
+class FCMTokenRead(ORMModel):
+    id: str
+    hotel_id: str
+    user_id: str
+    token: str
+    platform: str
+    updated_at: datetime
+
+
 class MediaFileCreate(BaseModel):
-    file_url: str = Field(min_length=2, max_length=800)
+    file_url: str | None = Field(default=None, min_length=2, max_length=800)
     file_type: str = Field(min_length=2, max_length=80)
     file_name: str | None = None
     file_size_bytes: int | None = None
     storage_provider: str = "local"
+    file_data_base64: str | None = None
 
 
 class MediaFileRead(ORMModel):

@@ -23,6 +23,12 @@ count_line_of_code.py
 gha-creds-*.json
 github-variables.txt
 github-secrets.txt
+frontend-github-variables.txt
 bootstrap-summary.txt
 secret-manager-summary.txt
+development-github-variables.txt
+development-github-secrets.txt
+frontend-development-github-variables.txt
+development-bootstrap-summary.txt
+development-secret-manager-summary.txt
 tsconfig.tsbuildinfo

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api/client";
+import { absolutizeBackendUrl, apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api/client";
 import { queryKeys } from "@/lib/api/query-keys";
 import type {
   MenuCategory,
@@ -29,6 +29,10 @@ export type MenuItemPayload = {
   is_available?: boolean;
   display_order?: number;
   tax_config_ids?: string[];
+};
+
+type MediaUploadResponse = {
+  file_url: string;
 };
 
 export type TaxPayload = {
@@ -174,6 +178,21 @@ export function useUpdateMenuItem(hotelId: string) {
   });
 }
 
+export function useUploadMedia(hotelId: string) {
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const media = await apiPost<MediaUploadResponse>(`/hotels/${hotelId}/media/upload`, {
+        file_type: file.type || mediaTypeFromName(file.name),
+        file_name: file.name,
+        file_size_bytes: file.size,
+        storage_provider: "database",
+        file_data_base64: await fileToBase64(file),
+      });
+      return absolutizeBackendUrl(media.file_url);
+    },
+  });
+}
+
 export function useDeleteMenuItem(hotelId: string) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -206,4 +225,24 @@ export function useUpdateOrderStatus(hotelId: string) {
       apiPatch<RestaurantOrder>(`/hotels/${hotelId}/restaurant/orders/${orderId}/status`, { status }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["fnb", hotelId, "orders"] }),
   });
+}
+
+function fileToBase64(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error("Could not read image"));
+    reader.onload = () => {
+      const result = String(reader.result ?? "");
+      resolve(result.includes(",") ? result.split(",", 2)[1] : result);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function mediaTypeFromName(name: string) {
+  const extension = name.split(".").pop()?.toLowerCase();
+  if (extension === "png") return "image/png";
+  if (extension === "webp") return "image/webp";
+  if (extension === "gif") return "image/gif";
+  return "image/jpeg";
 }
