@@ -18,9 +18,9 @@ export VPC_EGRESS="${VPC_EGRESS:-private-ranges-only}"
 export CLOUD_RUN_SERVICE="${CLOUD_RUN_SERVICE:-arcadia-backend-development}"
 export CLOUD_RUN_MIGRATION_JOB="${CLOUD_RUN_MIGRATION_JOB:-arcadia-backend-migrate-development}"
 
-export RUNTIME_SA="${RUNTIME_SA:-arcadia-backend-runner-development}"
-export FRONTEND_RUNTIME_SA="${FRONTEND_RUNTIME_SA:-arcadia-dashboard-runner-development}"
-export DEPLOY_SA="${DEPLOY_SA:-arcadia-github-deploy-development}"
+export RUNTIME_SA="${RUNTIME_SA:-arcadia-backend-run-dev}"
+export FRONTEND_RUNTIME_SA="${FRONTEND_RUNTIME_SA:-arcadia-dashboard-run-dev}"
+export DEPLOY_SA="${DEPLOY_SA:-arcadia-github-deploy-dev}"
 
 export WIF_POOL="${WIF_POOL:-github-actions-pool}"
 export WIF_PROVIDER="${WIF_PROVIDER:-github-actions-provider}"

@@ -137,9 +137,9 @@ export CLOUD_RUN_SERVICE="arcadia-backend-development"
 export CLOUD_RUN_MIGRATION_JOB="arcadia-backend-migrate-development"
 export FRONTEND_CLOUD_RUN_SERVICE="arcadia-dashboard-development"
 
-export RUNTIME_SA="arcadia-backend-runner-development"
-export FRONTEND_RUNTIME_SA="arcadia-dashboard-runner-development"
-export DEPLOY_SA="arcadia-github-deploy-development"
+export RUNTIME_SA="arcadia-backend-run-dev"
+export FRONTEND_RUNTIME_SA="arcadia-dashboard-run-dev"
+export DEPLOY_SA="arcadia-github-deploy-dev"
 
 export REDIS_INSTANCE="arcadia-redis-development"
 export VPC_CONNECTOR="arcadia-vpc-development"

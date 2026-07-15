@@ -14,7 +14,9 @@ import app.models  # noqa: F401
 
 config = context.config
 database_url = settings.database_url or config.get_main_option("sqlalchemy.url")
-config.set_main_option("sqlalchemy.url", database_url)
+# ConfigParser treats "%" as interpolation syntax. URL-encoded passwords often
+# contain percent escapes, so escape them only for Alembic's config storage.
+config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
