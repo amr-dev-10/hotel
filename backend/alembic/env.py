@@ -9,7 +9,7 @@ backend_dir = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(backend_dir))
 
 from app.core.config import settings
-from app.core.database import Base
+from app.core.database import Base, db_connect_args
 import app.models  # noqa: F401
 
 config = context.config
@@ -40,6 +40,7 @@ def run_migrations_online() -> None:
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args=db_connect_args(database_url),
     )
 
     with connectable.connect() as connection:

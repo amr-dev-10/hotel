@@ -3,6 +3,7 @@ name: Backend CI/CD
 on:
   push:
     branches:
+      - development
       - staging
       - main
     paths:
@@ -16,6 +17,7 @@ on:
         default: "staging"
         type: choice
         options:
+          - development
           - staging
           - production
 
@@ -32,9 +34,9 @@ jobs:
     name: Test, migrate, and deploy backend
     runs-on: ubuntu-latest
     environment:
-      name: ${{ github.event_name == 'workflow_dispatch' && inputs.target || (github.ref_name == 'main' && 'production' || 'staging') }}
+      name: ${{ github.event_name == 'workflow_dispatch' && inputs.target || (github.ref_name == 'main' && 'production' || github.ref_name) }}
     env:
-      ENVIRONMENT_NAME: ${{ github.event_name == 'workflow_dispatch' && inputs.target || (github.ref_name == 'main' && 'production' || 'staging') }}
+      ENVIRONMENT_NAME: ${{ github.event_name == 'workflow_dispatch' && inputs.target || (github.ref_name == 'main' && 'production' || github.ref_name) }}
       GCP_REGION: ${{ vars.GCP_REGION || 'us-central1' }}
       GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
       ARTIFACT_REPOSITORY: ${{ vars.ARTIFACT_REPOSITORY || 'arcadia-repo' }}
@@ -73,6 +75,14 @@ jobs:
             echo "Production deploys must run from the main branch."
             exit 1
           fi
+          if [[ "$ENVIRONMENT_NAME" == "staging" && "$GITHUB_REF_NAME" != "staging" ]]; then
+            echo "Staging deploys must run from the staging branch."
+            exit 1
+          fi
+          if [[ "$ENVIRONMENT_NAME" == "development" && "$GITHUB_REF_NAME" != "development" ]]; then
+            echo "Development deploys must run from the development branch."
+            exit 1
+          fi
           required=(
             GCP_PROJECT_ID
             GCP_WORKLOAD_IDENTITY_PROVIDER
@@ -80,7 +90,6 @@ jobs:
             CLOUD_RUN_SERVICE
             CLOUD_RUN_MIGRATION_JOB
             CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT
-            CLOUD_SQL_CONNECTION_NAME
             DATABASE_URL_SECRET
             REDIS_URL_SECRET
             CELERY_BROKER_URL_SECRET
@@ -98,6 +107,13 @@ jobs:
           if (( ${#missing[@]} > 0 )); then
             printf 'Missing required GitHub environment variables or secrets: %s\n' "${missing[*]}"
             exit 1
+          fi
+          if [[ "$ENVIRONMENT_NAME" != "development" && -z "${CLOUD_SQL_CONNECTION_NAME:-}" ]]; then
+            echo "CLOUD_SQL_CONNECTION_NAME is required outside development."
+            exit 1
+          fi
+          if [[ -z "${CLOUD_SQL_CONNECTION_NAME:-}" ]]; then
+            echo "CLOUD_SQL_CONNECTION_NAME is empty. Deploying without a Cloud SQL connector; DATABASE_URL must be directly reachable."
           fi
           if [[ "${WHATSAPP_DRY_RUN,,}" != "true" ]]; then
             whatsapp_missing=()
@@ -175,7 +191,6 @@ jobs:
             "--region=$GCP_REGION"
             "--image=$IMAGE_URI"
             "--service-account=$CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT"
-            "--set-cloudsql-instances=$CLOUD_SQL_CONNECTION_NAME"
             "--set-env-vars=$APP_ENV_VARS"
             "--set-secrets=$APP_SECRET_REFS"
             "--command=alembic"
@@ -185,6 +200,9 @@ jobs:
             "--task-timeout=900s"
             "--quiet"
           )
+          if [[ -n "${CLOUD_SQL_CONNECTION_NAME:-}" ]]; then
+            args+=("--set-cloudsql-instances=$CLOUD_SQL_CONNECTION_NAME")
+          fi
           if [[ -n "${VPC_CONNECTOR:-}" ]]; then
             args+=("--vpc-connector=$VPC_CONNECTOR" "--vpc-egress=$VPC_EGRESS")
           fi
@@ -203,12 +221,14 @@ jobs:
             "--region=$GCP_REGION"
             "--image=$IMAGE_URI"
             "--service-account=$CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT"
-            "--set-cloudsql-instances=$CLOUD_SQL_CONNECTION_NAME"
             "--set-env-vars=$APP_ENV_VARS"
             "--set-secrets=$APP_SECRET_REFS"
             "--allow-unauthenticated"
             "--quiet"
           )
+          if [[ -n "${CLOUD_SQL_CONNECTION_NAME:-}" ]]; then
+            args+=("--set-cloudsql-instances=$CLOUD_SQL_CONNECTION_NAME")
+          fi
           if [[ -n "${VPC_CONNECTOR:-}" ]]; then
             args+=("--vpc-connector=$VPC_CONNECTOR" "--vpc-egress=$VPC_EGRESS")
           fi

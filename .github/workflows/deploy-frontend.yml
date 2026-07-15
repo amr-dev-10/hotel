@@ -3,6 +3,7 @@ name: Frontend CI/CD
 on:
   push:
     branches:
+      - development
       - staging
       - main
     paths:
@@ -21,6 +22,7 @@ on:
         default: "staging"
         type: choice
         options:
+          - development
           - staging
           - production
 
@@ -37,9 +39,9 @@ jobs:
     name: Build and deploy frontend
     runs-on: ubuntu-latest
     environment:
-      name: ${{ github.event_name == 'workflow_dispatch' && inputs.target || (github.ref_name == 'main' && 'production' || 'staging') }}
+      name: ${{ github.event_name == 'workflow_dispatch' && inputs.target || (github.ref_name == 'main' && 'production' || github.ref_name) }}
     env:
-      ENVIRONMENT_NAME: ${{ github.event_name == 'workflow_dispatch' && inputs.target || (github.ref_name == 'main' && 'production' || 'staging') }}
+      ENVIRONMENT_NAME: ${{ github.event_name == 'workflow_dispatch' && inputs.target || (github.ref_name == 'main' && 'production' || github.ref_name) }}
       GCP_REGION: ${{ vars.GCP_REGION || 'us-central1' }}
       GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
       ARTIFACT_REPOSITORY: ${{ vars.ARTIFACT_REPOSITORY || 'arcadia-repo' }}
@@ -66,6 +68,14 @@ jobs:
           set -euo pipefail
           if [[ "$ENVIRONMENT_NAME" == "production" && "$GITHUB_REF_NAME" != "main" ]]; then
             echo "Production deploys must run from the main branch."
+            exit 1
+          fi
+          if [[ "$ENVIRONMENT_NAME" == "staging" && "$GITHUB_REF_NAME" != "staging" ]]; then
+            echo "Staging deploys must run from the staging branch."
+            exit 1
+          fi
+          if [[ "$ENVIRONMENT_NAME" == "development" && "$GITHUB_REF_NAME" != "development" ]]; then
+            echo "Development deploys must run from the development branch."
             exit 1
           fi
           required=(
