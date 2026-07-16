@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, UserPlus } from "lucide-react";
+import { Loader2, Sparkles, UserPlus } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { showApiErrorToast } from "@/lib/api/error-toast";
@@ -22,11 +22,12 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { Select } from "@/components/ui/select";
 import { useDepartments } from "@/features/departments/hooks/useDepartments";
 import { createStaffSchema, type CreateStaffValues } from "@/features/staff/schemas/create-staff.schema";
-import { useCreateStaff, useStaff } from "@/features/staff/hooks/useStaff";
+import { useCreateStaff, useGenerateEmployeeCode, useStaff } from "@/features/staff/hooks/useStaff";
 
 export function CreateStaffDialog({ hotelId }: { hotelId: string }) {
   const [open, setOpen] = useState(false);
   const createStaff = useCreateStaff(hotelId);
+  const generateEmployeeCode = useGenerateEmployeeCode(hotelId);
   const departments = useDepartments(hotelId);
   const staff = useStaff(hotelId);
   const form = useForm<CreateStaffValues>({
@@ -35,6 +36,7 @@ export function CreateStaffDialog({ hotelId }: { hotelId: string }) {
       name: "",
       email: "",
       password: "",
+      employee_code: "",
       department_id: "",
       reports_to: "",
       staff_level: "attendant",
@@ -47,6 +49,7 @@ export function CreateStaffDialog({ hotelId }: { hotelId: string }) {
     try {
       await createStaff.mutateAsync({
         ...values,
+        employee_code: values.employee_code?.trim() || undefined,
         department_id: values.department_id || undefined,
         reports_to: values.reports_to || undefined,
         job_role: values.job_role || undefined,
@@ -58,6 +61,21 @@ export function CreateStaffDialog({ hotelId }: { hotelId: string }) {
       showApiErrorToast(error);
     }
   });
+
+  async function handleGenerateEmployeeCode() {
+    try {
+      const generated = await generateEmployeeCode.mutateAsync({
+        staff_level: form.getValues("staff_level"),
+      });
+      form.setValue("employee_code", generated.employee_code, {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+      toast.success("Employee code generated");
+    } catch (error) {
+      showApiErrorToast(error);
+    }
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -82,6 +100,28 @@ export function CreateStaffDialog({ hotelId }: { hotelId: string }) {
             <div className="grid gap-2">
               <Label htmlFor="email">Email</Label>
               <Input id="email" type="email" {...form.register("email")} />
+            </div>
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="employee_code">Employee code</Label>
+            <div className="flex gap-2">
+              <Input
+                className="font-mono uppercase"
+                id="employee_code"
+                placeholder="TAJMANG234AX"
+                {...form.register("employee_code")}
+              />
+              <Button
+                className="shrink-0"
+                disabled={generateEmployeeCode.isPending}
+                type="button"
+                variant="secondary"
+                onClick={handleGenerateEmployeeCode}
+              >
+                {generateEmployeeCode.isPending ? <Loader2 className="animate-spin" /> : <Sparkles />}
+                Auto-generate
+              </Button>
             </div>
           </div>
 

@@ -17,11 +17,21 @@ class AuthService:
         self.users = UserRepository(db)
         self.sessions = UserSessionRepository(db)
 
-    def authenticate(self, email: str, password: str) -> User:
-        user = self.users.get_by_email(email)
+    def authenticate(self, identifier: str, password: str) -> User:
+        user = self._user_for_identifier(identifier)
         if not user or not user.is_active or not verify_password(password, user.hashed_password):
-            raise bad_request("Invalid email or password")
+            raise bad_request("Invalid email/employee code or password")
         return user
+
+    def _user_for_identifier(self, identifier: str) -> User | None:
+        value = identifier.strip()
+        if "@" in value:
+            return self.users.get_by_email(value)
+
+        candidates = [user for user in self.users.list_by_employee_code(value.upper()) if user.is_active]
+        if len(candidates) != 1:
+            return None
+        return candidates[0]
 
     def token_for_user(
         self,

@@ -35,7 +35,7 @@ import {
 import { toast } from "sonner";
 
 import { DispatchAlert } from "@/components/dispatch-alert";
-import { apiErrorDetails } from "@/lib/api/client";
+import { absolutizeBackendUrl, apiErrorDetails } from "@/lib/api/client";
 import { NotificationBell } from "@/components/notification-bell";
 import { Button } from "@/components/ui/button";
 import {
@@ -439,6 +439,7 @@ function HeaderUserMenu({
   }
 
   const role = titleCase(currentUser.job_role ?? currentUser.staff_level ?? "Hotel team");
+  const profileImageUrl = absolutizeBackendUrl(currentUser.profile_image_url);
 
   return (
     <DropdownMenu>
@@ -448,7 +449,7 @@ function HeaderUserMenu({
           type="button"
         >
           <span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/95 text-xs font-semibold text-[var(--background-deep)] ring-1 ring-white/20">
-            {currentUser.name?.[0]?.toUpperCase() ?? "U"}
+            {profileImageUrl ? <img alt="" className="h-full w-full object-cover" src={profileImageUrl} /> : currentUser.name?.[0]?.toUpperCase() ?? "U"}
           </span>
           <span className="hidden min-w-0 md:block">
             <span className="block max-w-36 truncate text-xs font-semibold leading-4 text-white">{currentUser.name}</span>
@@ -459,8 +460,8 @@ function HeaderUserMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-64 p-2">
         <div className="flex items-center gap-3 rounded-md bg-[var(--panel-muted)] p-3">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[var(--primary)] text-sm font-semibold text-white">
-            {currentUser.name?.[0]?.toUpperCase() ?? "U"}
+          <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--primary)] text-sm font-semibold text-white">
+            {profileImageUrl ? <img alt="" className="h-full w-full object-cover" src={profileImageUrl} /> : currentUser.name?.[0]?.toUpperCase() ?? "U"}
           </span>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold">{currentUser.name}</p>

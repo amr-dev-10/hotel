@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { format, formatDistanceToNow } from "date-fns";
@@ -36,13 +36,15 @@ import { useReservations } from "@/features/reservations/hooks/useReservations";
 import { useRooms } from "@/features/rooms/hooks/useRooms";
 import { useShifts, useUpdateShift } from "@/features/staff/hooks/useStaff";
 import { useAcceptTicket, useCompleteTicket, useRejectTicket, useTickets } from "@/features/tickets/hooks/useTickets";
+import { apiGet } from "@/lib/api/client";
 import { showApiErrorToast } from "@/lib/api/error-toast";
 import { titleCase } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth.store";
-import type { EmployeeShift, HousekeepingTask, Reservation, RestaurantOrder, Room, Ticket } from "@/types/domain";
+import type { CurrentUser, EmployeeShift, HousekeepingTask, Reservation, RestaurantOrder, Room, Ticket } from "@/types/domain";
 
 export function StaffPortalPage({ hotelId }: { hotelId: string }) {
   const currentUser = useAuthStore((state) => state.currentUser);
+  const setCurrentUser = useAuthStore((state) => state.setCurrentUser);
   const assignedTicketQuery = useTickets(hotelId, {
     assigned_to: currentUser?.id ?? "",
     limit: "100",
@@ -57,6 +59,26 @@ export function StaffPortalPage({ hotelId }: { hotelId: string }) {
   const acceptTicket = useAcceptTicket(hotelId);
   const rejectTicket = useRejectTicket(hotelId);
   const completeTicket = useCompleteTicket(hotelId);
+
+  useEffect(() => {
+    let active = true;
+
+    async function refreshCurrentUser() {
+      try {
+        const updated = await apiGet<CurrentUser>("/auth/me");
+        if (active) {
+          setCurrentUser(updated);
+        }
+      } catch {
+        // DashboardShell owns session-expiry handling; this page only refreshes fresh profile fields.
+      }
+    }
+
+    void refreshCurrentUser();
+    return () => {
+      active = false;
+    };
+  }, [setCurrentUser]);
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -174,6 +196,7 @@ export function StaffPortalPage({ hotelId }: { hotelId: string }) {
         activeTickets={activeTickets.length}
         currentShift={currentShift}
         dueSoonTickets={dueSoonTickets.length}
+        employeeCode={currentUser.employee_code ?? "Not assigned"}
         pendingTickets={pendingTickets.length}
         updatePending={updateShift.isPending}
         onShiftUpdate={handleShiftStatus}
@@ -225,6 +248,7 @@ function PersonalOverview({
   activeTickets,
   currentShift,
   dueSoonTickets,
+  employeeCode,
   pendingTickets,
   updatePending,
   onShiftUpdate,
@@ -232,6 +256,7 @@ function PersonalOverview({
   activeTickets: number;
   currentShift: EmployeeShift | undefined;
   dueSoonTickets: number;
+  employeeCode: string;
   pendingTickets: number;
   updatePending: boolean;
   onShiftUpdate: (shift: EmployeeShift, status: "checked_in" | "completed") => void;
@@ -253,15 +278,23 @@ function PersonalOverview({
             />
           </div>
         </div>
-        {currentShift ? (
-          <div className="grid gap-2 text-sm text-slate-600 sm:grid-cols-3">
-            <Info label="Status" value={titleCase(currentShift.status)} />
-            <Info label="Start" value={timeLabel(currentShift.actual_start ?? currentShift.shift_start)} />
-            <Info label="End" value={timeLabel(currentShift.actual_end ?? currentShift.shift_end)} />
-          </div>
-        ) : (
-          <p className="text-sm text-slate-500">No shift is scheduled for your account today, so check-in is not available yet.</p>
-        )}
+        <div className="grid gap-2 text-sm text-slate-600 sm:grid-cols-4">
+          <Info label="Employee code" value={employeeCode} />
+          {currentShift ? (
+            <>
+              <Info label="Status" value={titleCase(currentShift.status)} />
+              <Info label="Start" value={timeLabel(currentShift.actual_start ?? currentShift.shift_start)} />
+              <Info label="End" value={timeLabel(currentShift.actual_end ?? currentShift.shift_end)} />
+            </>
+          ) : (
+            <div className="rounded-md bg-slate-50 p-3 sm:col-span-3">
+              <p className="text-xs font-semibold uppercase tracking-normal text-slate-400">Shift</p>
+              <p className="mt-1 text-sm text-slate-500">
+                No shift is scheduled for your account today, so check-in is not available yet.
+              </p>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">

@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { DataState } from "@/components/ui/data-state";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { absolutizeBackendUrl } from "@/lib/api/client";
 import { titleCase } from "@/lib/utils";
 import { useDepartments } from "@/features/departments/hooks/useDepartments";
 import { useStaff } from "@/features/staff/hooks/useStaff";
@@ -70,6 +71,7 @@ export function StaffDirectory({ hotelId }: { hotelId: string }) {
       const searchText = [
         user.name,
         user.email,
+        user.employee_code ?? "",
         user.job_role ?? "",
         user.staff_level ?? "",
         departmentName ?? "",
@@ -156,7 +158,7 @@ export function StaffDirectory({ hotelId }: { hotelId: string }) {
             <Input
               aria-label="Search staff"
               className="pr-9"
-              placeholder="Search name, email, role, manager"
+              placeholder="Search name, email, code, role, manager"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
@@ -275,14 +277,17 @@ function StaffCard({
   return (
     <article className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <Link href={`/${hotelId}/settings/staff/${user.id}`} className="hover:text-[var(--primary)]" prefetch={false}>
-            <h2 className="truncate text-base font-semibold">{user.name}</h2>
-          </Link>
-          <p className="mt-1 flex items-center gap-2 truncate text-sm text-slate-500">
-            <Mail className="size-4" />
-            {user.email}
-          </p>
+        <div className="flex min-w-0 items-start gap-3">
+          <StaffAvatar user={user} />
+          <div className="min-w-0">
+            <Link href={`/${hotelId}/settings/staff/${user.id}`} className="hover:text-[var(--primary)]" prefetch={false}>
+              <h2 className="truncate text-base font-semibold">{user.name}</h2>
+            </Link>
+            <p className="mt-1 flex items-center gap-2 truncate text-sm text-slate-500">
+              <Mail className="size-4" />
+              {user.email}
+            </p>
+          </div>
         </div>
         <Badge variant={user.is_on_duty ? "green" : "default"}>
           {user.is_on_duty ? "On duty" : "Off duty"}
@@ -290,6 +295,7 @@ function StaffCard({
       </div>
 
       <div className="mt-4 grid gap-2 text-sm">
+        <DetailRow label="Employee code" value={employeeCode(user)} />
         <DetailRow label="Role" value={user.job_role ?? "Staff"} />
         <DetailRow label="Level" value={titleCase(user.staff_level)} />
         <DetailRow label="Department" value={departmentName ?? "Unassigned"} />
@@ -329,6 +335,19 @@ function StaffCard({
   );
 }
 
+function StaffAvatar({ user }: { user: StaffUser }) {
+  const imageUrl = absolutizeBackendUrl(user.profile_image_url);
+  return (
+    <span className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--primary)] text-sm font-semibold text-white">
+      {imageUrl ? <img alt="" className="h-full w-full object-cover" src={imageUrl} /> : initials(user.name)}
+    </span>
+  );
+}
+
+function employeeCode(user: StaffUser) {
+  return user.employee_code || "Not assigned";
+}
+
 function SummaryCard({
   icon: Icon,
   label,
@@ -347,6 +366,15 @@ function SummaryCard({
       <p className="mt-2 text-2xl font-semibold">{value}</p>
     </div>
   );
+}
+
+function initials(name: string) {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
 }
 
 function DetailRow({ label, value }: { label: string; value: string }) {

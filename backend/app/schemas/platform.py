@@ -153,6 +153,7 @@ class PlatformHotelCreateResponse(BaseModel):
 class PlatformUserSummary(ORMModel):
     id: str
     hotel_id: str
+    employee_code: str | None = None
     department_id: str | None = None
     reports_to: str | None = None
     name: str
@@ -160,6 +161,7 @@ class PlatformUserSummary(ORMModel):
     user_type: str
     staff_level: str | None = None
     job_role: str | None = None
+    profile_image_url: str | None = None
     is_hotel_owner: bool
     is_active: bool
     is_on_duty: bool

@@ -6,6 +6,12 @@ export const createStaffSchema = z.object({
   name: z.string().min(2).max(255),
   email: z.string().email(),
   password: z.string().min(8),
+  employee_code: z
+    .string()
+    .trim()
+    .max(40)
+    .regex(/^[A-Za-z0-9]*$/, "Use letters and numbers only")
+    .optional(),
   department_id: z.string().optional(),
   reports_to: z.string().optional(),
   staff_level: staffLevelSchema.optional(),

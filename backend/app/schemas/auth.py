@@ -1,11 +1,20 @@
-from pydantic import BaseModel, EmailStr, Field, model_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
 from app.schemas.common import ORMModel
+from app.schemas.ops import MediaFileCreate
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    email: str = Field(min_length=1, max_length=255)
     password: str = Field(min_length=6)
+
+    @field_validator("email")
+    @classmethod
+    def normalize_identifier(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Enter your email or employee code")
+        return normalized
 
 
 class TokenResponse(BaseModel):
@@ -18,12 +27,14 @@ class TokenResponse(BaseModel):
 class CurrentUserRead(ORMModel):
     id: str
     hotel_id: str
+    employee_code: str | None = None
     department_id: str | None = None
     name: str
     email: EmailStr
     user_type: str
     staff_level: str | None = None
     job_role: str | None = None
+    profile_image_url: str | None = None
     is_hotel_owner: bool
     is_on_duty: bool
     permissions: list[str] = Field(default_factory=list)
@@ -37,6 +48,14 @@ class RefreshTokenRequest(BaseModel):
 
 class LogoutRequest(BaseModel):
     refresh_token: str | None = None
+
+
+class ProfileUpdateRequest(BaseModel):
+    email: EmailStr | None = None
+
+
+class ProfileImageUploadRequest(MediaFileCreate):
+    pass
 
 
 class PasswordChangeRequest(BaseModel):

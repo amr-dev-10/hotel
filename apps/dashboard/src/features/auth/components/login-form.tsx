@@ -68,8 +68,14 @@ export function LoginForm() {
 
       <form className="grid gap-4" onSubmit={onSubmit}>
         <div className="grid gap-2">
-          <Label htmlFor="email">Email</Label>
-          <Input id="email" type="email" autoComplete="email" {...form.register("email")} />
+          <Label htmlFor="email">Email or employee code</Label>
+          <Input
+            id="email"
+            type="text"
+            autoComplete="username"
+            placeholder="owner@arcadia.demo or MGR001"
+            {...form.register("email")}
+          />
           {form.formState.errors.email ? (
             <p className="text-xs text-rose-700">{form.formState.errors.email.message}</p>
           ) : null}

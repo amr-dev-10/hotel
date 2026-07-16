@@ -9,7 +9,7 @@ from app.core.responses import ok
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
 from app.schemas.rbac import UserRoleAssign
-from app.schemas.user import UserCreate, UserRead, UserUpdate
+from app.schemas.user import EmployeeCodeGenerateRequest, EmployeeCodeGenerateResponse, UserCreate, UserRead, UserUpdate
 from app.services.auth_service import AuthService
 from app.services.audit_service import AuditService
 from app.services.rbac_service import RBACService
@@ -48,8 +48,11 @@ def create_user(
     repo = UserRepository(db)
     if repo.get_by_hotel_email(hotel_id, payload.email):
         raise bad_request("User email already exists for this hotel")
+    if payload.employee_code and repo.get_by_hotel_employee_code(hotel_id, payload.employee_code):
+        raise bad_request("Employee code already exists for this hotel")
     user = User(
         hotel_id=hotel_id,
+        employee_code=payload.employee_code,
         name=payload.name,
         email=payload.email,
         hashed_password=AuthService.password_hash(payload.password),
@@ -69,10 +72,25 @@ def create_user(
         "user",
         user.id,
         current_user.id,
-        {"name": user.name, "email": user.email, "user_type": user.user_type},
+        {"name": user.name, "email": user.email, "employee_code": user.employee_code, "user_type": user.user_type},
         commit=True,
     )
     return ok(UserRead.model_validate(user).model_dump())
+
+
+@router.post("/employee-code/generate")
+def generate_employee_code(
+    hotel_id: str,
+    payload: EmployeeCodeGenerateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_any_permission("user.create", "user.manage")),
+) -> dict:
+    code = UserService(db).generate_employee_code(
+        hotel_id,
+        staff_level=payload.staff_level,
+        job_role=payload.job_role,
+    )
+    return ok(EmployeeCodeGenerateResponse(employee_code=code).model_dump())
 
 
 @router.get("/{user_id}")

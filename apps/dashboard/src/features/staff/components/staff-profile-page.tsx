@@ -15,6 +15,7 @@ import {
   Pencil,
   Save,
   ShieldCheck,
+  Sparkles,
   TicketCheck,
   Trash2,
   UserCheck,
@@ -32,12 +33,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Can } from "@/lib/auth/can";
+import { absolutizeBackendUrl } from "@/lib/api/client";
 import { cn, compactId, titleCase } from "@/lib/utils";
 import { useDepartments } from "@/features/departments/hooks/useDepartments";
 import { useAssignUserRoles, useRoles } from "@/features/roles/hooks/useRoles";
 import { updateStaffSchema, type UpdateStaffValues } from "@/features/staff/schemas/create-staff.schema";
 import {
   useDeleteStaff,
+  useGenerateEmployeeCode,
   useShifts,
   useStaff,
   useUpdateStaff,
@@ -76,6 +79,7 @@ export function StaffProfilePage({
   const tickets = useTickets(hotelId, ticketFilters);
   const shifts = useShifts(hotelId);
   const updateStaff = useUpdateStaff(hotelId, staffId);
+  const generateEmployeeCode = useGenerateEmployeeCode(hotelId);
   const deleteStaff = useDeleteStaff(hotelId);
   const assignRoles = useAssignUserRoles(hotelId, staffId);
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
@@ -109,6 +113,7 @@ export function StaffProfilePage({
       email: "",
       department_id: "",
       reports_to: "",
+      employee_code: "",
       staff_level: "attendant",
       job_role: "",
       is_on_duty: false,
@@ -130,6 +135,7 @@ export function StaffProfilePage({
       email: user.email,
       department_id: user.department_id ?? "",
       reports_to: user.reports_to ?? "",
+      employee_code: user.employee_code ?? "",
       staff_level: normalizeStaffLevel(user.staff_level),
       job_role: user.job_role ?? "",
       is_on_duty: user.is_on_duty,
@@ -151,6 +157,7 @@ export function StaffProfilePage({
     try {
       await updateStaff.mutateAsync({
         ...values,
+        employee_code: values.employee_code?.trim().toUpperCase() || undefined,
         department_id: values.department_id || undefined,
         reports_to: values.reports_to || undefined,
         job_role: values.job_role || undefined,
@@ -161,6 +168,21 @@ export function StaffProfilePage({
       showApiErrorToast(error);
     }
   });
+
+  async function handleGenerateEmployeeCode() {
+    try {
+      const generated = await generateEmployeeCode.mutateAsync({
+        staff_level: form.getValues("staff_level"),
+      });
+      form.setValue("employee_code", generated.employee_code, {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+      toast.success("Employee code generated");
+    } catch (error) {
+      showApiErrorToast(error);
+    }
+  }
 
   async function handleDelete() {
     if (!user || !window.confirm(`Delete ${user.name}?`)) {
@@ -228,9 +250,7 @@ export function StaffProfilePage({
 
       <section className="grid gap-4 rounded-md border border-slate-200 bg-white p-4 lg:grid-cols-[1.2fr_2fr]">
         <div className="flex items-center gap-4">
-          <div className="flex size-16 shrink-0 items-center justify-center rounded-md bg-[var(--primary)] text-xl font-semibold text-white">
-            {initials(user.name)}
-          </div>
+          <ProfileAvatar user={user} />
           <div className="min-w-0">
             <p className="truncate text-lg font-semibold">{user.name}</p>
             <p className="truncate text-sm text-slate-500">{user.job_role ?? "Staff"}</p>
@@ -240,7 +260,8 @@ export function StaffProfilePage({
             </div>
           </div>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <Detail label="Employee code" value={employeeCode(user)} />
           <Detail label="Department" value={department?.name ?? compactId(user.department_id)} />
           <Detail label="Reports to" value={manager?.name ?? compactId(user.reports_to)} />
           <Detail label="Open tickets" value={String(metrics.openTickets)} />
@@ -258,6 +279,28 @@ export function StaffProfilePage({
             </Button>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
+            <Field label="Employee code" id="profile-employee-code">
+              <div className="flex gap-2">
+                <Input
+                  className="font-mono uppercase"
+                  id="profile-employee-code"
+                  maxLength={40}
+                  pattern="[A-Za-z0-9]*"
+                  placeholder="TAJMANG234AX"
+                  {...form.register("employee_code")}
+                />
+                <Button
+                  className="shrink-0"
+                  disabled={generateEmployeeCode.isPending}
+                  type="button"
+                  variant="secondary"
+                  onClick={handleGenerateEmployeeCode}
+                >
+                  {generateEmployeeCode.isPending ? <Loader2 className="animate-spin" /> : <Sparkles />}
+                  Auto-generate
+                </Button>
+              </div>
+            </Field>
             <Field label="Name" id="profile-name">
               <Input id="profile-name" {...form.register("name")} />
             </Field>
@@ -447,7 +490,7 @@ function OverviewPanel({
         <section className="grid gap-3 rounded-md border border-slate-200 bg-white p-4">
           <h3 className="text-base font-semibold">Workforce Profile</h3>
           <div className="grid gap-2">
-            <DetailRow label="Employee code" value={compactId(user.id)} />
+            <DetailRow label="Employee code" value={employeeCode(user)} />
             <DetailRow label="Department" value={department?.name ?? compactId(user.department_id)} />
             <DetailRow label="Manager" value={manager?.name ?? compactId(user.reports_to)} />
             <DetailRow label="Next shift" value={nextShift ? `${dateLabel(nextShift.shift_date)} ${timeLabel(nextShift.shift_start)}` : "None"} />
@@ -778,6 +821,7 @@ function AuditPanel({
   const rows = [
     { label: "Profile created", value: user.created_at ? dateTimeLabel(user.created_at) : "Not returned" },
     { label: "Profile updated", value: user.updated_at ? dateTimeLabel(user.updated_at) : "Not returned" },
+    { label: "Employee code", value: employeeCode(user) },
     { label: "Department", value: department?.name ?? compactId(user.department_id) },
     { label: "Reporting manager", value: manager?.name ?? compactId(user.reports_to) },
     { label: "Duty status", value: user.is_on_duty ? "On duty" : "Off duty" },
@@ -859,6 +903,19 @@ function Detail({ label, value }: { label: string; value: string }) {
       <p className="mt-1 truncate text-sm font-medium">{value}</p>
     </div>
   );
+}
+
+function ProfileAvatar({ user }: { user: StaffUser }) {
+  const imageUrl = absolutizeBackendUrl(user.profile_image_url);
+  return (
+    <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-md bg-[var(--primary)] text-xl font-semibold text-white">
+      {imageUrl ? <img alt="" className="h-full w-full object-cover" src={imageUrl} /> : initials(user.name)}
+    </div>
+  );
+}
+
+function employeeCode(user: StaffUser) {
+  return user.employee_code || "Not assigned";
 }
 
 function DetailRow({ label, value }: { label: string; value: string }) {

@@ -1,10 +1,14 @@
 from typing import Any
+import random
+import re
+import string
 
 from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import bad_request, not_found
 from app.models.base import utcnow
+from app.models.hotel import Hotel
 from app.models.rbac import user_roles
 from app.models.ticket import Ticket
 from app.models.user import User, UserSession
@@ -17,6 +21,21 @@ from app.services.rbac_service import RBACService
 
 ADMIN_USER_TYPE = "HOTEL_ADMIN"
 EMPLOYEE_USER_TYPE = "HOTEL_EMPLOYEE"
+ROLE_CODE_ALIASES = {
+    "admin": "ADMN",
+    "administrator": "ADMN",
+    "attendant": "ATTD",
+    "attendent": "ATTD",
+    "frontdesk": "FRNT",
+    "frontdeskagent": "FRNT",
+    "frontoffice": "FRNT",
+    "manager": "MANG",
+    "owner": "OWNR",
+    "reception": "RCPT",
+    "receptionist": "RCPT",
+    "supervisor": "SUPV",
+}
+_CODE_RANDOM = random.SystemRandom()
 
 
 class UserService:
@@ -30,6 +49,26 @@ class UserService:
         if not user:
             raise not_found("User not found")
         return user
+
+    def generate_employee_code(
+        self,
+        hotel_id: str,
+        staff_level: str | None = None,
+        job_role: str | None = None,
+    ) -> str:
+        hotel = self.db.get(Hotel, hotel_id)
+        if not hotel:
+            raise not_found("Hotel not found")
+
+        hotel_segment = _code_segment(hotel.name or hotel.slug, 3, "HTL")
+        role_segment = _role_segment(staff_level or job_role)
+        for _ in range(100):
+            digits = f"{_CODE_RANDOM.randrange(1000):03d}"
+            suffix = "".join(_CODE_RANDOM.choice(string.ascii_uppercase) for _ in range(2))
+            code = f"{hotel_segment}{role_segment}{digits}{suffix}"
+            if not self.users.get_by_hotel_employee_code(hotel_id, code):
+                return code
+        raise bad_request("Could not generate a unique employee code. Try again.")
 
     def update_user(
         self,
@@ -49,6 +88,9 @@ class UserService:
         if "email" in update_data and update_data["email"]:
             if self.users.email_exists_for_other_user(hotel_id, update_data["email"], user_id):
                 raise bad_request("User email already exists for this hotel")
+        if "employee_code" in update_data and update_data["employee_code"]:
+            if self.users.employee_code_exists_for_other_user(hotel_id, update_data["employee_code"], user_id):
+                raise bad_request("Employee code already exists for this hotel")
 
         if update_data.get("reports_to"):
             if update_data["reports_to"] == user_id:
@@ -151,13 +193,29 @@ class UserService:
         return {
             "name": user.name,
             "email": user.email,
+            "employee_code": user.employee_code,
             "department_id": user.department_id,
             "reports_to": user.reports_to,
             "user_type": user.user_type,
             "staff_level": user.staff_level,
             "job_role": user.job_role,
+            "profile_image_url": user.profile_image_url,
             "is_active": user.is_active,
             "is_deleted": user.is_deleted,
             "deleted_at": user.deleted_at.isoformat() if user.deleted_at else None,
             "deleted_by": user.deleted_by,
         }
+
+
+def _role_segment(value: str | None) -> str:
+    normalized = re.sub(r"[^a-z0-9]+", "", (value or "").lower())
+    if normalized in ROLE_CODE_ALIASES:
+        return ROLE_CODE_ALIASES[normalized]
+    return _code_segment(value, 4, "STAF")
+
+
+def _code_segment(value: str | None, length: int, fallback: str) -> str:
+    cleaned = re.sub(r"[^A-Za-z0-9]+", "", value or "").upper()
+    if not cleaned:
+        cleaned = fallback
+    return (cleaned + fallback)[:length]

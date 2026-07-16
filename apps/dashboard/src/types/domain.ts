@@ -52,6 +52,7 @@ export interface PlatformHotelSummary {
 export interface PlatformUserSummary {
   id: string;
   hotel_id: string;
+  employee_code: string | null;
   department_id: string | null;
   reports_to: string | null;
   name: string;
@@ -59,6 +60,7 @@ export interface PlatformUserSummary {
   user_type: string;
   staff_level: string | null;
   job_role: string | null;
+  profile_image_url: string | null;
   is_hotel_owner: boolean;
   is_active: boolean;
   is_on_duty: boolean;
@@ -109,12 +111,14 @@ export interface PlatformHotelCreateResponse {
 export interface CurrentUser {
   id: string;
   hotel_id: string;
+  employee_code: string | null;
   department_id: string | null;
   name: string;
   email: string;
   user_type: "SUPER_ADMIN" | "HOTEL_ADMIN" | "HOTEL_EMPLOYEE" | string;
   staff_level: string | null;
   job_role: string | null;
+  profile_image_url: string | null;
   is_hotel_owner: boolean;
   is_on_duty: boolean;
   permissions: string[];
@@ -452,6 +456,7 @@ export interface HousekeepingTask {
 export interface StaffUser {
   id: string;
   hotel_id: string;
+  employee_code?: string | null;
   department_id: string | null;
   reports_to?: string | null;
   user_type?: "HOTEL_ADMIN" | "HOTEL_EMPLOYEE" | string;
@@ -459,6 +464,7 @@ export interface StaffUser {
   name: string;
   email: string;
   job_role: string | null;
+  profile_image_url?: string | null;
   is_hotel_owner: boolean;
   is_active: boolean;
   is_on_duty: boolean;

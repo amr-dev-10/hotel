@@ -30,6 +30,7 @@ export const platformKeys = {
 export interface PlatformUserUpdatePayload {
   name?: string;
   email?: string;
+  employee_code?: string | null;
   department_id?: string | null;
   reports_to?: string | null;
   staff_level?: string | null;
@@ -37,6 +38,15 @@ export interface PlatformUserUpdatePayload {
   job_role?: string | null;
   is_active?: boolean;
   is_on_duty?: boolean;
+}
+
+export interface PlatformEmployeeCodeGeneratePayload {
+  staff_level?: string | null;
+  job_role?: string | null;
+}
+
+export interface PlatformEmployeeCodeGenerateResponse {
+  employee_code: string;
 }
 
 export interface PlatformHotelUpdatePayload {
@@ -156,6 +166,16 @@ export function useUpdatePlatformUser() {
       queryClient.invalidateQueries({ queryKey: platformKeys.users });
       queryClient.invalidateQueries({ queryKey: platformKeys.hotels });
     },
+  });
+}
+
+export function useGeneratePlatformEmployeeCode(hotelId: string | null | undefined) {
+  return useMutation({
+    mutationFn: (payload: PlatformEmployeeCodeGeneratePayload) =>
+      platformPost<PlatformEmployeeCodeGenerateResponse>(
+        `/platform/hotels/${hotelId}/users/employee-code/generate`,
+        payload,
+      ),
   });
 }
 

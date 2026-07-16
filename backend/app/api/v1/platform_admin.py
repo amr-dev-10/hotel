@@ -32,7 +32,7 @@ from app.schemas.platform import (
     PlatformUserPasswordReset,
     PlatformUserSummary,
 )
-from app.schemas.user import UserRead, UserUpdate
+from app.schemas.user import EmployeeCodeGenerateRequest, EmployeeCodeGenerateResponse, UserRead, UserUpdate
 from app.services.audit_service import AuditService
 from app.services.hotel_service import HotelService
 from app.models.base import utcnow
@@ -283,6 +283,21 @@ def update_platform_user(
         audit_payload={"source": "platform_admin", "platform_admin_id": admin.id},
     )
     return ok(PlatformUserSummary.model_validate(updated).model_dump())
+
+
+@router.post("/hotels/{hotel_id}/users/employee-code/generate")
+def generate_platform_employee_code(
+    hotel_id: str,
+    payload: EmployeeCodeGenerateRequest,
+    db: Session = Depends(get_db),
+    _: PlatformAdmin = Depends(get_platform_admin),
+) -> dict:
+    code = UserService(db).generate_employee_code(
+        hotel_id,
+        staff_level=payload.staff_level,
+        job_role=payload.job_role,
+    )
+    return ok(EmployeeCodeGenerateResponse(employee_code=code).model_dump())
 
 
 @router.post("/users/{user_id}/password")

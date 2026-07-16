@@ -32,6 +32,7 @@ class UserRepository(BaseRepository[User]):
                 or_(
                     User.name.ilike(pattern),
                     User.email.ilike(pattern),
+                    User.employee_code.ilike(pattern),
                     User.job_role.ilike(pattern),
                     User.staff_level.ilike(pattern),
                 )
@@ -40,14 +41,34 @@ class UserRepository(BaseRepository[User]):
 
     def get_by_email(self, email: str) -> User | None:
         return self.db.execute(
-            select(User).where(User.email == email, User.deleted_at.is_(None))
+            select(User).where(
+                func.lower(User.email) == email.lower(),
+                User.deleted_at.is_(None),
+            )
         ).scalar_one_or_none()
+
+    def list_by_employee_code(self, employee_code: str) -> Sequence[User]:
+        return self.db.execute(
+            select(User).where(
+                User.employee_code == employee_code,
+                User.deleted_at.is_(None),
+            )
+        ).scalars().all()
 
     def get_by_hotel_email(self, hotel_id: str, email: str) -> User | None:
         return self.db.execute(
             select(User).where(
                 User.hotel_id == hotel_id,
                 User.email == email,
+                User.deleted_at.is_(None),
+            )
+        ).scalar_one_or_none()
+
+    def get_by_hotel_employee_code(self, hotel_id: str, employee_code: str) -> User | None:
+        return self.db.execute(
+            select(User).where(
+                User.hotel_id == hotel_id,
+                User.employee_code == employee_code,
                 User.deleted_at.is_(None),
             )
         ).scalar_one_or_none()
@@ -102,6 +123,19 @@ class UserRepository(BaseRepository[User]):
                 select(User.id).where(
                     User.hotel_id == hotel_id,
                     User.email == email,
+                    User.id != user_id,
+                    User.deleted_at.is_(None),
+                )
+            ).scalar_one_or_none()
+            is not None
+        )
+
+    def employee_code_exists_for_other_user(self, hotel_id: str, employee_code: str, user_id: str) -> bool:
+        return (
+            self.db.execute(
+                select(User.id).where(
+                    User.hotel_id == hotel_id,
+                    User.employee_code == employee_code,
                     User.id != user_id,
                     User.deleted_at.is_(None),
                 )

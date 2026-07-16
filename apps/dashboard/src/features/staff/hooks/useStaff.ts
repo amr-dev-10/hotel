@@ -22,6 +22,15 @@ export type StaffQueryOptions = {
   q?: string;
 };
 
+export type EmployeeCodeGeneratePayload = {
+  staff_level?: string | null;
+  job_role?: string | null;
+};
+
+export type EmployeeCodeGenerateResponse = {
+  employee_code: string;
+};
+
 export function useStaff(hotelId: string, options: StaffQueryOptions = {}) {
   const limit = options.limit ?? 200;
   const q = options.q?.trim() || undefined;
@@ -39,6 +48,13 @@ export function useCreateStaff(hotelId: string) {
   return useMutation({
     mutationFn: (payload: CreateStaffValues) => apiPost<StaffUser>(`/hotels/${hotelId}/users`, payload),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.staff(hotelId) }),
+  });
+}
+
+export function useGenerateEmployeeCode(hotelId: string) {
+  return useMutation({
+    mutationFn: (payload: EmployeeCodeGeneratePayload) =>
+      apiPost<EmployeeCodeGenerateResponse>(`/hotels/${hotelId}/users/employee-code/generate`, payload),
   });
 }
 

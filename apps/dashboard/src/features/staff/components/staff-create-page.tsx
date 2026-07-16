@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, UserPlus } from "lucide-react";
+import { Loader2, Sparkles, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -15,11 +15,12 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { Select } from "@/components/ui/select";
 import { useDepartments } from "@/features/departments/hooks/useDepartments";
 import { createStaffSchema, type CreateStaffValues } from "@/features/staff/schemas/create-staff.schema";
-import { useCreateStaff, useStaff } from "@/features/staff/hooks/useStaff";
+import { useCreateStaff, useGenerateEmployeeCode, useStaff } from "@/features/staff/hooks/useStaff";
 
 export function StaffCreatePage({ hotelId }: { hotelId: string }) {
   const router = useRouter();
   const createStaff = useCreateStaff(hotelId);
+  const generateEmployeeCode = useGenerateEmployeeCode(hotelId);
   const departments = useDepartments(hotelId);
   const staff = useStaff(hotelId);
   const form = useForm<CreateStaffValues>({
@@ -28,6 +29,7 @@ export function StaffCreatePage({ hotelId }: { hotelId: string }) {
       name: "",
       email: "",
       password: "",
+      employee_code: "",
       department_id: "",
       reports_to: "",
       staff_level: "attendant",
@@ -40,6 +42,7 @@ export function StaffCreatePage({ hotelId }: { hotelId: string }) {
     try {
       await createStaff.mutateAsync({
         ...values,
+        employee_code: values.employee_code?.trim() || undefined,
         department_id: values.department_id || undefined,
         reports_to: values.reports_to || undefined,
         job_role: values.job_role || undefined,
@@ -50,6 +53,21 @@ export function StaffCreatePage({ hotelId }: { hotelId: string }) {
       showApiErrorToast(error);
     }
   });
+
+  async function handleGenerateEmployeeCode() {
+    try {
+      const generated = await generateEmployeeCode.mutateAsync({
+        staff_level: form.getValues("staff_level"),
+      });
+      form.setValue("employee_code", generated.employee_code, {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+      toast.success("Employee code generated");
+    } catch (error) {
+      showApiErrorToast(error);
+    }
+  }
 
   return (
     <form className="grid gap-5" onSubmit={onSubmit}>
@@ -78,6 +96,26 @@ export function StaffCreatePage({ hotelId }: { hotelId: string }) {
           </Field>
           <Field label="Temporary password" id="staff-password">
             <PasswordInput id="staff-password" {...form.register("password")} />
+          </Field>
+          <Field label="Employee code" id="staff-employee-code">
+            <div className="flex gap-2">
+              <Input
+                className="font-mono uppercase"
+                id="staff-employee-code"
+                placeholder="TAJMANG234AX"
+                {...form.register("employee_code")}
+              />
+              <Button
+                className="shrink-0"
+                disabled={generateEmployeeCode.isPending}
+                type="button"
+                variant="secondary"
+                onClick={handleGenerateEmployeeCode}
+              >
+                {generateEmployeeCode.isPending ? <Loader2 className="animate-spin" /> : <Sparkles />}
+                Auto-generate
+              </Button>
+            </div>
           </Field>
           <Field label="Job role" id="staff-job-role">
             <Input id="staff-job-role" {...form.register("job_role")} />

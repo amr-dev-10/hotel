@@ -8,6 +8,7 @@ Architecture documents are versioned by folder so new designs can be added witho
 - `development-setup-testing-and-seeding.md` - pointer to the canonical setup guide.
 - `GCP_BACKEND_DEPLOYMENT.md` - Google Cloud Run, Cloud SQL, Redis, Secret Manager, and GitHub Actions deployment guide.
 - `development-supabase-cloud-run-deployment.md` - development Cloud Run deployment guide using Supabase Postgres with automatic Alembic migrations.
+- `development-cloud-run-deployment-field-guide.md` - step-by-step field guide for the actual development deployment flow, including Cloud Shell commands, GitHub variables, errors encountered, fixes, frontend deploy, admin bootstrap, and seed data.
 - `frontend-cloud-run-deployment.md` - Next.js dashboard deployment to Google Cloud Run with GitHub Actions.
 - `release-versioning-and-development-track.md` - SemVer, release candidate, migration, infrastructure, documentation, and current staging deployment fix tracking.
 - `staging-serverless-deployment-runbook.md` - staging deployment runbook for `amr-dev-10/hotel`, including Cloud Shell setup, GitHub environment variables, CI/CD trigger steps, verification, and troubleshooting.

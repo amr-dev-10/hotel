@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
-import { Edit3, KeyRound, Loader2, Search, UsersRound } from "lucide-react";
+import { Edit3, KeyRound, Loader2, Search, Sparkles, UsersRound } from "lucide-react";
 import { toast } from "sonner";
 import { showApiErrorToast } from "@/lib/api/error-toast";
 
@@ -26,6 +26,7 @@ import { PlatformShell } from "@/features/platform/components/platform-shell";
 import {
   usePlatformHotels,
   usePlatformUsers,
+  useGeneratePlatformEmployeeCode,
   useResetPlatformUserPassword,
   useUpdatePlatformUser,
   type PlatformUserUpdatePayload,
@@ -36,6 +37,7 @@ import type { PlatformUserSummary } from "@/types/domain";
 interface UserFormState {
   name: string;
   email: string;
+  employee_code: string;
   job_role: string;
   user_type: string;
   staff_level: string;
@@ -68,6 +70,7 @@ function PlatformUsersContent() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [page, setPage] = useState(1);
   const [editingUser, setEditingUser] = useState<PlatformUserSummary | null>(null);
+  const generateEmployeeCode = useGeneratePlatformEmployeeCode(editingUser?.hotel_id);
   const [passwordUser, setPasswordUser] = useState<PlatformUserSummary | null>(null);
   const [form, setForm] = useState<UserFormState>(() => emptyForm());
   const [passwordForm, setPasswordForm] = useState<PasswordFormState>(() => emptyPasswordForm());
@@ -92,7 +95,7 @@ function PlatformUsersContent() {
         (statusFilter === "inactive" && !user.is_active);
       const matchesSearch =
         !normalizedSearch ||
-        [user.name, user.email, user.user_type, user.staff_level, user.job_role, hotelName]
+        [user.name, user.email, user.employee_code, user.user_type, user.staff_level, user.job_role, hotelName]
           .filter(Boolean)
           .some((value) => value?.toLowerCase().includes(normalizedSearch));
 
@@ -116,6 +119,7 @@ function PlatformUsersContent() {
     setForm({
       name: user.name,
       email: user.email,
+      employee_code: user.employee_code ?? "",
       job_role: user.job_role ?? "",
       user_type: user.user_type,
       staff_level: user.staff_level ?? "",
@@ -138,6 +142,7 @@ function PlatformUsersContent() {
     const payload: PlatformUserUpdatePayload = {
       name: form.name,
       email: form.email,
+      employee_code: form.employee_code.trim().toUpperCase() || null,
       job_role: form.job_role || null,
       user_type: form.user_type,
       staff_level: form.staff_level || null,
@@ -149,6 +154,22 @@ function PlatformUsersContent() {
       await updateUser.mutateAsync({ userId: editingUser.id, payload });
       toast.success("User profile updated");
       setEditingUser(null);
+    } catch (error) {
+      showApiErrorToast(error);
+    }
+  }
+
+  async function handleGenerateEmployeeCode() {
+    if (!editingUser) {
+      return;
+    }
+
+    try {
+      const generated = await generateEmployeeCode.mutateAsync({
+        staff_level: form.staff_level || null,
+      });
+      setForm((current) => ({ ...current, employee_code: generated.employee_code }));
+      toast.success("Employee code generated");
     } catch (error) {
       showApiErrorToast(error);
     }
@@ -195,7 +216,7 @@ function PlatformUsersContent() {
             <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <Input
               className="pr-9"
-              placeholder="Search users, email, role, or hotel"
+              placeholder="Search users, email, code, role, or hotel"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
@@ -228,10 +249,11 @@ function PlatformUsersContent() {
         <div className="grid gap-3">
           <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1080px] border-collapse text-sm">
+              <table className="w-full min-w-[1160px] border-collapse text-sm">
                 <thead className="bg-slate-50 text-left text-xs uppercase tracking-normal text-slate-500">
                   <tr>
                     <th className="border-b border-slate-200 px-4 py-3 font-semibold">User</th>
+                    <th className="border-b border-slate-200 px-4 py-3 font-semibold">Employee code</th>
                     <th className="border-b border-slate-200 px-4 py-3 font-semibold">Hotel</th>
                     <th className="border-b border-slate-200 px-4 py-3 font-semibold">Role</th>
                     <th className="border-b border-slate-200 px-4 py-3 font-semibold">Duty</th>
@@ -248,6 +270,11 @@ function PlatformUsersContent() {
                           <p className="truncate font-semibold text-slate-950">{user.name}</p>
                           <p className="truncate text-xs text-slate-500">{user.email}</p>
                         </div>
+                      </td>
+                      <td className="px-4 py-3 align-middle">
+                        <code className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
+                          {employeeCode(user)}
+                        </code>
                       </td>
                       <td className="px-4 py-3 align-middle">
                         <Link className="font-medium hover:text-[var(--primary)]" href={`/platform/hotels/${user.hotel_id}`}>
@@ -321,6 +348,34 @@ function PlatformUsersContent() {
                   value={form.email}
                   onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
                 />
+              </Field>
+              <Field label="Employee code" id="platform-user-employee-code">
+                <div className="flex gap-2">
+                  <Input
+                    className="font-mono uppercase"
+                    id="platform-user-employee-code"
+                    maxLength={40}
+                    pattern="[A-Za-z0-9]*"
+                    placeholder="TAJMANG234AX"
+                    value={form.employee_code}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        employee_code: event.target.value.replace(/[^a-z0-9]/gi, "").toUpperCase(),
+                      }))
+                    }
+                  />
+                  <Button
+                    className="shrink-0"
+                    disabled={generateEmployeeCode.isPending || !editingUser}
+                    type="button"
+                    variant="secondary"
+                    onClick={handleGenerateEmployeeCode}
+                  >
+                    {generateEmployeeCode.isPending ? <Loader2 className="animate-spin" /> : <Sparkles />}
+                    Auto-generate
+                  </Button>
+                </div>
               </Field>
               <Field label="Job role" id="platform-user-job-role">
                 <Input
@@ -438,10 +493,15 @@ function PlatformUsersContent() {
   );
 }
 
+function employeeCode(user: PlatformUserSummary) {
+  return user.employee_code || "Not assigned";
+}
+
 function emptyForm(): UserFormState {
   return {
     name: "",
     email: "",
+    employee_code: "",
     job_role: "",
     user_type: "HOTEL_EMPLOYEE",
     staff_level: "",
