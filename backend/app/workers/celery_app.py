@@ -21,5 +21,9 @@ celery_app.conf.update(
             "task": "tickets.check_escalations",
             "schedule": crontab(minute="*"), # runs every 1 minute
         },
+        "finalize-attendance-nightly": {
+            "task": "attendance.finalize_missing",
+            "schedule": crontab(hour=1, minute=15),
+        },
     }
 )

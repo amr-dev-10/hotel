@@ -34,13 +34,14 @@ import { useRestaurantOrders } from "@/features/fnb/hooks/useFnb";
 import { useHousekeeping } from "@/features/housekeeping/hooks/useHousekeeping";
 import { useReservations } from "@/features/reservations/hooks/useReservations";
 import { useRooms } from "@/features/rooms/hooks/useRooms";
-import { useShifts, useUpdateShift } from "@/features/staff/hooks/useStaff";
+import { useAttendanceToday, useCheckIn, useCheckOut } from "@/features/staff/hooks/useAttendance";
+import { useShifts } from "@/features/staff/hooks/useStaff";
 import { useAcceptTicket, useCompleteTicket, useRejectTicket, useTickets } from "@/features/tickets/hooks/useTickets";
 import { apiGet } from "@/lib/api/client";
 import { showApiErrorToast } from "@/lib/api/error-toast";
 import { titleCase } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth.store";
-import type { CurrentUser, EmployeeShift, HousekeepingTask, Reservation, RestaurantOrder, Room, Ticket } from "@/types/domain";
+import type { AttendanceToday, CurrentUser, EmployeeShift, HousekeepingTask, Reservation, RestaurantOrder, Room, Ticket } from "@/types/domain";
 
 export function StaffPortalPage({ hotelId }: { hotelId: string }) {
   const currentUser = useAuthStore((state) => state.currentUser);
@@ -55,7 +56,9 @@ export function StaffPortalPage({ hotelId }: { hotelId: string }) {
   const rooms = useRooms(hotelId);
   const housekeeping = useHousekeeping(hotelId);
   const orders = useRestaurantOrders(hotelId);
-  const updateShift = useUpdateShift(hotelId);
+  const attendanceToday = useAttendanceToday(hotelId);
+  const checkIn = useCheckIn(hotelId);
+  const checkOut = useCheckOut(hotelId);
   const acceptTicket = useAcceptTicket(hotelId);
   const rejectTicket = useRejectTicket(hotelId);
   const completeTicket = useCompleteTicket(hotelId);
@@ -96,12 +99,6 @@ export function StaffPortalPage({ hotelId }: { hotelId: string }) {
     return minutes <= 15;
   });
 
-  const todayShifts = useMemo(
-    () => (shifts.data ?? []).filter((shift) => shift.user_id === currentUser?.id && dateOnly(shift.shift_date) === today),
-    [currentUser?.id, shifts.data, today],
-  );
-  const currentShift = todayShifts.find((shift) => !["completed", "on_leave"].includes(normalizeStage(shift.status))) ?? todayShifts[0];
-
   const operationalTickets = allTickets.data.length ? allTickets.data : assignedTickets;
   const operations = buildOperationsOverview({
     reservations: reservations.data ?? [],
@@ -123,12 +120,17 @@ export function StaffPortalPage({ hotelId }: { hotelId: string }) {
     return <DataState empty emptyTitle="Sign in required." />;
   }
 
-  if (assignedTicketQuery.isLoading || shifts.isLoading) {
+  if (assignedTicketQuery.isLoading || shifts.isLoading || attendanceToday.isLoading) {
     return <DataState isLoading />;
   }
 
-  if (assignedTicketQuery.error || shifts.error) {
-    return <DataState error={assignedTicketQuery.error ?? shifts.error} />;
+  if (assignedTicketQuery.error || shifts.error || attendanceToday.error) {
+    return <DataState error={assignedTicketQuery.error ?? shifts.error ?? attendanceToday.error} />;
+  }
+
+  async function refreshCurrentUserSnapshot() {
+    const updated = await apiGet<CurrentUser>("/auth/me");
+    setCurrentUser(updated);
   }
 
   async function handleAccept(ticketId: string) {
@@ -158,17 +160,21 @@ export function StaffPortalPage({ hotelId }: { hotelId: string }) {
     }
   }
 
-  async function handleShiftStatus(shift: EmployeeShift, status: "checked_in" | "completed") {
+  async function handleCheckIn() {
     try {
-      await updateShift.mutateAsync({
-        shiftId: shift.id,
-        payload: {
-          status,
-          actual_start: status === "checked_in" ? new Date().toISOString() : shift.actual_start,
-          actual_end: status === "completed" ? new Date().toISOString() : shift.actual_end,
-        },
-      });
-      toast.success(status === "checked_in" ? "Checked in" : "Checked out");
+      await checkIn.mutateAsync({ method: "web" });
+      await refreshCurrentUserSnapshot();
+      toast.success("Checked in");
+    } catch (error) {
+      showApiErrorToast(error);
+    }
+  }
+
+  async function handleCheckOut() {
+    try {
+      await checkOut.mutateAsync({ method: "web" });
+      await refreshCurrentUserSnapshot();
+      toast.success("Checked out");
     } catch (error) {
       showApiErrorToast(error);
     }
@@ -194,12 +200,13 @@ export function StaffPortalPage({ hotelId }: { hotelId: string }) {
 
       <PersonalOverview
         activeTickets={activeTickets.length}
-        currentShift={currentShift}
+        attendance={attendanceToday.data}
         dueSoonTickets={dueSoonTickets.length}
         employeeCode={currentUser.employee_code ?? "Not assigned"}
         pendingTickets={pendingTickets.length}
-        updatePending={updateShift.isPending}
-        onShiftUpdate={handleShiftStatus}
+        updatePending={checkIn.isPending || checkOut.isPending}
+        onCheckIn={handleCheckIn}
+        onCheckOut={handleCheckOut}
       />
 
       <OperationsOverview
@@ -246,21 +253,27 @@ export function StaffPortalPage({ hotelId }: { hotelId: string }) {
 
 function PersonalOverview({
   activeTickets,
-  currentShift,
+  attendance,
   dueSoonTickets,
   employeeCode,
   pendingTickets,
   updatePending,
-  onShiftUpdate,
+  onCheckIn,
+  onCheckOut,
 }: {
   activeTickets: number;
-  currentShift: EmployeeShift | undefined;
+  attendance: AttendanceToday | undefined;
   dueSoonTickets: number;
   employeeCode: string;
   pendingTickets: number;
   updatePending: boolean;
-  onShiftUpdate: (shift: EmployeeShift, status: "checked_in" | "completed") => void;
+  onCheckIn: () => void;
+  onCheckOut: () => void;
 }) {
+  const status = attendance?.log?.attendance_status ?? (attendance?.can_check_in ? "SCHEDULED" : "NO_SHIFT");
+  const startValue = attendance?.log?.actual_start ?? attendance?.log?.scheduled_start ?? attendance?.template?.start_time;
+  const endValue = attendance?.log?.actual_end ?? attendance?.log?.scheduled_end ?? attendance?.template?.end_time;
+
   return (
     <section className="grid gap-4 xl:grid-cols-[1fr_1.2fr]">
       <div className="grid gap-3 rounded-md border border-slate-200 bg-white p-4">
@@ -270,27 +283,33 @@ function PersonalOverview({
             <p className="text-sm text-slate-500">Shift status and check-in controls</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {currentShift ? <Badge variant={shiftVariant(currentShift.status)}>{shiftTime(currentShift)}</Badge> : <Badge>No shift</Badge>}
-            <ShiftAction
+            {attendance?.template ? (
+              <Badge variant={attendanceVariant(status)}>{attendanceSchedule(attendance)}</Badge>
+            ) : (
+              <Badge>No shift</Badge>
+            )}
+            <AttendanceAction
+              attendance={attendance}
               isPending={updatePending}
-              shift={currentShift}
-              onUpdate={onShiftUpdate}
+              onCheckIn={onCheckIn}
+              onCheckOut={onCheckOut}
             />
           </div>
         </div>
         <div className="grid gap-2 text-sm text-slate-600 sm:grid-cols-4">
           <Info label="Employee code" value={employeeCode} />
-          {currentShift ? (
+          {attendance?.assignment ? (
             <>
-              <Info label="Status" value={titleCase(currentShift.status)} />
-              <Info label="Start" value={timeLabel(currentShift.actual_start ?? currentShift.shift_start)} />
-              <Info label="End" value={timeLabel(currentShift.actual_end ?? currentShift.shift_end)} />
+              <Info label="Shift" value={attendance.template?.name ?? attendance.assignment.template_name ?? "Assigned"} />
+              <Info label="Status" value={titleCase(status)} />
+              <Info label="Start" value={startValue ? timeLabel(startValue) : "Pending"} />
+              <Info label="End" value={endValue ? timeLabel(endValue) : "Pending"} />
             </>
           ) : (
             <div className="rounded-md bg-slate-50 p-3 sm:col-span-3">
               <p className="text-xs font-semibold uppercase tracking-normal text-slate-400">Shift</p>
               <p className="mt-1 text-sm text-slate-500">
-                No shift is scheduled for your account today, so check-in is not available yet.
+                {attendance?.message ?? "No shift is scheduled for your account today, so check-in is not available yet."}
               </p>
             </div>
           )}
@@ -405,34 +424,34 @@ function QuickActionsGrid({ hotelId }: { hotelId: string }) {
   );
 }
 
-function ShiftAction({
-  shift,
+function AttendanceAction({
+  attendance,
   isPending,
-  onUpdate,
+  onCheckIn,
+  onCheckOut,
 }: {
-  shift: EmployeeShift | undefined;
+  attendance: AttendanceToday | undefined;
   isPending: boolean;
-  onUpdate: (shift: EmployeeShift, status: "checked_in" | "completed") => void;
+  onCheckIn: () => void;
+  onCheckOut: () => void;
 }) {
-  if (!shift) {
+  if (!attendance) {
     return (
       <Button className="h-8 text-xs" disabled type="button" variant="secondary">
         <LogIn />
-        No shift today
+        Loading
       </Button>
     );
   }
 
-  const status = normalizeStage(shift.status);
-
-  if (status === "checked_in") {
+  if (attendance.can_check_out) {
     return (
       <Button
         className="h-8 text-xs"
         disabled={isPending}
         type="button"
         variant="secondary"
-        onClick={() => onUpdate(shift, "completed")}
+        onClick={onCheckOut}
       >
         <LogOut />
         Check out
@@ -440,7 +459,18 @@ function ShiftAction({
     );
   }
 
-  if (["completed", "on_leave"].includes(status)) {
+  if (attendance.can_check_in) {
+    return (
+      <Button className="h-8 text-xs" disabled={isPending} type="button" onClick={onCheckIn}>
+        <LogIn />
+        Check in
+      </Button>
+    );
+  }
+
+  const status = normalizeStage(attendance.log?.attendance_status ?? (attendance.assignment ? "scheduled" : "no_shift"));
+
+  if (["completed", "holiday", "weekend"].includes(status)) {
     return (
       <Button className="h-8 text-xs" disabled type="button" variant="secondary">
         <CheckCircle2 />
@@ -450,9 +480,9 @@ function ShiftAction({
   }
 
   return (
-    <Button className="h-8 text-xs" disabled={isPending} type="button" onClick={() => onUpdate(shift, "checked_in")}>
+    <Button className="h-8 text-xs" disabled type="button" variant="secondary">
       <LogIn />
-      Check in
+      No check-in
     </Button>
   );
 }
@@ -709,8 +739,30 @@ function shiftVariant(status: string): "green" | "amber" | "blue" | "rose" | "de
   return "default";
 }
 
-function shiftTime(shift: EmployeeShift) {
-  return `${timeLabel(shift.shift_start)} - ${timeLabel(shift.shift_end)}`;
+function attendanceVariant(status: string): "green" | "amber" | "blue" | "rose" | "default" {
+  const normalized = normalizeStage(status);
+  if (["checked_in", "completed"].includes(normalized)) {
+    return "green";
+  }
+  if (["scheduled", "on_time"].includes(normalized)) {
+    return "blue";
+  }
+  if (normalized === "late") {
+    return "amber";
+  }
+  if (["absent", "no_shift"].includes(normalized)) {
+    return "rose";
+  }
+  return "default";
+}
+
+function attendanceSchedule(attendance: AttendanceToday) {
+  const start = attendance.log?.scheduled_start ?? attendance.template?.start_time;
+  const end = attendance.log?.scheduled_end ?? attendance.template?.end_time;
+  if (!start || !end) {
+    return "Assigned";
+  }
+  return `${timeLabel(start)} - ${timeLabel(end)}`;
 }
 
 function timeLabel(value: string) {

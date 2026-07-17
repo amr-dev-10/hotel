@@ -493,6 +493,98 @@ export interface EmployeeShift {
   created_at: string;
 }
 
+export interface ShiftTemplate {
+  id: string;
+  hotel_id: string;
+  name: string;
+  code: string;
+  start_time: string;
+  end_time: string;
+  break_minutes: number;
+  grace_minutes: number;
+  late_after_minutes: number;
+  is_night_shift: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ShiftAssignment {
+  id: string;
+  hotel_id: string;
+  employee_id: string;
+  shift_template_id: string;
+  effective_from: string;
+  effective_to: string | null;
+  working_days: number[];
+  rotation_type: string;
+  is_active: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  employee_name?: string | null;
+  employee_code?: string | null;
+  template_name?: string | null;
+  template_code?: string | null;
+}
+
+export interface AttendanceLog {
+  id: string;
+  hotel_id: string;
+  employee_id: string;
+  attendance_date: string;
+  shift_assignment_id: string | null;
+  shift_template_id: string | null;
+  shift_name: string | null;
+  scheduled_start: string | null;
+  scheduled_end: string | null;
+  actual_start: string | null;
+  actual_end: string | null;
+  attendance_status: string;
+  arrival_status: string;
+  leave_status: string;
+  worked_minutes: number;
+  late_minutes: number;
+  early_leave_minutes: number;
+  overtime_minutes: number;
+  checkin_method: string | null;
+  checkout_method: string | null;
+  device_info: string | null;
+  ip_address: string | null;
+  gps_location: string | null;
+  notes: string | null;
+  approved_by: string | null;
+  created_at: string;
+  updated_at: string;
+  employee_name?: string | null;
+  employee_code?: string | null;
+}
+
+export interface AttendanceToday {
+  attendance_date: string;
+  assignment: ShiftAssignment | null;
+  template: ShiftTemplate | null;
+  log: AttendanceLog | null;
+  can_check_in: boolean;
+  can_check_out: boolean;
+  message: string;
+}
+
+export interface AttendanceDashboard {
+  attendance_date: string;
+  total_records: number;
+  present: number;
+  scheduled: number;
+  checked_in: number;
+  checked_out: number;
+  absent: number;
+  late: number;
+  on_leave: number;
+  holidays: number;
+  weekends: number;
+  logs: AttendanceLog[];
+}
+
 export interface Department {
   id: string;
   hotel_id: string;

@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.v1 import (
     analytics,
+    attendance,
     ai_chat,
     ai_settings,
     auth,
@@ -148,6 +149,11 @@ api_router.include_router(
     shifts.router,
     prefix="/hotels/{hotel_id}/shifts",
     tags=["shifts"],
+)
+api_router.include_router(
+    attendance.router,
+    prefix="/hotels/{hotel_id}/attendance",
+    tags=["attendance"],
 )
 api_router.include_router(
     workflows.router,

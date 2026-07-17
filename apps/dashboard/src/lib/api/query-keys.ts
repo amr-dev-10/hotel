@@ -52,6 +52,15 @@ export const queryKeys = {
   staff: (hotelId: string, filters?: Record<string, string | number | undefined>) =>
     filters ? (["staff", hotelId, filters] as const) : (["staff", hotelId] as const),
   shifts: (hotelId: string) => ["shifts", hotelId] as const,
+  attendance: {
+    templates: (hotelId: string) => ["attendance", hotelId, "templates"] as const,
+    assignments: (hotelId: string) => ["attendance", hotelId, "assignments"] as const,
+    today: (hotelId: string) => ["attendance", hotelId, "today"] as const,
+    logs: (hotelId: string, filters?: Record<string, string | number | undefined>) =>
+      ["attendance", hotelId, "logs", filters ?? {}] as const,
+    dashboard: (hotelId: string, attendanceDate?: string) =>
+      ["attendance", hotelId, "dashboard", attendanceDate ?? "today"] as const,
+  },
   roles: {
     all: (hotelId: string) => ["roles", hotelId] as const,
     permissions: (hotelId: string) => ["roles", hotelId, "permissions"] as const,

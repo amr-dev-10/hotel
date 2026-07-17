@@ -94,7 +94,7 @@ class ShiftService:
         if shift.status == "checked_in":
             shift.actual_start = shift.actual_start or utcnow()
             user.is_on_duty = True
-        if shift.status == "checked_out":
+        if shift.status in {"checked_out", "completed"}:
             shift.actual_end = shift.actual_end or utcnow()
             user.is_on_duty = False
 

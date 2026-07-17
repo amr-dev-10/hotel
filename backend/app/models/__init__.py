@@ -53,7 +53,7 @@ from app.models.restaurant import RestaurantOrder, RestaurantOrderItem, Restaura
 from app.models.routing_rule import RoutingRule
 from app.models.room import Room, RoomType
 from app.models.saas import Feature, PlanFeature, UsageLimit
-from app.models.staff import EmployeeShift
+from app.models.staff import AttendanceLog, EmployeeShift, EmployeeShiftAssignment, HotelHoliday, ShiftTemplate
 from app.models.ticket import MobileChatMessage, Ticket, TicketEvent, TicketMessage, ticket_menu_items
 from app.models.ticket_category import TicketCategory
 from app.models.task_type_sla import TaskTypeSLA
@@ -80,6 +80,7 @@ __all__ = [
     "AIToolExecutionLog",
     "AIUsageLog",
     "ApiRateLimit",
+    "AttendanceLog",
     "BotConfig",
     "BotVersion",
     "Campaign",
@@ -87,6 +88,7 @@ __all__ = [
     "Department",
     "DepartmentConfig",
     "EmployeeShift",
+    "EmployeeShiftAssignment",
     "EscalationLog",
     "EscalationRule",
     "FCMToken",
@@ -101,6 +103,7 @@ __all__ = [
     "HotelSecret",
     "Hotel",
     "HotelFAQ",
+    "HotelHoliday",
     "HotelLanguage",
     "HousekeepingChecklist",
     "HousekeepingSchedule",
@@ -148,6 +151,7 @@ __all__ = [
     "RoutingRule",
     "ServiceForm",
     "ServiceFormField",
+    "ShiftTemplate",
     "StayRecord",
     "Subscription",
     "TaxConfig",
