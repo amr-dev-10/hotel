@@ -35,13 +35,12 @@ import { useHousekeeping } from "@/features/housekeeping/hooks/useHousekeeping";
 import { useReservations } from "@/features/reservations/hooks/useReservations";
 import { useRooms } from "@/features/rooms/hooks/useRooms";
 import { useAttendanceToday, useCheckIn, useCheckOut } from "@/features/staff/hooks/useAttendance";
-import { useShifts } from "@/features/staff/hooks/useStaff";
 import { useAcceptTicket, useCompleteTicket, useRejectTicket, useTickets } from "@/features/tickets/hooks/useTickets";
 import { apiGet } from "@/lib/api/client";
 import { showApiErrorToast } from "@/lib/api/error-toast";
 import { titleCase } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth.store";
-import type { AttendanceToday, CurrentUser, EmployeeShift, HousekeepingTask, Reservation, RestaurantOrder, Room, Ticket } from "@/types/domain";
+import type { AttendanceToday, CurrentUser, HousekeepingTask, Reservation, RestaurantOrder, Room, Ticket } from "@/types/domain";
 
 export function StaffPortalPage({ hotelId }: { hotelId: string }) {
   const currentUser = useAuthStore((state) => state.currentUser);
@@ -51,7 +50,6 @@ export function StaffPortalPage({ hotelId }: { hotelId: string }) {
     limit: "100",
   });
   const allTickets = useTickets(hotelId, { limit: "200" });
-  const shifts = useShifts(hotelId);
   const reservations = useReservations(hotelId, { limit: 200 });
   const rooms = useRooms(hotelId);
   const housekeeping = useHousekeeping(hotelId);
@@ -109,23 +107,22 @@ export function StaffPortalPage({ hotelId }: { hotelId: string }) {
   const roomStats = buildRoomsOverview(rooms.data ?? []);
   const departmentRows = buildDepartmentStatus({
     hotelId,
+    attendance: attendanceToday.data,
     housekeeping: housekeeping.data ?? [],
     orders: orders.data ?? [],
-    shifts: shifts.data ?? [],
     tickets: operationalTickets,
-    today,
   });
 
   if (!currentUser) {
     return <DataState empty emptyTitle="Sign in required." />;
   }
 
-  if (assignedTicketQuery.isLoading || shifts.isLoading || attendanceToday.isLoading) {
+  if (assignedTicketQuery.isLoading || attendanceToday.isLoading) {
     return <DataState isLoading />;
   }
 
-  if (assignedTicketQuery.error || shifts.error || attendanceToday.error) {
-    return <DataState error={assignedTicketQuery.error ?? shifts.error ?? attendanceToday.error} />;
+  if (assignedTicketQuery.error || attendanceToday.error) {
+    return <DataState error={assignedTicketQuery.error ?? attendanceToday.error} />;
   }
 
   async function refreshCurrentUserSnapshot() {
@@ -624,23 +621,21 @@ function buildRoomsOverview(rooms: Room[]): RoomStats {
 
 function buildDepartmentStatus({
   hotelId,
+  attendance,
   housekeeping,
   orders,
-  shifts,
   tickets,
-  today,
 }: {
   hotelId: string;
+  attendance: AttendanceToday | undefined;
   housekeeping: HousekeepingTask[];
   orders: RestaurantOrder[];
-  shifts: EmployeeShift[];
   tickets: Ticket[];
-  today: string;
 }): DepartmentStatusItem[] {
   const pendingHousekeeping = housekeeping.filter((task) => !["completed", "done"].includes(normalizeStage(task.status))).length;
   const openTickets = tickets.filter((ticket) => !isClosed(ticket)).length;
   const activeOrders = orders.filter((order) => !["delivered", "completed", "cancelled", "void"].includes(normalizeStage(order.status))).length;
-  const checkedInStaff = shifts.filter((shift) => dateOnly(shift.shift_date) === today && normalizeStage(shift.status) === "checked_in").length;
+  const attendanceStatus = attendance?.log?.attendance_status ?? (attendance?.assignment ? "SCHEDULED" : "NO_SHIFT");
 
   return [
     {
@@ -671,9 +666,9 @@ function buildDepartmentStatus({
       href: `/${hotelId}/settings/staff`,
       icon: <Users />,
       label: "Staff",
-      helper: "Checked in today",
-      value: checkedInStaff,
-      variant: checkedInStaff ? "green" : "default",
+      helper: "My attendance today",
+      value: titleCase(attendanceStatus),
+      variant: attendanceVariant(attendanceStatus),
     },
   ];
 }
@@ -717,23 +712,6 @@ function stageVariant(stage: string): "green" | "amber" | "blue" | "rose" | "def
     return "amber";
   }
   if (stage === "cancelled") {
-    return "rose";
-  }
-  return "default";
-}
-
-function shiftVariant(status: string): "green" | "amber" | "blue" | "rose" | "default" {
-  const normalized = normalizeStage(status);
-  if (["checked_in", "completed"].includes(normalized)) {
-    return "green";
-  }
-  if (normalized === "scheduled") {
-    return "blue";
-  }
-  if (normalized === "late") {
-    return "amber";
-  }
-  if (["absent", "on_leave"].includes(normalized)) {
     return "rose";
   }
   return "default";

@@ -1,20 +1,37 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import type { ComponentType } from "react";
 import { CheckCircle2, Clock3, LogIn, LogOut, UserCheck, X } from "lucide-react";
 
 import { PageBreadcrumbs } from "@/components/layout/page-breadcrumbs";
 import { Badge } from "@/components/ui/badge";
 import { DataState } from "@/components/ui/data-state";
+import { PaginationControls } from "@/components/ui/pagination-controls";
 import { titleCase } from "@/lib/utils";
 import { useAttendanceDashboard } from "@/features/staff/hooks/useAttendance";
 import type { AttendanceLog } from "@/types/domain";
 
+const ATTENDANCE_LOG_PAGE_SIZE = 25;
+
 export function StaffAttendancePage({ hotelId }: { hotelId: string }) {
+  const [page, setPage] = useState(1);
   const today = new Date().toISOString().slice(0, 10);
   const dashboard = useAttendanceDashboard(hotelId, today);
   const metrics = dashboard.data;
-  const logs = metrics?.logs ?? [];
+  const logs = useMemo(() => metrics?.logs ?? [], [metrics?.logs]);
+  const pageCount = Math.max(1, Math.ceil(logs.length / ATTENDANCE_LOG_PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const paginatedLogs = useMemo(() => {
+    const start = (currentPage - 1) * ATTENDANCE_LOG_PAGE_SIZE;
+    return logs.slice(start, start + ATTENDANCE_LOG_PAGE_SIZE);
+  }, [currentPage, logs]);
+
+  useEffect(() => {
+    if (page > pageCount) {
+      setPage(pageCount);
+    }
+  }, [page, pageCount]);
 
   if (dashboard.isLoading) {
     return <DataState isLoading />;
@@ -54,7 +71,7 @@ export function StaffAttendancePage({ hotelId }: { hotelId: string }) {
           <span>Status</span>
         </div>
         {logs.length ? (
-          logs.map((log) => (
+          paginatedLogs.map((log) => (
             <div
               className="grid min-w-[760px] grid-cols-[1fr_150px_150px_130px_140px] items-center gap-3 border-b border-slate-100 px-4 py-3 text-sm last:border-b-0"
               key={log.id}
@@ -70,6 +87,15 @@ export function StaffAttendancePage({ hotelId }: { hotelId: string }) {
           <DataState empty emptyTitle="No attendance records for today." />
         )}
       </section>
+
+      {logs.length > ATTENDANCE_LOG_PAGE_SIZE ? (
+        <PaginationControls
+          page={currentPage}
+          pageSize={ATTENDANCE_LOG_PAGE_SIZE}
+          totalItems={logs.length}
+          onPageChange={setPage}
+        />
+      ) : null}
     </div>
   );
 }

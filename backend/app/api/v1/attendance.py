@@ -20,6 +20,8 @@ from app.schemas.attendance import (
     AttendanceFinalizeRead,
     AttendanceLogRead,
     AttendanceTodayRead,
+    BulkDefaultShiftAssignmentCreate,
+    BulkDefaultShiftAssignmentRead,
     HotelHolidayCreate,
     HotelHolidayRead,
     ShiftAssignmentCreate,
@@ -83,7 +85,19 @@ def list_assignments(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_any_permission(*SHIFT_READ_PERMISSIONS)),
 ) -> dict:
+    scope = RBACService(db).shift_visibility_scope(current_user)
     assignments = AttendanceService(db).list_assignments(hotel_id)
+    if scope == "own":
+        assignments = [assignment for assignment in assignments if assignment.employee_id == current_user.id]
+    elif scope == "department":
+        staff = _staff_by_id(db, hotel_id)
+        assignments = [
+            assignment
+            for assignment in assignments
+            if staff.get(assignment.employee_id) and staff[assignment.employee_id].department_id == current_user.department_id
+        ]
+    elif scope != "all":
+        assignments = []
     return ok(_assignment_reads(db, hotel_id, assignments))
 
 
@@ -96,6 +110,17 @@ def create_assignment(
 ) -> dict:
     assignment = AttendanceService(db).create_assignment(hotel_id, payload, current_user.id)
     return ok(_assignment_read(db, hotel_id, assignment))
+
+
+@router.post("/assignments/bulk-default")
+def bulk_assign_default(
+    hotel_id: str,
+    payload: BulkDefaultShiftAssignmentCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission(Permissions.SHIFT_MANAGE)),
+) -> dict:
+    result = AttendanceService(db).bulk_assign_default(hotel_id, payload, current_user.id)
+    return ok(BulkDefaultShiftAssignmentRead.model_validate(result).model_dump())
 
 
 @router.patch("/assignments/{assignment_id}")

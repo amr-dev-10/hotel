@@ -27,6 +27,14 @@ class ShiftTemplateRepository(BaseRepository[ShiftTemplate]):
             )
         ).scalar_one_or_none()
 
+    def get_default(self, hotel_id: str) -> ShiftTemplate | None:
+        return self.db.execute(
+            select(ShiftTemplate).where(
+                ShiftTemplate.hotel_id == hotel_id,
+                ShiftTemplate.is_default.is_(True),
+            )
+        ).scalars().first()
+
 
 class ShiftAssignmentRepository(BaseRepository[EmployeeShiftAssignment]):
     def __init__(self, db: Session) -> None:

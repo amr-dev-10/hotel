@@ -9,6 +9,7 @@ export const shiftTemplateSchema = z.object({
   grace_minutes: z.number().int().min(0).max(180),
   late_after_minutes: z.number().int().min(0).max(180),
   is_night_shift: z.boolean(),
+  is_default: z.boolean(),
   is_active: z.boolean(),
 });
 
@@ -22,5 +23,16 @@ export const shiftAssignmentSchema = z.object({
   is_active: z.boolean(),
 });
 
+export const bulkDefaultShiftAssignmentSchema = z.object({
+  shift_template_id: z.string().optional(),
+  effective_from: z.string().min(1),
+  effective_to: z.string().optional(),
+  working_days: z.array(z.number().int().min(0).max(6)).min(1),
+  rotation_type: z.string().min(1).max(40),
+  overwrite_existing: z.boolean(),
+  include_admins: z.boolean(),
+});
+
 export type ShiftTemplateValues = z.infer<typeof shiftTemplateSchema>;
 export type ShiftAssignmentValues = z.infer<typeof shiftAssignmentSchema>;
+export type BulkDefaultShiftAssignmentValues = z.infer<typeof bulkDefaultShiftAssignmentSchema>;

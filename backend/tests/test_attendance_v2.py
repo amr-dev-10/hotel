@@ -163,3 +163,53 @@ def test_attendance_v2_checkin_checkout_dashboard_and_finalize() -> None:
         data = final_dashboard.json()["data"]
         assert data["checked_out"] == 1
         assert data["absent"] == 1
+
+
+def test_bulk_default_shift_assignment_creates_template_and_skips_existing() -> None:
+    with TestClient(app) as client:
+        hotel_id, owner_token = _bootstrap(client)
+        owner_headers = {"Authorization": f"Bearer {owner_token}"}
+        today = utcnow().date()
+
+        _create_staff(client, hotel_id, owner_headers, "Default Staff One")
+        _create_staff(client, hotel_id, owner_headers, "Default Staff Two")
+
+        assigned = client.post(
+            f"/api/v1/hotels/{hotel_id}/attendance/assignments/bulk-default",
+            headers=owner_headers,
+            json={
+                "effective_from": today.isoformat(),
+                "working_days": [today.weekday()],
+                "rotation_type": "fixed",
+                "overwrite_existing": False,
+                "include_admins": False,
+            },
+        )
+        assert assigned.status_code == 200
+        data = assigned.json()["data"]
+        assert data["shift_template_code"] == "MORNING"
+        assert data["created"] == 2
+        assert data["skipped"] == 0
+        assert data["employee_count"] == 2
+
+        templates = client.get(f"/api/v1/hotels/{hotel_id}/attendance/templates", headers=owner_headers)
+        assert templates.status_code == 200
+        default_templates = [item for item in templates.json()["data"] if item["is_default"]]
+        assert len(default_templates) == 1
+        assert default_templates[0]["code"] == "MORNING"
+
+        assigned_again = client.post(
+            f"/api/v1/hotels/{hotel_id}/attendance/assignments/bulk-default",
+            headers=owner_headers,
+            json={
+                "effective_from": today.isoformat(),
+                "working_days": [today.weekday()],
+                "rotation_type": "fixed",
+                "overwrite_existing": False,
+                "include_admins": False,
+            },
+        )
+        assert assigned_again.status_code == 200
+        data_again = assigned_again.json()["data"]
+        assert data_again["created"] == 0
+        assert data_again["skipped"] == 2

@@ -14,6 +14,7 @@ class ShiftTemplateCreate(ORMModel):
     grace_minutes: int = Field(default=0, ge=0, le=180)
     late_after_minutes: int = Field(default=0, ge=0, le=180)
     is_night_shift: bool = False
+    is_default: bool = False
     is_active: bool = True
 
     @field_validator("code")
@@ -31,6 +32,7 @@ class ShiftTemplateUpdate(ORMModel):
     grace_minutes: int | None = Field(default=None, ge=0, le=180)
     late_after_minutes: int | None = Field(default=None, ge=0, le=180)
     is_night_shift: bool | None = None
+    is_default: bool | None = None
     is_active: bool | None = None
 
     @field_validator("code")
@@ -50,6 +52,7 @@ class ShiftTemplateRead(ORMModel):
     grace_minutes: int
     late_after_minutes: int
     is_night_shift: bool
+    is_default: bool
     is_active: bool
     created_at: datetime
     updated_at: datetime
@@ -113,6 +116,37 @@ class ShiftAssignmentRead(ORMModel):
     employee_code: str | None = None
     template_name: str | None = None
     template_code: str | None = None
+
+
+class BulkDefaultShiftAssignmentCreate(ORMModel):
+    shift_template_id: str | None = None
+    effective_from: date | None = None
+    effective_to: date | None = None
+    working_days: list[int] = Field(default_factory=lambda: [0, 1, 2, 3, 4, 5])
+    rotation_type: str = Field(default="fixed", max_length=40)
+    overwrite_existing: bool = False
+    include_admins: bool = False
+
+    @field_validator("working_days")
+    @classmethod
+    def validate_working_days(cls, values: list[int]) -> list[int]:
+        unique_days = sorted(set(values))
+        if not unique_days:
+            raise ValueError("At least one working day is required")
+        if any(day < 0 or day > 6 for day in unique_days):
+            raise ValueError("Working days must be between 0 and 6")
+        return unique_days
+
+
+class BulkDefaultShiftAssignmentRead(ORMModel):
+    shift_template_id: str
+    shift_template_name: str
+    shift_template_code: str
+    effective_from: date
+    created: int
+    skipped: int
+    updated: int
+    employee_count: int
 
 
 class AttendanceActionPayload(ORMModel):

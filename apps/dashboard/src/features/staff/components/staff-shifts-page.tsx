@@ -1,12 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CalendarClock, Loader2, Repeat2, Save, UserRoundCheck } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Repeat2, Save, UserRoundCheck, UsersRound, Wand2 } from "lucide-react";
 import { useForm } from "react-hook-form";
+import type { UseFormRegisterReturn } from "react-hook-form";
 import { toast } from "sonner";
-import { showApiErrorToast } from "@/lib/api/error-toast";
 
 import { PageBreadcrumbs } from "@/components/layout/page-breadcrumbs";
 import { Badge } from "@/components/ui/badge";
@@ -15,47 +15,39 @@ import { DataState } from "@/components/ui/data-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { titleCase } from "@/lib/utils";
-import { useDepartments } from "@/features/departments/hooks/useDepartments";
 import {
+  bulkDefaultShiftAssignmentSchema,
   shiftAssignmentSchema,
   shiftTemplateSchema,
+  type BulkDefaultShiftAssignmentValues,
   type ShiftAssignmentValues,
   type ShiftTemplateValues,
 } from "@/features/staff/schemas/attendance.schema";
-import { shiftSchema, type ShiftValues } from "@/features/staff/schemas/create-staff.schema";
 import {
+  useBulkAssignDefaultShift,
   useCreateShiftAssignment,
   useCreateShiftTemplate,
   useShiftAssignments,
   useShiftTemplates,
 } from "@/features/staff/hooks/useAttendance";
-import { useCreateShift, useShifts, useStaff } from "@/features/staff/hooks/useStaff";
-import type { EmployeeShift, ShiftAssignment, ShiftTemplate, StaffUser } from "@/types/domain";
+import { useStaff } from "@/features/staff/hooks/useStaff";
+import { showApiErrorToast } from "@/lib/api/error-toast";
+import type { ShiftAssignment, ShiftTemplate, StaffUser } from "@/types/domain";
+
+const DEFAULT_WORKING_DAYS = [0, 1, 2, 3, 4, 5];
+const SHIFT_TEMPLATE_PAGE_SIZE = 8;
+const SHIFT_ASSIGNMENT_PAGE_SIZE = 10;
+const SHIFT_EMPLOYEE_PAGE_SIZE = 10;
 
 export function StaffShiftsPage({ hotelId }: { hotelId: string }) {
   const staff = useStaff(hotelId);
-  const departments = useDepartments(hotelId);
-  const shifts = useShifts(hotelId);
   const templates = useShiftTemplates(hotelId);
   const assignments = useShiftAssignments(hotelId);
-  const createShift = useCreateShift(hotelId);
   const createTemplate = useCreateShiftTemplate(hotelId);
   const createAssignment = useCreateShiftAssignment(hotelId);
-  const [viewMode, setViewMode] = useState("weekly");
-  const form = useForm<ShiftValues>({
-    resolver: zodResolver(shiftSchema),
-    defaultValues: {
-      user_id: "",
-      department_id: "",
-      shift_date: new Date().toISOString().slice(0, 10),
-      shift_start: "09:00",
-      shift_end: "17:00",
-      shift_type: "morning",
-      status: "scheduled",
-      notes: "",
-    },
-  });
+  const bulkAssignDefault = useBulkAssignDefaultShift(hotelId);
+
+  const today = new Date().toISOString().slice(0, 10);
   const templateForm = useForm<ShiftTemplateValues>({
     resolver: zodResolver(shiftTemplateSchema),
     defaultValues: {
@@ -67,6 +59,7 @@ export function StaffShiftsPage({ hotelId }: { hotelId: string }) {
       grace_minutes: 10,
       late_after_minutes: 10,
       is_night_shift: false,
+      is_default: true,
       is_active: true,
     },
   });
@@ -75,50 +68,43 @@ export function StaffShiftsPage({ hotelId }: { hotelId: string }) {
     defaultValues: {
       employee_id: "",
       shift_template_id: "",
-      effective_from: new Date().toISOString().slice(0, 10),
+      effective_from: today,
       effective_to: "",
-      working_days: [0, 1, 2, 3, 4, 5],
+      working_days: DEFAULT_WORKING_DAYS,
       rotation_type: "fixed",
       is_active: true,
     },
   });
-
-  const staffById = useMemo(() => new Map((staff.data ?? []).map((user) => [user.id, user])), [staff.data]);
-  const departmentById = useMemo(
-    () => new Map((departments.data ?? []).map((department) => [department.id, department.name])),
-    [departments.data],
-  );
-  const visibleShifts = useMemo(() => filterShiftsByView(shifts.data ?? [], viewMode), [shifts.data, viewMode]);
-  const grouped = useMemo(() => groupByDate(visibleShifts), [visibleShifts]);
-  const metrics = useMemo(() => {
-    const records = shifts.data ?? [];
-    return {
-      scheduled: records.filter((shift) => shift.status === "scheduled").length,
-      checkedIn: records.filter((shift) => shift.status === "checked_in").length,
-      completed: records.filter((shift) => shift.status === "completed").length,
-      exceptions: records.filter((shift) => ["absent", "late", "on_leave"].includes(shift.status)).length,
-    };
-  }, [shifts.data]);
-  const selectedWorkingDays = assignmentForm.watch("working_days") ?? [];
-
-  const onSubmit = form.handleSubmit(async (values) => {
-    try {
-      await createShift.mutateAsync({
-        ...values,
-        department_id: values.department_id || undefined,
-        notes: values.notes || undefined,
-      });
-      toast.success("Shift created");
-      form.reset({
-        ...values,
-        user_id: "",
-        department_id: "",
-        notes: "",
-      });
-    } catch (error) {
-      showApiErrorToast(error);
-    }
+  const bulkForm = useForm<BulkDefaultShiftAssignmentValues>({
+    resolver: zodResolver(bulkDefaultShiftAssignmentSchema),
+    defaultValues: {
+      shift_template_id: "",
+      effective_from: today,
+      effective_to: "",
+      working_days: DEFAULT_WORKING_DAYS,
+      rotation_type: "fixed",
+      overwrite_existing: false,
+      include_admins: false,
+    },
   });
+
+  const eligibleStaff = useMemo(() => (staff.data ?? []).filter(isBulkEligibleEmployee), [staff.data]);
+  const activeAssignmentEmployeeIds = useMemo(
+    () => new Set((assignments.data ?? []).filter((assignment) => assignment.is_active).map((assignment) => assignment.employee_id)),
+    [assignments.data],
+  );
+  const metrics = useMemo(
+    () => ({
+      employees: eligibleStaff.length,
+      templates: templates.data?.length ?? 0,
+      assigned: activeAssignmentEmployeeIds.size,
+      missing: eligibleStaff.filter((user) => !activeAssignmentEmployeeIds.has(user.id)).length,
+    }),
+    [activeAssignmentEmployeeIds, eligibleStaff, templates.data?.length],
+  );
+  const defaultTemplate = (templates.data ?? []).find((template) => template.is_default);
+  const selectedWorkingDays = assignmentForm.watch("working_days") ?? [];
+  const selectedBulkWorkingDays = bulkForm.watch("working_days") ?? [];
 
   const onTemplateSubmit = templateForm.handleSubmit(async (values) => {
     try {
@@ -126,11 +112,12 @@ export function StaffShiftsPage({ hotelId }: { hotelId: string }) {
         ...values,
         code: values.code.toUpperCase(),
       });
-      toast.success("Shift template created");
+      toast.success(values.is_default ? "Default shift template saved" : "Shift template saved");
       templateForm.reset({
         ...values,
         name: "",
         code: "",
+        is_default: false,
       });
     } catch (error) {
       showApiErrorToast(error);
@@ -155,48 +142,114 @@ export function StaffShiftsPage({ hotelId }: { hotelId: string }) {
     }
   });
 
+  const onBulkSubmit = bulkForm.handleSubmit(async (values) => {
+    try {
+      const result = await bulkAssignDefault.mutateAsync({
+        ...values,
+        shift_template_id: values.shift_template_id || undefined,
+        effective_to: values.effective_to || undefined,
+        working_days: selectedBulkWorkingDays,
+      });
+      toast.success(`Assigned ${result.created} employees, skipped ${result.skipped}`);
+    } catch (error) {
+      showApiErrorToast(error);
+    }
+  });
+
   function toggleWorkingDay(day: number) {
-    const next = selectedWorkingDays.includes(day)
-      ? selectedWorkingDays.filter((item) => item !== day)
-      : [...selectedWorkingDays, day].sort((a, b) => a - b);
-    assignmentForm.setValue("working_days", next, { shouldDirty: true, shouldValidate: true });
+    assignmentForm.setValue("working_days", toggleDay(selectedWorkingDays, day), {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
   }
 
-  if (staff.isLoading || departments.isLoading || shifts.isLoading || templates.isLoading || assignments.isLoading) {
+  function toggleBulkWorkingDay(day: number) {
+    bulkForm.setValue("working_days", toggleDay(selectedBulkWorkingDays, day), {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+  }
+
+  if (staff.isLoading || templates.isLoading || assignments.isLoading) {
     return <DataState isLoading />;
   }
 
-  if (staff.error || departments.error || shifts.error || templates.error || assignments.error) {
-    return <DataState error={staff.error ?? departments.error ?? shifts.error ?? templates.error ?? assignments.error} />;
+  if (staff.error || templates.error || assignments.error) {
+    return <DataState error={staff.error ?? templates.error ?? assignments.error} />;
   }
 
   return (
     <div className="grid gap-5">
-      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-        <PageBreadcrumbs
-          current="Shift Management"
-          description="Calendar and roster planning for hotel teams."
-          hotelId={hotelId}
-          items={[
-            { label: "Settings" },
-            { label: "Staff Management", href: `/${hotelId}/settings/staff` },
-          ]}
-        />
-        <div className="w-full sm:w-44">
-          <Select aria-label="Shift view" value={viewMode} onChange={(event) => setViewMode(event.target.value)}>
-            <option value="daily">Daily</option>
-            <option value="weekly">Weekly</option>
-            <option value="monthly">Monthly</option>
-          </Select>
-        </div>
-      </div>
+      <PageBreadcrumbs
+        current="Shift Management"
+        description="Recurring attendance roster and default shift assignment."
+        hotelId={hotelId}
+        items={[
+          { label: "Settings" },
+          { label: "Staff Management", href: `/${hotelId}/settings/staff` },
+        ]}
+      />
 
       <div className="grid gap-3 md:grid-cols-4">
-        <Metric label="Scheduled" value={metrics.scheduled} />
-        <Metric label="Checked in" value={metrics.checkedIn} />
-        <Metric label="Completed" value={metrics.completed} />
-        <Metric label="Exceptions" value={metrics.exceptions} />
+        <Metric label="Employees" value={metrics.employees} />
+        <Metric label="Assigned" value={metrics.assigned} />
+        <Metric label="Missing" value={metrics.missing} />
+        <Metric label="Templates" value={metrics.templates} />
       </div>
+
+      <form className="grid gap-4 rounded-md border border-slate-200 bg-white p-4" onSubmit={onBulkSubmit}>
+        <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-center">
+          <div className="flex items-center gap-2">
+            <Wand2 className="size-4 text-slate-500" />
+            <div>
+              <h3 className="text-base font-semibold">Bulk Default Shift</h3>
+              <p className="text-sm text-slate-500">
+                {defaultTemplate
+                  ? `${defaultTemplate.name} is the current default template.`
+                  : "No default exists yet. Running this creates Morning Shift automatically."}
+              </p>
+            </div>
+          </div>
+          <Button disabled={bulkAssignDefault.isPending} type="submit">
+            {bulkAssignDefault.isPending ? <Loader2 className="animate-spin" /> : <UsersRound />}
+            Assign default
+          </Button>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <Field label="Template" id="bulk-template">
+            <Select id="bulk-template" {...bulkForm.register("shift_template_id")}>
+              <option value="">Use default / create Morning</option>
+              {(templates.data ?? []).map((template) => (
+                <option key={template.id} value={template.id}>
+                  {template.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Effective from" id="bulk-from">
+            <Input id="bulk-from" type="date" {...bulkForm.register("effective_from")} />
+          </Field>
+          <Field label="Effective to" id="bulk-to">
+            <Input id="bulk-to" type="date" {...bulkForm.register("effective_to")} />
+          </Field>
+          <Field label="Rotation" id="bulk-rotation">
+            <Select id="bulk-rotation" {...bulkForm.register("rotation_type")}>
+              <option value="fixed">Fixed</option>
+              <option value="weekly">Weekly</option>
+              <option value="custom">Custom</option>
+            </Select>
+          </Field>
+        </div>
+
+        <div className="grid gap-3 xl:grid-cols-[1fr_auto] xl:items-end">
+          <WorkingDayPicker selectedDays={selectedBulkWorkingDays} onToggle={toggleBulkWorkingDay} />
+          <div className="flex flex-wrap gap-3">
+            <Checkbox label="Overwrite existing" registration={bulkForm.register("overwrite_existing")} />
+            <Checkbox label="Include admins" registration={bulkForm.register("include_admins")} />
+          </div>
+        </div>
+      </form>
 
       <section className="grid gap-4 xl:grid-cols-2">
         <form className="grid gap-4 rounded-md border border-slate-200 bg-white p-4" onSubmit={onTemplateSubmit}>
@@ -232,10 +285,10 @@ export function StaffShiftsPage({ hotelId }: { hotelId: string }) {
             <Field label="Late after" id="template-late">
               <Input id="template-late" min={0} type="number" {...templateForm.register("late_after_minutes", { valueAsNumber: true })} />
             </Field>
-            <label className="flex items-center gap-2 rounded-md bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
-              <input className="size-4 accent-[var(--primary)]" type="checkbox" {...templateForm.register("is_night_shift")} />
-              Night shift
-            </label>
+            <div className="grid gap-2">
+              <Checkbox label="Night shift" registration={templateForm.register("is_night_shift")} />
+              <Checkbox label="Default template" registration={templateForm.register("is_default")} />
+            </div>
           </div>
         </form>
 
@@ -243,7 +296,7 @@ export function StaffShiftsPage({ hotelId }: { hotelId: string }) {
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <UserRoundCheck className="size-4 text-slate-500" />
-              <h3 className="text-base font-semibold">Assign Template</h3>
+              <h3 className="text-base font-semibold">Assign Employee</h3>
             </div>
             <Button disabled={createAssignment.isPending} type="submit">
               {createAssignment.isPending ? <Loader2 className="animate-spin" /> : <Save />}
@@ -277,21 +330,8 @@ export function StaffShiftsPage({ hotelId }: { hotelId: string }) {
             <Field label="Effective to" id="assignment-to">
               <Input id="assignment-to" type="date" {...assignmentForm.register("effective_to")} />
             </Field>
-            <div className="grid gap-2 md:col-span-2">
-              <Label>Working days</Label>
-              <div className="flex flex-wrap gap-2">
-                {WEEK_DAYS.map((day) => (
-                  <Button
-                    key={day.value}
-                    size="sm"
-                    type="button"
-                    variant={selectedWorkingDays.includes(day.value) ? "default" : "secondary"}
-                    onClick={() => toggleWorkingDay(day.value)}
-                  >
-                    {day.label}
-                  </Button>
-                ))}
-              </div>
+            <div className="md:col-span-2">
+              <WorkingDayPicker selectedDays={selectedWorkingDays} onToggle={toggleWorkingDay} />
             </div>
           </div>
         </form>
@@ -302,160 +342,47 @@ export function StaffShiftsPage({ hotelId }: { hotelId: string }) {
           <Repeat2 className="size-4 text-slate-500" />
           <h3 className="text-base font-semibold">Recurring Roster</h3>
         </div>
-        <div className="grid gap-4 xl:grid-cols-2">
+        <div className="grid items-stretch gap-4 xl:grid-cols-3">
+          <EmployeeAssignmentList employees={eligibleStaff} assignedEmployeeIds={activeAssignmentEmployeeIds} />
           <TemplateList templates={templates.data ?? []} />
           <AssignmentList assignments={assignments.data ?? []} />
         </div>
       </section>
-
-      <form className="grid gap-4 rounded-md border border-slate-200 bg-white p-4" onSubmit={onSubmit}>
-        <div className="flex items-center justify-between gap-3">
-          <h3 className="text-base font-semibold">Create Shift</h3>
-          <Button disabled={createShift.isPending} type="submit">
-            {createShift.isPending ? <Loader2 className="animate-spin" /> : <Save />}
-            Save shift
-          </Button>
-        </div>
-        <div className="grid gap-4 md:grid-cols-4">
-          <Field label="Employee" id="shift-user">
-            <Select id="shift-user" {...form.register("user_id")}>
-              <option value="">Select employee</option>
-              {(staff.data ?? []).map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Department" id="shift-department">
-            <Select id="shift-department" {...form.register("department_id")}>
-              <option value="">Auto</option>
-              {(departments.data ?? []).map((department) => (
-                <option key={department.id} value={department.id}>
-                  {department.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Date" id="shift-date">
-            <Input id="shift-date" type="date" {...form.register("shift_date")} />
-          </Field>
-          <Field label="Shift type" id="shift-type">
-            <Select id="shift-type" {...form.register("shift_type")}>
-              <option value="morning">Morning</option>
-              <option value="afternoon">Afternoon</option>
-              <option value="night">Night</option>
-              <option value="custom">Custom</option>
-            </Select>
-          </Field>
-          <Field label="Start time" id="shift-start">
-            <Input id="shift-start" type="time" {...form.register("shift_start")} />
-          </Field>
-          <Field label="End time" id="shift-end">
-            <Input id="shift-end" type="time" {...form.register("shift_end")} />
-          </Field>
-          <Field label="Status" id="shift-status">
-            <Select id="shift-status" {...form.register("status")}>
-              <option value="scheduled">Scheduled</option>
-              <option value="checked_in">Checked in</option>
-              <option value="completed">Completed</option>
-              <option value="late">Late</option>
-              <option value="absent">Absent</option>
-              <option value="on_leave">On leave</option>
-            </Select>
-          </Field>
-          <Field label="Notes" id="shift-notes">
-            <Input id="shift-notes" {...form.register("notes")} />
-          </Field>
-        </div>
-      </form>
-
-      <section className="grid gap-4 rounded-md border border-slate-200 bg-white p-4">
-        <div className="flex items-center gap-2">
-          <CalendarClock className="size-4 text-slate-500" />
-          <h3 className="text-base font-semibold">Calendar View</h3>
-        </div>
-        {grouped.length ? (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {grouped.map(([date, records]) => (
-              <div className="rounded-md border border-slate-200 p-3" key={date}>
-                <p className="font-semibold">{dateLabel(date)}</p>
-                <div className="mt-3 grid gap-2">
-                  {records.map((shift) => (
-                    <ShiftPill key={shift.id} shift={shift} staffMember={staffById.get(shift.user_id)} />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <DataState empty emptyTitle="No shifts in this view." />
-        )}
-      </section>
-
-      <section className="overflow-x-auto rounded-md border border-slate-200 bg-white">
-        <div className="grid min-w-[760px] grid-cols-[1fr_150px_170px_150px_140px] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-normal text-slate-500">
-          <span>Employee</span>
-          <span>Department</span>
-          <span>Shift</span>
-          <span>Date</span>
-          <span>Status</span>
-        </div>
-        {visibleShifts.length ? (
-          visibleShifts.map((shift) => (
-            <div
-              className="grid min-w-[760px] grid-cols-[1fr_150px_170px_150px_140px] items-center gap-3 border-b border-slate-100 px-4 py-3 text-sm last:border-b-0"
-              key={shift.id}
-            >
-              <span className="truncate font-medium">{staffById.get(shift.user_id)?.name ?? "Unknown staff"}</span>
-              <span className="truncate text-slate-600">
-                {shift.department_id ? departmentById.get(shift.department_id) ?? "Auto" : "Auto"}
-              </span>
-              <span className="truncate text-slate-600">
-                {timeLabel(shift.shift_start)} - {timeLabel(shift.shift_end)}
-              </span>
-              <span className="truncate text-slate-600">{dateLabel(shift.shift_date)}</span>
-              <Badge variant={shiftVariant(shift.status)}>{titleCase(shift.status)}</Badge>
-            </div>
-          ))
-        ) : (
-          <DataState empty emptyTitle="No roster records." />
-        )}
-      </section>
-    </div>
-  );
-}
-
-function ShiftPill({ shift, staffMember }: { shift: EmployeeShift; staffMember?: StaffUser }) {
-  return (
-    <div className="rounded bg-slate-50 px-3 py-2 text-sm">
-      <div className="flex items-center justify-between gap-2">
-        <span className="truncate font-medium">{staffMember?.name ?? "Unknown staff"}</span>
-        <Badge variant={shiftVariant(shift.status)}>{titleCase(shift.status)}</Badge>
-      </div>
-      <p className="mt-1 text-xs text-slate-500">
-        {timeLabel(shift.shift_start)} - {timeLabel(shift.shift_end)}
-      </p>
     </div>
   );
 }
 
 function TemplateList({ templates }: { templates: ShiftTemplate[] }) {
+  const { currentPage, paginatedItems, setPage } = useClientPagination(templates, SHIFT_TEMPLATE_PAGE_SIZE);
+
   return (
-    <div className="grid gap-2">
+    <div className="flex min-h-full min-w-0 flex-col gap-2">
       <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Templates</p>
       {templates.length ? (
-        templates.map((template) => (
-          <div className="rounded-md border border-slate-200 px-3 py-2 text-sm" key={template.id}>
-            <div className="flex items-center justify-between gap-2">
-              <span className="truncate font-medium">{template.name}</span>
-              <Badge variant={template.is_active ? "green" : "default"}>{template.code}</Badge>
+        <>
+          {paginatedItems.map((template) => (
+            <div className="rounded-md border border-slate-200 px-3 py-2 text-sm" key={template.id}>
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate font-medium">{template.name}</span>
+                <span className="flex shrink-0 gap-1">
+                  {template.is_default ? <Badge variant="blue">Default</Badge> : null}
+                  <Badge variant={template.is_active ? "green" : "default"}>{template.code}</Badge>
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-slate-500">
+                {timeLabel(template.start_time)} - {timeLabel(template.end_time)}
+              </p>
             </div>
-            <p className="mt-1 text-xs text-slate-500">
-              {timeLabel(template.start_time)} - {timeLabel(template.end_time)}
-            </p>
-          </div>
-        ))
+          ))}
+          {templates.length > SHIFT_TEMPLATE_PAGE_SIZE ? (
+            <RosterPaginationControls
+              page={currentPage}
+              pageSize={SHIFT_TEMPLATE_PAGE_SIZE}
+              totalItems={templates.length}
+              onPageChange={setPage}
+            />
+          ) : null}
+        </>
       ) : (
         <DataState empty emptyTitle="No shift templates." />
       )}
@@ -464,26 +391,149 @@ function TemplateList({ templates }: { templates: ShiftTemplate[] }) {
 }
 
 function AssignmentList({ assignments }: { assignments: ShiftAssignment[] }) {
+  const { currentPage, paginatedItems, setPage } = useClientPagination(assignments, SHIFT_ASSIGNMENT_PAGE_SIZE);
+
   return (
-    <div className="grid gap-2">
+    <div className="flex min-h-full min-w-0 flex-col gap-2">
       <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Assignments</p>
       {assignments.length ? (
-        assignments.map((assignment) => (
-          <div className="rounded-md border border-slate-200 px-3 py-2 text-sm" key={assignment.id}>
-            <div className="flex items-center justify-between gap-2">
-              <span className="truncate font-medium">{assignment.employee_name ?? assignment.employee_code ?? "Unknown staff"}</span>
-              <Badge variant={assignment.is_active ? "blue" : "default"}>{assignment.template_code ?? "Template"}</Badge>
+        <>
+          {paginatedItems.map((assignment) => (
+            <div className="rounded-md border border-slate-200 px-3 py-2 text-sm" key={assignment.id}>
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate font-medium">{assignment.employee_name ?? assignment.employee_code ?? "Unknown staff"}</span>
+                <Badge variant={assignment.is_active ? "blue" : "default"}>{assignment.template_code ?? "Template"}</Badge>
+              </div>
+              <p className="mt-1 text-xs text-slate-500">
+                {assignment.template_name ?? "Assigned shift"} - {workingDayLabel(assignment.working_days)}
+              </p>
             </div>
-            <p className="mt-1 text-xs text-slate-500">
-              {assignment.template_name ?? "Assigned shift"} · {workingDayLabel(assignment.working_days)}
-            </p>
-          </div>
-        ))
+          ))}
+          {assignments.length > SHIFT_ASSIGNMENT_PAGE_SIZE ? (
+            <RosterPaginationControls
+              page={currentPage}
+              pageSize={SHIFT_ASSIGNMENT_PAGE_SIZE}
+              totalItems={assignments.length}
+              onPageChange={setPage}
+            />
+          ) : null}
+        </>
       ) : (
         <DataState empty emptyTitle="No recurring assignments." />
       )}
     </div>
   );
+}
+
+function EmployeeAssignmentList({
+  employees,
+  assignedEmployeeIds,
+}: {
+  employees: StaffUser[];
+  assignedEmployeeIds: Set<string>;
+}) {
+  const { currentPage, paginatedItems, setPage } = useClientPagination(employees, SHIFT_EMPLOYEE_PAGE_SIZE);
+
+  return (
+    <div className="flex min-h-full min-w-0 flex-col gap-2">
+      <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Employees</p>
+      {employees.length ? (
+        <>
+          {paginatedItems.map((employee) => {
+            const isAssigned = assignedEmployeeIds.has(employee.id);
+            return (
+              <div className="rounded-md border border-slate-200 px-3 py-2 text-sm" key={employee.id}>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate font-medium">{employee.name}</span>
+                  <Badge variant={isAssigned ? "green" : "amber"}>{isAssigned ? "Assigned" : "Missing"}</Badge>
+                </div>
+                <p className="mt-1 truncate text-xs text-slate-500">{employee.employee_code ?? employee.email}</p>
+              </div>
+            );
+          })}
+          {employees.length > SHIFT_EMPLOYEE_PAGE_SIZE ? (
+            <RosterPaginationControls
+              page={currentPage}
+              pageSize={SHIFT_EMPLOYEE_PAGE_SIZE}
+              totalItems={employees.length}
+              onPageChange={setPage}
+            />
+          ) : null}
+        </>
+      ) : (
+        <DataState empty emptyTitle="No eligible employees." />
+      )}
+    </div>
+  );
+}
+
+function RosterPaginationControls({
+  page,
+  pageSize,
+  totalItems,
+  onPageChange,
+}: {
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  onPageChange: (page: number) => void;
+}) {
+  const pageCount = Math.max(1, Math.ceil(totalItems / pageSize));
+  const currentPage = Math.min(Math.max(page, 1), pageCount);
+
+  return (
+    <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 text-xs text-slate-500">
+      <span className="font-semibold uppercase tracking-normal">Total {totalItems}</span>
+      <div className="flex items-center gap-1">
+        <Button
+          aria-label="Previous page"
+          disabled={currentPage <= 1}
+          size="iconSm"
+          type="button"
+          variant="ghost"
+          onClick={() => onPageChange(currentPage - 1)}
+        >
+          <ChevronLeft />
+        </Button>
+        <span className="min-w-20 rounded border border-[var(--primary)] bg-[var(--primary-soft)] px-2 py-1 text-center font-bold uppercase tracking-normal text-[var(--primary)]">
+          Page {currentPage} / {pageCount}
+        </span>
+        <Button
+          aria-label="Next page"
+          disabled={currentPage >= pageCount}
+          size="iconSm"
+          type="button"
+          variant="ghost"
+          onClick={() => onPageChange(currentPage + 1)}
+        >
+          <ChevronRight />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function useClientPagination<T>(items: T[], pageSize: number) {
+  const [page, setPage] = useState(1);
+  const pageCount = Math.max(1, Math.ceil(items.length / pageSize));
+  const currentPage = Math.min(page, pageCount);
+
+  useEffect(() => {
+    setPage(1);
+  }, [items]);
+
+  useEffect(() => {
+    if (page > pageCount) {
+      setPage(pageCount);
+    }
+  }, [page, pageCount]);
+
+  const paginatedItems = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return items.slice(start, start + pageSize);
+  }, [currentPage, items, pageSize]);
+
+  return { currentPage, paginatedItems, setPage };
 }
 
 function Metric({ label, value }: { label: string; value: number }) {
@@ -512,6 +562,48 @@ function Field({
   );
 }
 
+function Checkbox({
+  label,
+  registration,
+}: {
+  label: string;
+  registration: UseFormRegisterReturn;
+}) {
+  return (
+    <label className="flex min-h-10 items-center gap-2 rounded-md bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
+      <input className="size-4 accent-[var(--primary)]" type="checkbox" {...registration} />
+      {label}
+    </label>
+  );
+}
+
+function WorkingDayPicker({
+  selectedDays,
+  onToggle,
+}: {
+  selectedDays: number[];
+  onToggle: (day: number) => void;
+}) {
+  return (
+    <div className="grid gap-2">
+      <Label>Working days</Label>
+      <div className="flex flex-wrap gap-2">
+        {WEEK_DAYS.map((day) => (
+          <Button
+            key={day.value}
+            size="sm"
+            type="button"
+            variant={selectedDays.includes(day.value) ? "default" : "secondary"}
+            onClick={() => onToggle(day.value)}
+          >
+            {day.label}
+          </Button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const WEEK_DAYS = [
   { value: 0, label: "Mon" },
   { value: 1, label: "Tue" },
@@ -522,60 +614,22 @@ const WEEK_DAYS = [
   { value: 6, label: "Sun" },
 ];
 
+function isBulkEligibleEmployee(user: StaffUser) {
+  return user.is_active && !user.is_hotel_owner && user.user_type === "HOTEL_EMPLOYEE";
+}
+
+function toggleDay(selectedDays: number[], day: number) {
+  return selectedDays.includes(day)
+    ? selectedDays.filter((item) => item !== day)
+    : [...selectedDays, day].sort((a, b) => a - b);
+}
+
 function workingDayLabel(values: number[]) {
   const labels = WEEK_DAYS.filter((day) => values.includes(day.value)).map((day) => day.label);
   return labels.length ? labels.join(", ") : "No days";
 }
 
-function filterShiftsByView(shifts: EmployeeShift[], viewMode: string) {
-  const today = new Date().toISOString().slice(0, 10);
-  const weekEnd = new Date();
-  weekEnd.setDate(weekEnd.getDate() + 7);
-  const weekEndKey = weekEnd.toISOString().slice(0, 10);
-
-  return shifts
-    .filter((shift) => {
-      if (viewMode === "daily") {
-        return shift.shift_date === today;
-      }
-      if (viewMode === "weekly") {
-        return shift.shift_date >= today && shift.shift_date <= weekEndKey;
-      }
-      return true;
-    })
-    .slice()
-    .sort((a, b) => `${a.shift_date}${a.shift_start}`.localeCompare(`${b.shift_date}${b.shift_start}`));
-}
-
-function groupByDate(shifts: EmployeeShift[]) {
-  const groups = new Map<string, EmployeeShift[]>();
-  shifts.forEach((shift) => {
-    groups.set(shift.shift_date, [...(groups.get(shift.shift_date) ?? []), shift]);
-  });
-  return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
-}
-
 function timeLabel(value: string) {
   const normalized = value.includes("T") ? value : `2026-01-01T${value}`;
   return new Intl.DateTimeFormat("en-IN", { hour: "2-digit", minute: "2-digit" }).format(new Date(normalized));
-}
-
-function dateLabel(value: string) {
-  return new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(value));
-}
-
-function shiftVariant(status: string): "green" | "amber" | "blue" | "rose" | "default" {
-  if (["completed", "checked_in"].includes(status)) {
-    return "green";
-  }
-  if (status === "late") {
-    return "amber";
-  }
-  if (status === "scheduled") {
-    return "blue";
-  }
-  if (["absent", "on_leave"].includes(status)) {
-    return "rose";
-  }
-  return "default";
 }

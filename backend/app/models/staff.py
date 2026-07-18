@@ -38,6 +38,7 @@ class ShiftTemplate(UUIDPrimaryKeyMixin, Base):
     grace_minutes: Mapped[int] = mapped_column(Integer, default=0)
     late_after_minutes: Mapped[int] = mapped_column(Integer, default=0)
     is_night_shift: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

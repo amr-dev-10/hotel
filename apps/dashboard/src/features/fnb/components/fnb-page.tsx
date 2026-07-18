@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PaginationControls } from "@/components/ui/pagination-controls";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -96,6 +97,7 @@ const orderColumns = [
   { key: "delivered", label: "Delivered" },
   { key: "cancelled", label: "Cancelled" },
 ];
+const MENU_ITEM_PAGE_SIZE = 24;
 
 type SectionKey = (typeof sections)[number]["key"];
 type ItemDrawerState = { mode: "new"; kind: "food" | "beverage" } | { mode: "edit"; item: MenuItem };
@@ -388,6 +390,7 @@ function MenuWorkspace({
   const [taxId, setTaxId] = useState("");
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
+  const [page, setPage] = useState(1);
   const counts = useMemo(() => categoryCounts(items), [items]);
 
   const filteredItems = useMemo(() => {
@@ -412,6 +415,23 @@ function MenuWorkspace({
     });
     return sortItems(rows, sort);
   }, [availability, categoryId, items, maxPrice, minPrice, search, sort, taxId]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [availability, categoryId, maxPrice, minPrice, search, sort, taxId]);
+
+  const pageCount = Math.max(1, Math.ceil(filteredItems.length / MENU_ITEM_PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const paginatedItems = useMemo(() => {
+    const start = (currentPage - 1) * MENU_ITEM_PAGE_SIZE;
+    return filteredItems.slice(start, start + MENU_ITEM_PAGE_SIZE);
+  }, [currentPage, filteredItems]);
+
+  useEffect(() => {
+    if (page > pageCount) {
+      setPage(pageCount);
+    }
+  }, [page, pageCount]);
 
   const visibleCategories = categories.filter((category) =>
     category.name.toLowerCase().includes(categorySearch.trim().toLowerCase()),
@@ -523,7 +543,7 @@ function MenuWorkspace({
           {isLoading ? <DataState isLoading /> : null}
           {!isLoading && !filteredItems.length ? <DataState empty emptyTitle="No menu items match these filters." /> : null}
           <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
-            {filteredItems.map((item) => (
+            {paginatedItems.map((item) => (
               <MenuItemCard
                 categoryName={categoryById.get(item.category_id)?.name ?? "Category"}
                 deleteItem={() => deleteItem(item.id)}
@@ -536,6 +556,14 @@ function MenuWorkspace({
               />
             ))}
           </div>
+          {filteredItems.length > MENU_ITEM_PAGE_SIZE ? (
+            <PaginationControls
+              page={currentPage}
+              pageSize={MENU_ITEM_PAGE_SIZE}
+              totalItems={filteredItems.length}
+              onPageChange={setPage}
+            />
+          ) : null}
         </section>
       </div>
     </div>

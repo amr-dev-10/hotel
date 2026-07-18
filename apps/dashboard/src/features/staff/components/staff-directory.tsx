@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ComponentType } from "react";
 import Link from "next/link";
 import {
@@ -19,6 +19,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { DataState } from "@/components/ui/data-state";
 import { Input } from "@/components/ui/input";
+import { PaginationControls } from "@/components/ui/pagination-controls";
 import { Select } from "@/components/ui/select";
 import { absolutizeBackendUrl } from "@/lib/api/client";
 import { titleCase } from "@/lib/utils";
@@ -30,6 +31,7 @@ import type { StaffUser, Ticket } from "@/types/domain";
 type GroupBy = "department" | "role" | "manager" | "shift" | "staff_level" | "status";
 
 const ticketFilters = {};
+const STAFF_DIRECTORY_PAGE_SIZE = 12;
 
 export function StaffDirectory({ hotelId }: { hotelId: string }) {
   const staff = useStaff(hotelId);
@@ -44,6 +46,7 @@ export function StaffDirectory({ hotelId }: { hotelId: string }) {
   const [ticketLoad, setTicketLoad] = useState("");
   const [rating, setRating] = useState("");
   const [groupBy, setGroupBy] = useState<GroupBy>("department");
+  const [page, setPage] = useState(1);
 
   const departmentById = useMemo(
     () => new Map((departments.data ?? []).map((department) => [department.id, department.name])),
@@ -107,16 +110,6 @@ export function StaffDirectory({ hotelId }: { hotelId: string }) {
     ticketsByUser,
   ]);
 
-  const groupedStaff = useMemo(() => {
-    const groups = new Map<string, StaffUser[]>();
-    visibleStaff.forEach((user) => {
-      const key = groupLabel(user, groupBy, departmentById, staffById);
-      groups.set(key, [...(groups.get(key) ?? []), user]);
-    });
-
-    return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [departmentById, groupBy, staffById, visibleStaff]);
-
   const summary = useMemo(() => {
     const active = (staff.data ?? []).filter((user) => user.is_active).length;
     const onDuty = (staff.data ?? []).filter((user) => user.is_on_duty).length;
@@ -129,6 +122,33 @@ export function StaffDirectory({ hotelId }: { hotelId: string }) {
       openTickets,
     };
   }, [staff.data, ticketsByUser]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [departmentId, groupBy, level, query, rating, role, shiftStatus, status, ticketLoad]);
+
+  const pageCount = Math.max(1, Math.ceil(visibleStaff.length / STAFF_DIRECTORY_PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const paginatedStaff = useMemo(() => {
+    const start = (currentPage - 1) * STAFF_DIRECTORY_PAGE_SIZE;
+    return visibleStaff.slice(start, start + STAFF_DIRECTORY_PAGE_SIZE);
+  }, [currentPage, visibleStaff]);
+
+  const groupedStaff = useMemo(() => {
+    const groups = new Map<string, StaffUser[]>();
+    paginatedStaff.forEach((user) => {
+      const key = groupLabel(user, groupBy, departmentById, staffById);
+      groups.set(key, [...(groups.get(key) ?? []), user]);
+    });
+
+    return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [departmentById, groupBy, paginatedStaff, staffById]);
+
+  useEffect(() => {
+    if (page > pageCount) {
+      setPage(pageCount);
+    }
+  }, [page, pageCount]);
 
   if (staff.isLoading) {
     return <DataState isLoading />;
@@ -254,6 +274,15 @@ export function StaffDirectory({ hotelId }: { hotelId: string }) {
           </section>
         ))}
       </div>
+
+      {visibleStaff.length > STAFF_DIRECTORY_PAGE_SIZE ? (
+        <PaginationControls
+          page={currentPage}
+          pageSize={STAFF_DIRECTORY_PAGE_SIZE}
+          totalItems={visibleStaff.length}
+          onPageChange={setPage}
+        />
+      ) : null}
     </div>
   );
 }

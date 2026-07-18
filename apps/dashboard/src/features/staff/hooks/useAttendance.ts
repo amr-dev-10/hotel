@@ -6,10 +6,12 @@ import type {
   AttendanceDashboard,
   AttendanceLog,
   AttendanceToday,
+  BulkDefaultShiftAssignmentResult,
   ShiftAssignment,
   ShiftTemplate,
 } from "@/types/domain";
 import type {
+  BulkDefaultShiftAssignmentValues,
   ShiftAssignmentValues,
   ShiftTemplateValues,
 } from "@/features/staff/schemas/attendance.schema";
@@ -72,6 +74,21 @@ export function useCreateShiftAssignment(hotelId: string) {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.attendance.assignments(hotelId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.attendance.today(hotelId) });
+    },
+  });
+}
+
+export function useBulkAssignDefaultShift(hotelId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: BulkDefaultShiftAssignmentValues) =>
+      apiPost<BulkDefaultShiftAssignmentResult>(`/hotels/${hotelId}/attendance/assignments/bulk-default`, payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.attendance.templates(hotelId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.attendance.assignments(hotelId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.attendance.today(hotelId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.attendance.dashboard(hotelId) });
     },
   });
 }

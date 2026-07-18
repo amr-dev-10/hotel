@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -16,6 +16,7 @@ from app.repositories.attendance_repository import (
 from app.repositories.user_repository import UserRepository
 from app.schemas.attendance import (
     AttendanceActionPayload,
+    BulkDefaultShiftAssignmentCreate,
     HotelHolidayCreate,
     ShiftAssignmentCreate,
     ShiftAssignmentUpdate,
@@ -35,6 +36,19 @@ ARRIVAL_UNKNOWN = "UNKNOWN"
 ARRIVAL_ON_TIME = "ON_TIME"
 ARRIVAL_LATE = "LATE"
 
+DEFAULT_SHIFT_TEMPLATE = {
+    "name": "Morning Shift",
+    "code": "MORNING",
+    "start_time": time(9, 0),
+    "end_time": time(17, 0),
+    "break_minutes": 30,
+    "grace_minutes": 10,
+    "late_after_minutes": 10,
+    "is_night_shift": False,
+    "is_default": True,
+    "is_active": True,
+}
+
 
 class AttendanceService:
     def __init__(self, db: Session) -> None:
@@ -51,6 +65,8 @@ class AttendanceService:
     def create_template(self, hotel_id: str, payload: ShiftTemplateCreate, actor_id: str | None) -> ShiftTemplate:
         if self.templates.get_by_code(hotel_id, payload.code):
             raise conflict("Shift template code already exists for this hotel")
+        if payload.is_default:
+            self._clear_default_templates(hotel_id)
         template = ShiftTemplate(hotel_id=hotel_id, **payload.model_dump())
         self.db.add(template)
         AuditService(self.db).log(hotel_id, "attendance.shift_template.created", "shift_template", None, actor_id)
@@ -71,6 +87,8 @@ class AttendanceService:
         data = payload.model_dump(exclude_unset=True)
         if "code" in data and data["code"] != template.code and self.templates.get_by_code(hotel_id, data["code"]):
             raise conflict("Shift template code already exists for this hotel")
+        if data.get("is_default"):
+            self._clear_default_templates(hotel_id, keep_id=template.id)
         for key, value in data.items():
             setattr(template, key, value)
         AuditService(self.db).log(hotel_id, "attendance.shift_template.updated", "shift_template", template.id, actor_id)
@@ -105,6 +123,83 @@ class AttendanceService:
         self.db.commit()
         self.db.refresh(assignment)
         return assignment
+
+    def bulk_assign_default(
+        self,
+        hotel_id: str,
+        payload: BulkDefaultShiftAssignmentCreate,
+        actor_id: str | None,
+    ) -> dict:
+        effective_from = payload.effective_from or utcnow().date()
+        if payload.effective_to and payload.effective_to < effective_from:
+            raise bad_request("Assignment end date cannot be before start date")
+
+        template = self._template_for_bulk_default(hotel_id, payload.shift_template_id)
+        self.db.flush()
+
+        employees = [
+            user
+            for user in self.users.list_active_for_hotel(hotel_id)
+            if self._is_bulk_assignment_employee(user, payload.include_admins)
+        ]
+        created = 0
+        skipped = 0
+        updated = 0
+
+        for user in employees:
+            existing = self.assignments.active_for_employee_on_date(hotel_id, user.id, effective_from)
+            if existing and not payload.overwrite_existing:
+                skipped += 1
+                continue
+            if existing and payload.overwrite_existing:
+                for assignment in self.assignments.list_for_hotel(hotel_id, active_only=True, employee_id=user.id):
+                    if self._assignment_overlaps(assignment, effective_from, payload.effective_to):
+                        assignment.is_active = False
+                        assignment.updated_at = utcnow()
+                        updated += 1
+
+            self.db.add(
+                EmployeeShiftAssignment(
+                    hotel_id=hotel_id,
+                    employee_id=user.id,
+                    shift_template_id=template.id,
+                    effective_from=effective_from,
+                    effective_to=payload.effective_to,
+                    working_days=payload.working_days,
+                    rotation_type=payload.rotation_type,
+                    is_active=True,
+                    created_by=actor_id,
+                )
+            )
+            created += 1
+
+        AuditService(self.db).log(
+            hotel_id,
+            "attendance.shift_assignment.bulk_default",
+            "shift_assignment",
+            None,
+            actor_id,
+            {
+                "shift_template_id": template.id,
+                "effective_from": effective_from.isoformat(),
+                "created": created,
+                "skipped": skipped,
+                "updated": updated,
+                "employee_count": len(employees),
+            },
+        )
+        self.db.commit()
+        self.db.refresh(template)
+        return {
+            "shift_template_id": template.id,
+            "shift_template_name": template.name,
+            "shift_template_code": template.code,
+            "effective_from": effective_from,
+            "created": created,
+            "skipped": skipped,
+            "updated": updated,
+            "employee_count": len(employees),
+        }
 
     def update_assignment(
         self,
@@ -366,6 +461,56 @@ class AttendanceService:
         if not user or not user.is_active:
             raise not_found("Employee not found")
         return user
+
+    def _template_for_bulk_default(self, hotel_id: str, template_id: str | None) -> ShiftTemplate:
+        if template_id:
+            template = self.templates.get_for_hotel(hotel_id, template_id)
+            if not template:
+                raise not_found("Shift template not found")
+            if not template.is_active:
+                raise bad_request("Shift template is inactive")
+            if not template.is_default:
+                self._clear_default_templates(hotel_id, keep_id=template.id)
+                template.is_default = True
+            return template
+
+        template = self.templates.get_default(hotel_id)
+        if template:
+            if not template.is_active:
+                template.is_active = True
+            return template
+
+        template = self.templates.get_by_code(hotel_id, DEFAULT_SHIFT_TEMPLATE["code"])
+        if template:
+            self._clear_default_templates(hotel_id, keep_id=template.id)
+            template.is_default = True
+            template.is_active = True
+            return template
+
+        template = ShiftTemplate(hotel_id=hotel_id, **DEFAULT_SHIFT_TEMPLATE)
+        self.db.add(template)
+        return template
+
+    def _clear_default_templates(self, hotel_id: str, keep_id: str | None = None) -> None:
+        for template in self.templates.list_for_hotel(hotel_id):
+            if template.id != keep_id and template.is_default:
+                template.is_default = False
+
+    @staticmethod
+    def _is_bulk_assignment_employee(user: User, include_admins: bool) -> bool:
+        if user.is_hotel_owner:
+            return False
+        return include_admins or user.user_type == "HOTEL_EMPLOYEE"
+
+    @staticmethod
+    def _assignment_overlaps(
+        assignment: EmployeeShiftAssignment,
+        effective_from: date,
+        effective_to: date | None,
+    ) -> bool:
+        assignment_to = assignment.effective_to or date.max
+        new_to = effective_to or date.max
+        return assignment.effective_from <= new_to and assignment_to >= effective_from
 
     @staticmethod
     def _is_assignment_working_day(assignment: EmployeeShiftAssignment | None, target_date: date) -> bool:

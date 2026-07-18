@@ -504,6 +504,7 @@ export interface ShiftTemplate {
   grace_minutes: number;
   late_after_minutes: number;
   is_night_shift: boolean;
+  is_default: boolean;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -526,6 +527,17 @@ export interface ShiftAssignment {
   employee_code?: string | null;
   template_name?: string | null;
   template_code?: string | null;
+}
+
+export interface BulkDefaultShiftAssignmentResult {
+  shift_template_id: string;
+  shift_template_name: string;
+  shift_template_code: string;
+  effective_from: string;
+  created: number;
+  skipped: number;
+  updated: number;
+  employee_count: number;
 }
 
 export interface AttendanceLog {
