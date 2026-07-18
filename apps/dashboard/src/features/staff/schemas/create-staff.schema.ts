@@ -23,6 +23,16 @@ export const updateStaffSchema = createStaffSchema.omit({ password: true }).exte
   is_active: z.boolean().optional(),
 });
 
+export const resetStaffPasswordSchema = z
+  .object({
+    new_password: z.string().min(8, "Use at least 8 characters"),
+    confirm_password: z.string().min(8, "Confirm the new password"),
+  })
+  .refine((values) => values.new_password === values.confirm_password, {
+    message: "Passwords do not match",
+    path: ["confirm_password"],
+  });
+
 export const shiftSchema = z.object({
   user_id: z.string().min(1),
   department_id: z.string().optional(),
@@ -35,5 +45,6 @@ export const shiftSchema = z.object({
 });
 
 export type CreateStaffValues = z.infer<typeof createStaffSchema>;
+export type ResetStaffPasswordValues = z.infer<typeof resetStaffPasswordSchema>;
 export type UpdateStaffValues = z.infer<typeof updateStaffSchema>;
 export type ShiftValues = z.infer<typeof shiftSchema>;

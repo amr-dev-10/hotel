@@ -11,6 +11,7 @@ import {
   ClipboardCheck,
   Clock3,
   History,
+  KeyRound,
   Loader2,
   Pencil,
   Save,
@@ -31,16 +32,23 @@ import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Select } from "@/components/ui/select";
 import { Can } from "@/lib/auth/can";
 import { absolutizeBackendUrl } from "@/lib/api/client";
 import { cn, compactId, titleCase } from "@/lib/utils";
 import { useDepartments } from "@/features/departments/hooks/useDepartments";
 import { useAssignUserRoles, useRoles } from "@/features/roles/hooks/useRoles";
-import { updateStaffSchema, type UpdateStaffValues } from "@/features/staff/schemas/create-staff.schema";
+import {
+  resetStaffPasswordSchema,
+  updateStaffSchema,
+  type ResetStaffPasswordValues,
+  type UpdateStaffValues,
+} from "@/features/staff/schemas/create-staff.schema";
 import {
   useDeleteStaff,
   useGenerateEmployeeCode,
+  useResetStaffPassword,
   useShifts,
   useStaff,
   useUpdateStaff,
@@ -79,6 +87,7 @@ export function StaffProfilePage({
   const tickets = useTickets(hotelId, ticketFilters);
   const shifts = useShifts(hotelId);
   const updateStaff = useUpdateStaff(hotelId, staffId);
+  const resetPassword = useResetStaffPassword(hotelId, staffId);
   const generateEmployeeCode = useGenerateEmployeeCode(hotelId);
   const deleteStaff = useDeleteStaff(hotelId);
   const assignRoles = useAssignUserRoles(hotelId, staffId);
@@ -118,6 +127,13 @@ export function StaffProfilePage({
       job_role: "",
       is_on_duty: false,
       is_active: true,
+    },
+  });
+  const passwordForm = useForm<ResetStaffPasswordValues>({
+    resolver: zodResolver(resetStaffPasswordSchema),
+    defaultValues: {
+      new_password: "",
+      confirm_password: "",
     },
   });
 
@@ -164,6 +180,16 @@ export function StaffProfilePage({
       });
       toast.success("Staff profile updated");
       setEditing(false);
+    } catch (error) {
+      showApiErrorToast(error);
+    }
+  });
+
+  const onPasswordSubmit = passwordForm.handleSubmit(async (values) => {
+    try {
+      await resetPassword.mutateAsync(values);
+      toast.success("Staff password reset");
+      passwordForm.reset();
     } catch (error) {
       showApiErrorToast(error);
     }
@@ -270,86 +296,123 @@ export function StaffProfilePage({
       </section>
 
       {editing ? (
-        <form className="grid gap-4 rounded-md border border-slate-200 bg-white p-4" onSubmit={onSubmit}>
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="text-base font-semibold">Edit Staff</h3>
-            <Button disabled={updateStaff.isPending} type="submit">
-              {updateStaff.isPending ? <Loader2 className="animate-spin" /> : <Save />}
-              Save
-            </Button>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Employee code" id="profile-employee-code">
-              <div className="flex gap-2">
-                <Input
-                  className="font-mono uppercase"
-                  id="profile-employee-code"
-                  maxLength={40}
-                  pattern="[A-Za-z0-9]*"
-                  placeholder="TAJMANG234AX"
-                  {...form.register("employee_code")}
-                />
-                <Button
-                  className="shrink-0"
-                  disabled={generateEmployeeCode.isPending}
-                  type="button"
-                  variant="secondary"
-                  onClick={handleGenerateEmployeeCode}
-                >
-                  {generateEmployeeCode.isPending ? <Loader2 className="animate-spin" /> : <Sparkles />}
-                  Auto-generate
-                </Button>
-              </div>
-            </Field>
-            <Field label="Name" id="profile-name">
-              <Input id="profile-name" {...form.register("name")} />
-            </Field>
-            <Field label="Email" id="profile-email">
-              <Input id="profile-email" type="email" {...form.register("email")} />
-            </Field>
-            <Field label="Job role" id="profile-job-role">
-              <Input id="profile-job-role" {...form.register("job_role")} />
-            </Field>
-            <Field label="Staff level" id="profile-staff-level">
-              <Select id="profile-staff-level" {...form.register("staff_level")}>
-                <option value="admin">Admin</option>
-                <option value="manager">Manager</option>
-                <option value="supervisor">Supervisor</option>
-                <option value="attendant">Attendant</option>
-              </Select>
-            </Field>
-            <Field label="Department" id="profile-department">
-              <Select id="profile-department" {...form.register("department_id")}>
-                <option value="">Unassigned</option>
-                {(departments.data ?? []).map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="Reports to" id="profile-reports-to">
-              <Select id="profile-reports-to" {...form.register("reports_to")}>
-                <option value="">None</option>
-                {(staff.data ?? [])
-                  .filter((item) => item.id !== user.id)
-                  .map((item) => (
+        <div className="grid gap-4">
+          <form className="grid gap-4 rounded-md border border-slate-200 bg-white p-4" onSubmit={onSubmit}>
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-base font-semibold">Edit Staff</h3>
+              <Button disabled={updateStaff.isPending} type="submit">
+                {updateStaff.isPending ? <Loader2 className="animate-spin" /> : <Save />}
+                Save
+              </Button>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field label="Employee code" id="profile-employee-code">
+                <div className="flex gap-2">
+                  <Input
+                    className="font-mono uppercase"
+                    id="profile-employee-code"
+                    maxLength={40}
+                    pattern="[A-Za-z0-9]*"
+                    placeholder="TAJMANG234AX"
+                    {...form.register("employee_code")}
+                  />
+                  <Button
+                    className="shrink-0"
+                    disabled={generateEmployeeCode.isPending}
+                    type="button"
+                    variant="secondary"
+                    onClick={handleGenerateEmployeeCode}
+                  >
+                    {generateEmployeeCode.isPending ? <Loader2 className="animate-spin" /> : <Sparkles />}
+                    Auto-generate
+                  </Button>
+                </div>
+              </Field>
+              <Field label="Name" id="profile-name">
+                <Input id="profile-name" {...form.register("name")} />
+              </Field>
+              <Field label="Email" id="profile-email">
+                <Input id="profile-email" type="email" {...form.register("email")} />
+              </Field>
+              <Field label="Job role" id="profile-job-role">
+                <Input id="profile-job-role" {...form.register("job_role")} />
+              </Field>
+              <Field label="Staff level" id="profile-staff-level">
+                <Select id="profile-staff-level" {...form.register("staff_level")}>
+                  <option value="admin">Admin</option>
+                  <option value="manager">Manager</option>
+                  <option value="supervisor">Supervisor</option>
+                  <option value="attendant">Attendant</option>
+                </Select>
+              </Field>
+              <Field label="Department" id="profile-department">
+                <Select id="profile-department" {...form.register("department_id")}>
+                  <option value="">Unassigned</option>
+                  {(departments.data ?? []).map((item) => (
                     <option key={item.id} value={item.id}>
                       {item.name}
                     </option>
                   ))}
-              </Select>
-            </Field>
-            <label className="flex items-center gap-2 rounded-md border border-slate-200 p-3 text-sm">
-              <input className="size-4 accent-[var(--primary)]" type="checkbox" {...form.register("is_on_duty")} />
-              On duty
-            </label>
-            <label className="flex items-center gap-2 rounded-md border border-slate-200 p-3 text-sm">
-              <input className="size-4 accent-[var(--primary)]" type="checkbox" {...form.register("is_active")} />
-              Active
-            </label>
-          </div>
-        </form>
+                </Select>
+              </Field>
+              <Field label="Reports to" id="profile-reports-to">
+                <Select id="profile-reports-to" {...form.register("reports_to")}>
+                  <option value="">None</option>
+                  {(staff.data ?? [])
+                    .filter((item) => item.id !== user.id)
+                    .map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name}
+                      </option>
+                    ))}
+                </Select>
+              </Field>
+              <label className="flex items-center gap-2 rounded-md border border-slate-200 p-3 text-sm">
+                <input className="size-4 accent-[var(--primary)]" type="checkbox" {...form.register("is_on_duty")} />
+                On duty
+              </label>
+              <label className="flex items-center gap-2 rounded-md border border-slate-200 p-3 text-sm">
+                <input className="size-4 accent-[var(--primary)]" type="checkbox" {...form.register("is_active")} />
+                Active
+              </label>
+            </div>
+          </form>
+          <Can I="manage" a="Staff">
+            <form className="grid gap-4 rounded-md border border-slate-200 bg-white p-4" onSubmit={onPasswordSubmit}>
+              <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                <h3 className="text-base font-semibold">Password Reset</h3>
+                <Button disabled={resetPassword.isPending} type="submit" variant="secondary">
+                  {resetPassword.isPending ? <Loader2 className="animate-spin" /> : <KeyRound />}
+                  Reset password
+                </Button>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label="New password" id="profile-new-password">
+                  <PasswordInput
+                    autoComplete="new-password"
+                    disabled={resetPassword.isPending}
+                    id="profile-new-password"
+                    {...passwordForm.register("new_password")}
+                  />
+                  {passwordForm.formState.errors.new_password ? (
+                    <p className="text-xs text-rose-600">{passwordForm.formState.errors.new_password.message}</p>
+                  ) : null}
+                </Field>
+                <Field label="Confirm password" id="profile-confirm-password">
+                  <PasswordInput
+                    autoComplete="new-password"
+                    disabled={resetPassword.isPending}
+                    id="profile-confirm-password"
+                    {...passwordForm.register("confirm_password")}
+                  />
+                  {passwordForm.formState.errors.confirm_password ? (
+                    <p className="text-xs text-rose-600">{passwordForm.formState.errors.confirm_password.message}</p>
+                  ) : null}
+                </Field>
+              </div>
+            </form>
+          </Can>
+        </div>
       ) : null}
 
       <div className="flex gap-2 overflow-x-auto rounded-md border border-slate-200 bg-white p-2">

@@ -134,6 +134,35 @@ def test_user_update_delete_soft_delete_sessions_and_audit() -> None:
 
         login = client.post("/api/v1/auth/login", json={"email": email, "password": "secretpass123"})
         assert login.status_code == 200
+        staff_headers = {"Authorization": f"Bearer {login.json()['data']['access_token']}"}
+
+        denied_reset = client.post(
+            f"/api/v1/hotels/{hotel_id}/users/{user_id}/password",
+            headers=staff_headers,
+            json={"new_password": "newsecretpass123", "confirm_password": "newsecretpass123"},
+        )
+        assert denied_reset.status_code == 403
+
+        reset = client.post(
+            f"/api/v1/hotels/{hotel_id}/users/{user_id}/password",
+            headers=headers,
+            json={"new_password": "newsecretpass123", "confirm_password": "newsecretpass123"},
+        )
+        assert reset.status_code == 200
+        assert reset.json()["data"]["password_changed"] is True
+
+        duplicate_reset = client.post(
+            f"/api/v1/hotels/{hotel_id}/users/{user_id}/password",
+            headers=headers,
+            json={"new_password": "newsecretpass123", "confirm_password": "newsecretpass123"},
+        )
+        assert duplicate_reset.status_code == 400
+
+        old_login = client.post("/api/v1/auth/login", json={"email": email, "password": "secretpass123"})
+        assert old_login.status_code == 400
+
+        new_login = client.post("/api/v1/auth/login", json={"email": email, "password": "newsecretpass123"})
+        assert new_login.status_code == 200
 
         patched = client.patch(
             f"/api/v1/hotels/{hotel_id}/users/{user_id}",
@@ -169,7 +198,7 @@ def test_user_update_delete_soft_delete_sessions_and_audit() -> None:
                 row.action
                 for row in db.query(AuditLog).filter(AuditLog.entity == "user", AuditLog.entity_id == user_id).all()
             }
-            assert {"user.created", "user.updated", "user.deleted"} <= audit_actions
+            assert {"user.created", "user.updated", "user.password_reset", "user.deleted"} <= audit_actions
         finally:
             db.close()
 

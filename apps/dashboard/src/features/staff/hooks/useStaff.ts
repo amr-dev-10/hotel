@@ -5,6 +5,7 @@ import { queryKeys } from "@/lib/api/query-keys";
 import type { EmployeeShift, StaffUser } from "@/types/domain";
 import type {
   CreateStaffValues,
+  ResetStaffPasswordValues,
   ShiftValues,
   UpdateStaffValues,
 } from "@/features/staff/schemas/create-staff.schema";
@@ -65,6 +66,13 @@ export function useUpdateStaff(hotelId: string, staffId: string) {
     mutationFn: (payload: UpdateStaffValues) =>
       apiPatch<StaffUser>(`/hotels/${hotelId}/users/${staffId}`, payload),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.staff(hotelId) }),
+  });
+}
+
+export function useResetStaffPassword(hotelId: string, staffId: string) {
+  return useMutation({
+    mutationFn: (payload: ResetStaffPasswordValues) =>
+      apiPost<{ password_changed: boolean }>(`/hotels/${hotelId}/users/${staffId}/password`, payload),
   });
 }
 

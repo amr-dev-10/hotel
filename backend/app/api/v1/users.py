@@ -9,7 +9,14 @@ from app.core.responses import ok
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
 from app.schemas.rbac import UserRoleAssign
-from app.schemas.user import EmployeeCodeGenerateRequest, EmployeeCodeGenerateResponse, UserCreate, UserRead, UserUpdate
+from app.schemas.user import (
+    EmployeeCodeGenerateRequest,
+    EmployeeCodeGenerateResponse,
+    UserCreate,
+    UserPasswordReset,
+    UserRead,
+    UserUpdate,
+)
 from app.services.auth_service import AuthService
 from app.services.audit_service import AuditService
 from app.services.rbac_service import RBACService
@@ -130,6 +137,22 @@ def update_user(
             raise forbidden("Only an owner, admin, or the staff member can update duty status")
     user = UserService(db).update_user(hotel_id, user_id, payload, current_user)
     return ok(UserRead.model_validate(user).model_dump())
+
+
+@router.post("/{user_id}/password")
+def reset_user_password(
+    hotel_id: str,
+    user_id: str,
+    payload: UserPasswordReset,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_any_permission(Permissions.USER_MANAGE, Permissions.STAFF_MANAGE)),
+) -> dict:
+    service = UserService(db)
+    target = service.get_user(hotel_id, user_id)
+    if not RBACService(db).can_update_staff(current_user, target):
+        raise forbidden("Staff member is outside your access scope")
+    service.reset_password(hotel_id, user_id, payload.new_password, current_user)
+    return ok({"password_changed": True})
 
 
 @router.delete("/{user_id}")

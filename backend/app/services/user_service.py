@@ -7,6 +7,7 @@ from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import bad_request, not_found
+from app.core.security import hash_password, verify_password
 from app.models.base import utcnow
 from app.models.hotel import Hotel
 from app.models.rbac import user_roles
@@ -165,6 +166,35 @@ class UserService:
             actor.id,
             old_payload=old_payload,
             new_payload=self._user_audit_payload(user),
+        )
+        self.db.commit()
+
+    def reset_password(
+        self,
+        hotel_id: str,
+        user_id: str,
+        new_password: str,
+        actor: User | None,
+        audit_payload: dict[str, Any] | None = None,
+    ) -> None:
+        user = self.get_user(hotel_id, user_id)
+        if verify_password(new_password, user.hashed_password):
+            raise bad_request("New password must be different from current password")
+
+        user.hashed_password = hash_password(new_password)
+        now = utcnow()
+        self.db.execute(
+            update(UserSession)
+            .where(UserSession.user_id == user_id, UserSession.revoked_at.is_(None))
+            .values(revoked_at=now)
+        )
+        AuditService(self.db).log(
+            hotel_id,
+            "user.password_reset",
+            "user",
+            user.id,
+            actor.id if actor else None,
+            payload=audit_payload,
         )
         self.db.commit()
 

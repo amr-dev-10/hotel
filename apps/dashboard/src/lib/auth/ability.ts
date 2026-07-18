@@ -86,12 +86,12 @@ export function buildAbility(user: CurrentUser | null): AppAbility {
   grant(permissions, Permissions.USER_CREATE, () => can("create", "Staff"));
   grant(permissions, Permissions.USER_UPDATE, () => can("edit", "Staff"));
   grant(permissions, Permissions.USER_DELETE, () => can("delete", "Staff"));
-  grant(permissions, Permissions.USER_MANAGE, () => can(["view", "create", "edit", "delete"], "Staff"));
+  grant(permissions, Permissions.USER_MANAGE, () => can(["view", "create", "edit", "delete", "manage"], "Staff"));
   grant(permissions, Permissions.STAFF_VIEW, () => can(["view"], "Staff"));
   grant(permissions, Permissions.STAFF_CREATE, () => can("create", "Staff"));
   grant(permissions, Permissions.STAFF_UPDATE, () => can("edit", "Staff"));
   grant(permissions, Permissions.STAFF_DELETE, () => can("delete", "Staff"));
-  grant(permissions, Permissions.STAFF_MANAGE, () => can(["view", "create", "edit", "delete"], "Staff"));
+  grant(permissions, Permissions.STAFF_MANAGE, () => can(["view", "create", "edit", "delete", "manage"], "Staff"));
 
   grant(permissions, Permissions.ROLE_VIEW, () => can("view", "Role"));
   grant(permissions, Permissions.ROLE_MANAGE, () => can("manage", "Role"));
