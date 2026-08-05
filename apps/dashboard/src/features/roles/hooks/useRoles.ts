@@ -2,7 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api/client";
 import { queryKeys } from "@/lib/api/query-keys";
-import type { Permission, PermissionGroup, Role } from "@/types/domain";
+import { useAuthStore } from "@/stores/auth.store";
+import type { CurrentUser, Permission, PermissionGroup, Role } from "@/types/domain";
 
 export interface RolePayload {
   name: string;
@@ -71,6 +72,12 @@ export function useAssignUserRoles(hotelId: string, userId: string) {
         `/hotels/${hotelId}/roles/users/${userId}`,
         { role_ids: roleIds },
       ),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.staff(hotelId) }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.staff(hotelId) });
+      const auth = useAuthStore.getState();
+      if (auth.currentUser?.id === userId) {
+        auth.setCurrentUser(await apiGet<CurrentUser>("/auth/me"));
+      }
+    },
   });
 }

@@ -2,12 +2,13 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import require_any_permission, require_permission
+from app.api.dependencies import require_permission
 from app.core.permissions import Permissions
 from app.core.database import get_db
-from app.core.exceptions import bad_request, forbidden, not_found
+from app.core.exceptions import bad_request, forbidden, missing_permission, not_found
 from app.core.responses import ok
 from app.models.base import utcnow
+from app.models.department import Department
 from app.models.guest import Guest
 from app.models.reservation import Reservation
 from app.models.room import Room
@@ -37,14 +38,6 @@ from app.services.ticket_service import TicketService
 
 router = APIRouter()
 
-TICKET_VIEW_PERMISSIONS = (
-    Permissions.TICKET_VIEW,
-    Permissions.TICKET_VIEW_OWN,
-    Permissions.TICKET_VIEW_DEPT,
-    Permissions.TICKET_VIEW_ALL,
-)
-
-
 @router.get("")
 def list_tickets(
     hotel_id: str,
@@ -60,7 +53,7 @@ def list_tickets(
     cursor: str | None = None,
     limit: int = Query(default=50, ge=1, le=200),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_any_permission(*TICKET_VIEW_PERMISSIONS)),
+    current_user: User = Depends(require_permission(Permissions.TICKET_VIEW)),
 ) -> dict:
     rbac = RBACService(db)
     visibility_scope = rbac.ticket_visibility_scope(current_user)
@@ -112,8 +105,9 @@ def create_ticket(
     hotel_id: str,
     payload: TicketCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("ticket.create")),
+    current_user: User = Depends(require_permission(Permissions.TICKET_CREATE)),
 ) -> dict:
+    _ensure_ticket_create_assignment_allowed(db, current_user, payload)
     ticket = TicketService(db).create_ticket(hotel_id, payload, actor_id=current_user.id)
     return ok(_ticket_read(ticket, _ticket_context(db, hotel_id, [ticket])).model_dump())
 
@@ -123,7 +117,7 @@ def list_escalated_tickets(
     hotel_id: str,
     scope: str | None = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_any_permission(*TICKET_VIEW_PERMISSIONS)),
+    current_user: User = Depends(require_permission(Permissions.TICKET_VIEW)),
 ) -> dict:
     visibility_scope = RBACService(db).ticket_visibility_scope(current_user)
     include_all = bool(scope == "all" and visibility_scope == "all")
@@ -204,7 +198,7 @@ def get_ticket(
     hotel_id: str,
     ticket_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_any_permission(*TICKET_VIEW_PERMISSIONS)),
+    current_user: User = Depends(require_permission(Permissions.TICKET_VIEW)),
 ) -> dict:
     ticket = TicketRepository(db).get_for_hotel(hotel_id, ticket_id)
     if not ticket:
@@ -218,7 +212,7 @@ def list_ticket_messages(
     hotel_id: str,
     ticket_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_any_permission(*TICKET_VIEW_PERMISSIONS)),
+    current_user: User = Depends(require_permission(Permissions.TICKET_VIEW)),
 ) -> dict:
     _get_visible_ticket(db, hotel_id, ticket_id, current_user)
     messages = TicketService(db).list_messages(hotel_id, ticket_id)
@@ -231,7 +225,7 @@ def create_ticket_message(
     ticket_id: str,
     payload: TicketMessageCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_any_permission(*TICKET_VIEW_PERMISSIONS)),
+    current_user: User = Depends(require_permission(Permissions.TICKET_VIEW)),
 ) -> dict:
     _get_visible_ticket(db, hotel_id, ticket_id, current_user)
     message = TicketService(db).create_message(hotel_id, ticket_id, payload, current_user.id)
@@ -243,7 +237,7 @@ def get_ticket_timeline(
     hotel_id: str,
     ticket_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_any_permission(*TICKET_VIEW_PERMISSIONS)),
+    current_user: User = Depends(require_permission(Permissions.TICKET_VIEW)),
 ) -> dict:
     _get_visible_ticket(db, hotel_id, ticket_id, current_user)
     items = TicketService(db).timeline(hotel_id, ticket_id)
@@ -255,7 +249,7 @@ def list_ticket_guest_messages(
     hotel_id: str,
     ticket_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_any_permission(*TICKET_VIEW_PERMISSIONS)),
+    current_user: User = Depends(require_permission(Permissions.TICKET_VIEW)),
 ) -> dict:
     _get_visible_ticket(db, hotel_id, ticket_id, current_user)
     messages = WhatsAppConversationRepository(db).list_ticket_messages(hotel_id, ticket_id)
@@ -268,8 +262,9 @@ def update_ticket_stage(
     ticket_id: str,
     payload: TicketStageUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("ticket.close")),
+    current_user: User = Depends(require_permission(Permissions.TICKET_UPDATE)),
 ) -> dict:
+    _get_updateable_ticket(db, hotel_id, ticket_id, current_user)
     ticket = TicketService(db).update_stage(
         hotel_id,
         ticket_id,
@@ -287,8 +282,10 @@ def update_ticket(
     ticket_id: str,
     payload: TicketUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("ticket.assign")),
+    current_user: User = Depends(require_permission(Permissions.TICKET_VIEW)),
 ) -> dict:
+    ticket_to_update = _get_visible_ticket(db, hotel_id, ticket_id, current_user)
+    _authorize_ticket_patch(db, current_user, ticket_to_update, payload)
     ticket = TicketService(db).update_ticket(hotel_id, ticket_id, payload, actor_id=current_user.id)
     return ok(_ticket_read(ticket, _ticket_context(db, hotel_id, [ticket])).model_dump())
 
@@ -298,9 +295,10 @@ def delete_ticket(
     hotel_id: str,
     ticket_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("ticket.delete")),
+    current_user: User = Depends(require_permission(Permissions.TICKET_DELETE)),
 ) -> dict:
     ticket = _get_visible_ticket(db, hotel_id, ticket_id, current_user)
+    _ensure_ticket_delete_allowed(db, current_user, ticket)
     AuditService(db).log(
         hotel_id,
         "ticket.deleted",
@@ -318,9 +316,9 @@ def accept_ticket(
     hotel_id: str,
     ticket_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_any_permission(Permissions.TICKET_ACCEPT, Permissions.TICKET_VIEW)),
+    current_user: User = Depends(require_permission(Permissions.TICKET_UPDATE)),
 ) -> dict:
-    _get_visible_ticket(db, hotel_id, ticket_id, current_user)
+    _get_updateable_ticket(db, hotel_id, ticket_id, current_user)
     ticket = TicketService(db).accept_ticket(hotel_id, ticket_id, current_user.id)
     return ok(TicketRead.model_validate(ticket).model_dump())
 
@@ -331,9 +329,9 @@ def reject_ticket(
     ticket_id: str,
     payload: TicketRejectRequest | None = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_any_permission(Permissions.TICKET_REJECT, Permissions.TICKET_VIEW)),
+    current_user: User = Depends(require_permission(Permissions.TICKET_UPDATE)),
 ) -> dict:
-    _get_visible_ticket(db, hotel_id, ticket_id, current_user)
+    _get_updateable_ticket(db, hotel_id, ticket_id, current_user)
     ticket = TicketService(db).reject_ticket(
         hotel_id,
         ticket_id,
@@ -348,9 +346,9 @@ def complete_ticket(
     hotel_id: str,
     ticket_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_any_permission(Permissions.TICKET_COMPLETE_OWN, Permissions.TICKET_VIEW)),
+    current_user: User = Depends(require_permission(Permissions.TICKET_UPDATE)),
 ) -> dict:
-    _get_visible_ticket(db, hotel_id, ticket_id, current_user)
+    _get_updateable_ticket(db, hotel_id, ticket_id, current_user)
     ticket = TicketService(db).complete_ticket(hotel_id, ticket_id, current_user.id)
     return ok(TicketRead.model_validate(ticket).model_dump())
 
@@ -360,8 +358,9 @@ def approve_ticket(
     hotel_id: str,
     ticket_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("ticket.approve")),
+    current_user: User = Depends(require_permission(Permissions.TICKET_UPDATE)),
 ) -> dict:
+    _get_updateable_ticket(db, hotel_id, ticket_id, current_user)
     ticket = TicketService(db).approve_ticket(hotel_id, ticket_id, current_user.id)
     return ok(TicketRead.model_validate(ticket).model_dump())
 
@@ -372,8 +371,9 @@ def reopen_ticket(
     ticket_id: str,
     payload: TicketStageUpdate | None = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("ticket.approve")),
+    current_user: User = Depends(require_permission(Permissions.TICKET_UPDATE)),
 ) -> dict:
+    _get_updateable_ticket(db, hotel_id, ticket_id, current_user)
     ticket = TicketService(db).reopen_ticket(
         hotel_id,
         ticket_id,
@@ -388,7 +388,7 @@ def list_ticket_acceptances(
     hotel_id: str,
     ticket_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_any_permission(*TICKET_VIEW_PERMISSIONS)),
+    current_user: User = Depends(require_permission(Permissions.TICKET_VIEW)),
 ) -> dict:
     _get_visible_ticket(db, hotel_id, ticket_id, current_user)
     rows = TicketAcceptanceRepository(db).list_for_ticket(ticket_id)
@@ -400,7 +400,7 @@ def list_ticket_escalations(
     hotel_id: str,
     ticket_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_any_permission(*TICKET_VIEW_PERMISSIONS)),
+    current_user: User = Depends(require_permission(Permissions.TICKET_VIEW)),
 ) -> dict:
     _get_visible_ticket(db, hotel_id, ticket_id, current_user)
     rows = EscalationLogRepository(db).list_for_ticket(ticket_id)
@@ -415,9 +415,79 @@ def _get_visible_ticket(db: Session, hotel_id: str, ticket_id: str, current_user
     return ticket
 
 
+def _get_updateable_ticket(db: Session, hotel_id: str, ticket_id: str, current_user: User) -> Ticket:
+    ticket = _get_visible_ticket(db, hotel_id, ticket_id, current_user)
+    _ensure_ticket_update_allowed(db, current_user, ticket)
+    return ticket
+
+
 def _ensure_ticket_visible(db: Session, current_user: User, ticket: Ticket) -> None:
     if not RBACService(db).can_view_ticket(current_user, ticket):
         raise forbidden("Ticket is outside your access scope")
+
+
+def _ensure_ticket_update_allowed(db: Session, current_user: User, ticket: Ticket) -> None:
+    if not RBACService(db).can_update_ticket(current_user, ticket):
+        raise forbidden("Ticket is outside your update scope")
+
+
+def _ensure_ticket_delete_allowed(db: Session, current_user: User, ticket: Ticket) -> None:
+    if not RBACService(db).can_delete_ticket(current_user, ticket):
+        raise forbidden("Ticket is outside your delete scope")
+
+
+def _authorize_ticket_patch(db: Session, current_user: User, ticket: Ticket, payload: TicketUpdate) -> None:
+    changes = payload.model_dump(exclude_unset=True)
+    if not changes:
+        _ensure_ticket_update_allowed(db, current_user, ticket)
+        return
+
+    assignment_changed = "assigned_to" in changes and changes["assigned_to"] != ticket.assigned_to
+    non_assignment_changes = set(changes) - {"assigned_to"}
+
+    if non_assignment_changes:
+        _ensure_ticket_update_allowed(db, current_user, ticket)
+    if assignment_changed:
+        _ensure_ticket_assignment_allowed(db, current_user, ticket, changes["assigned_to"])
+
+
+def _ensure_ticket_assignment_allowed(
+    db: Session,
+    current_user: User,
+    ticket: Ticket,
+    assignee_id: str | None,
+) -> None:
+    rbac = RBACService(db)
+    if assignee_id == current_user.id:
+        if rbac.can_assign_ticket_to_self(current_user, ticket):
+            return
+    elif assignee_id and rbac.can_assign_ticket_to_others(current_user, ticket):
+        return
+    elif not assignee_id and rbac.can_assign_ticket_to_others(current_user, ticket):
+        return
+    permission = Permissions.TICKET_ASSIGN_SELF if assignee_id == current_user.id else Permissions.TICKET_ASSIGN_OTHERS
+    raise missing_permission(permission, "Missing ticket assignment permission")
+
+
+def _ensure_ticket_create_assignment_allowed(db: Session, current_user: User, payload: TicketCreate) -> None:
+    assignee_ids = {user_id for user_id in [payload.assigned_to, *payload.followers] if user_id}
+    if not assignee_ids or current_user.is_hotel_owner:
+        return
+
+    rbac = RBACService(db)
+    assigns_only_self = assignee_ids == {current_user.id}
+    required_permission = Permissions.TICKET_ASSIGN_SELF if assigns_only_self else Permissions.TICKET_ASSIGN_OTHERS
+    if not rbac.has_permission(current_user, required_permission):
+        raise missing_permission(required_permission, "Missing ticket assignment permission")
+
+    scope = rbac.permission_scope(current_user, required_permission)
+    if scope == "hotel":
+        return
+    if scope == "department" and payload.department_id and payload.department_id == current_user.department_id:
+        return
+    if scope == "own" and assigns_only_self:
+        return
+    raise forbidden("Ticket assignment is outside your access scope")
 
 
 def _ticket_read(ticket: Ticket, ticket_context: dict[str, dict[str, str | None]]) -> TicketRead:
@@ -432,6 +502,7 @@ def _ticket_context(db: Session, hotel_id: str, tickets: list[Ticket]) -> dict[s
     room_numbers = _room_numbers(db, hotel_id, [ticket.room_id for ticket in tickets])
     guest_names = _guest_names(db, hotel_id, [ticket.guest_id for ticket in tickets])
     reservation_numbers = _reservation_numbers(db, hotel_id, [ticket.reservation_id for ticket in tickets])
+    department_names = _department_names(db, hotel_id, [ticket.department_id for ticket in tickets])
     category_names = _category_names(db, hotel_id, [ticket.task_category_id for ticket in tickets])
 
     return {
@@ -440,6 +511,7 @@ def _ticket_context(db: Session, hotel_id: str, tickets: list[Ticket]) -> dict[s
             "room_number": room_numbers.get(ticket.room_id or ""),
             "guest_name": guest_names.get(ticket.guest_id or ""),
             "reservation_no": reservation_numbers.get(ticket.reservation_id or ""),
+            "department_name": department_names.get(ticket.department_id or ""),
             "task_category_name": category_names.get(ticket.task_category_id or ""),
         }
         for ticket in tickets
@@ -500,6 +572,20 @@ def _reservation_numbers(db: Session, hotel_id: str, reservation_ids: list[str |
         )
     ).all()
     return {reservation_id: reservation_no for reservation_id, reservation_no in rows}
+
+
+def _department_names(db: Session, hotel_id: str, department_ids: list[str | None]) -> dict[str, str]:
+    ids = {department_id for department_id in department_ids if department_id}
+    if not ids:
+        return {}
+    rows = db.execute(
+        select(Department.id, Department.name).where(
+            Department.hotel_id == hotel_id,
+            Department.id.in_(ids),
+            Department.deleted_at.is_(None),
+        )
+    ).all()
+    return {department_id: name for department_id, name in rows}
 
 
 def _category_names(db: Session, hotel_id: str, category_ids: list[str | None]) -> dict[str, str]:

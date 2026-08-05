@@ -1,6 +1,7 @@
 import { AbilityBuilder, createMongoAbility, type MongoAbility } from "@casl/ability";
 
 import { Permissions, shiftViewPermissions, ticketViewPermissions } from "@/constants/permissions";
+import { hasAnyPermission, hasPermission } from "@/lib/auth/permissions";
 import type { CurrentUser } from "@/types/domain";
 
 export type AppAction =
@@ -14,19 +15,35 @@ export type AppAction =
   | "complete"
   | "close"
   | "assign"
+  | "assignSelf"
   | "approve"
   | "delete"
-  | "export";
+  | "export"
+  | "publish"
+  | "send"
+  | "upload";
 
 export type AppSubject =
   | "all"
   | "AI"
   | "Analytics"
+  | "Billing"
+  | "Campaign"
+  | "Feature"
+  | "Folio"
   | "Guest"
   | "Hierarchy"
   | "Housekeeping"
   | "HotelSettings"
+  | "Inventory"
+  | "LostFound"
+  | "Maintenance"
+  | "Media"
+  | "Menu"
+  | "Organization"
+  | "RatePlan"
   | "Reservation"
+  | "Restaurant"
   | "Role"
   | "Room"
   | "Shift"
@@ -50,73 +67,86 @@ export function buildAbility(user: CurrentUser | null): AppAbility {
     return build();
   }
 
-  const permissions = new Set(user.permissions ?? []);
-
-  if (ticketViewPermissions.some((permission) => permissions.has(permission))) {
+  if (hasAnyPermission(user, ticketViewPermissions)) {
     can("view", "Ticket");
   }
-  grant(permissions, Permissions.TICKET_CREATE, () => can("create", "Ticket"));
-  grant(permissions, Permissions.TICKET_ASSIGN, () => can(["assign", "edit"], "Ticket"));
-  grant(permissions, Permissions.TICKET_ACCEPT, () => can("accept", "Ticket"));
-  grant(permissions, Permissions.TICKET_REJECT, () => can("reject", "Ticket"));
-  grant(permissions, Permissions.TICKET_COMPLETE_OWN, () => can("complete", "Ticket"));
-  grant(permissions, Permissions.TICKET_CLOSE, () => can("close", "Ticket"));
-  grant(permissions, Permissions.TICKET_APPROVE, () => can("approve", "Ticket"));
-  grant(permissions, Permissions.TICKET_DELETE, () => can("delete", "Ticket"));
+  grant(user, Permissions.TICKET_CREATE, () => can("create", "Ticket"));
+  grant(user, Permissions.TICKET_UPDATE, () => can(["edit", "accept", "reject", "complete", "close", "approve"], "Ticket"));
+  grant(user, Permissions.TICKET_ASSIGN_SELF, () => can("assignSelf", "Ticket"));
+  grant(user, Permissions.TICKET_ASSIGN_OTHERS, () => can(["assign", "assignSelf"], "Ticket"));
+  grant(user, Permissions.TICKET_DELETE, () => can("delete", "Ticket"));
 
-  grant(permissions, Permissions.GUEST_VIEW, () => can("view", "Guest"));
-  grant(permissions, Permissions.GUEST_VIEW_BASIC, () => can("view", "Guest"));
-  grant(permissions, Permissions.GUEST_VIEW_SENSITIVE, () => can(["view", "viewSensitive"], "Guest"));
-  grant(permissions, Permissions.GUEST_CREATE, () => can("create", "Guest"));
-  grant(permissions, Permissions.GUEST_EDIT, () => can(["edit", "delete"], "Guest"));
+  grant(user, Permissions.GUEST_VIEW, () => can("view", "Guest"));
+  grant(user, Permissions.GUEST_VIEW_BASIC, () => can("view", "Guest"));
+  grant(user, Permissions.GUEST_VIEW_SENSITIVE, () => can(["view", "viewSensitive"], "Guest"));
+  grant(user, Permissions.GUEST_CREATE, () => can("create", "Guest"));
+  grant(user, Permissions.GUEST_EDIT, () => can(["edit", "delete"], "Guest"));
+  grant(user, Permissions.GUEST_CHECKOUT, () => can("edit", "Guest"));
 
-  grant(permissions, Permissions.RESERVATION_VIEW, () => can("view", "Reservation"));
-  grant(permissions, Permissions.RESERVATION_MANAGE, () => can(["view", "create", "edit"], "Reservation"));
-  grant(permissions, Permissions.RESERVATION_CREATE, () => can("create", "Reservation"));
-  grant(permissions, Permissions.RESERVATION_UPDATE, () => can("edit", "Reservation"));
-  grant(permissions, Permissions.RESERVATION_CANCEL, () => can("delete", "Reservation"));
+  grant(user, Permissions.RESERVATION_VIEW, () => can("view", "Reservation"));
+  grant(user, Permissions.RESERVATION_MANAGE, () => can(["view", "create", "edit"], "Reservation"));
+  grant(user, Permissions.RESERVATION_CREATE, () => can("create", "Reservation"));
+  grant(user, Permissions.RESERVATION_UPDATE, () => can("edit", "Reservation"));
+  grant(user, Permissions.RESERVATION_CANCEL, () => can("delete", "Reservation"));
+  grant(user, Permissions.RESERVATION_CHECKOUT, () => can("edit", "Reservation"));
 
-  grant(permissions, Permissions.ROOM_VIEW, () => can("view", "Room"));
-  grant(permissions, Permissions.ROOM_CREATE, () => can("create", "Room"));
-  grant(permissions, Permissions.ROOM_UPDATE, () => can("edit", "Room"));
-  grant(permissions, Permissions.ROOM_DELETE, () => can("delete", "Room"));
+  grant(user, Permissions.ROOM_VIEW, () => can("view", "Room"));
+  grant(user, Permissions.ROOM_CREATE, () => can("create", "Room"));
+  grant(user, Permissions.ROOM_UPDATE, () => can("edit", "Room"));
+  grant(user, Permissions.ROOM_DELETE, () => can("delete", "Room"));
 
-  grant(permissions, Permissions.USER_VIEW, () => can(["view"], "Staff"));
-  grant(permissions, Permissions.USER_VIEW, () => can(["view"], "User"));
-  grant(permissions, Permissions.USER_CREATE, () => can("create", "Staff"));
-  grant(permissions, Permissions.USER_UPDATE, () => can("edit", "Staff"));
-  grant(permissions, Permissions.USER_DELETE, () => can("delete", "Staff"));
-  grant(permissions, Permissions.USER_MANAGE, () => can(["view", "create", "edit", "delete", "manage"], "Staff"));
-  grant(permissions, Permissions.STAFF_VIEW, () => can(["view"], "Staff"));
-  grant(permissions, Permissions.STAFF_CREATE, () => can("create", "Staff"));
-  grant(permissions, Permissions.STAFF_UPDATE, () => can("edit", "Staff"));
-  grant(permissions, Permissions.STAFF_DELETE, () => can("delete", "Staff"));
-  grant(permissions, Permissions.STAFF_MANAGE, () => can(["view", "create", "edit", "delete", "manage"], "Staff"));
+  grant(user, Permissions.USER_VIEW, () => can(["view"], "Staff"));
+  grant(user, Permissions.USER_VIEW, () => can(["view"], "User"));
+  grant(user, Permissions.USER_CREATE, () => can("create", "Staff"));
+  grant(user, Permissions.USER_UPDATE, () => can("edit", "Staff"));
+  grant(user, Permissions.USER_DELETE, () => can("delete", "Staff"));
+  grant(user, Permissions.USER_MANAGE, () => can(["view", "create", "edit", "delete", "manage"], "Staff"));
 
-  grant(permissions, Permissions.ROLE_VIEW, () => can("view", "Role"));
-  grant(permissions, Permissions.ROLE_MANAGE, () => can("manage", "Role"));
+  grant(user, Permissions.ROLE_VIEW, () => can("view", "Role"));
+  grant(user, Permissions.ROLE_MANAGE, () => can(["view", "create", "edit", "delete", "manage"], "Role"));
 
-  if (shiftViewPermissions.some((permission) => permissions.has(permission))) {
+  if (hasAnyPermission(user, shiftViewPermissions)) {
     can("view", "Shift");
   }
-  grant(permissions, Permissions.SHIFT_UPDATE, () => can("edit", "Shift"));
-  grant(permissions, Permissions.SHIFT_UPDATE_OWN, () => can("edit", "Shift"));
-  grant(permissions, Permissions.SHIFT_MANAGE, () => can("manage", "Shift"));
+  grant(user, Permissions.SHIFT_UPDATE, () => can("edit", "Shift"));
+  grant(user, Permissions.SHIFT_UPDATE_OWN, () => can("edit", "Shift"));
+  grant(user, Permissions.SHIFT_MANAGE, () => can(["view", "edit", "manage"], "Shift"));
 
-  grant(permissions, Permissions.ANALYTICS_VIEW, () => can("view", "Analytics"));
-  grant(permissions, Permissions.HOTEL_SETTINGS_MANAGE, () => can("manage", "HotelSettings"));
-  grant(permissions, Permissions.WORKFLOW_MANAGE, () => can("manage", "Workflow"));
-  grant(permissions, Permissions.BOT_VIEW, () => can("view", "AI"));
-  grant(permissions, Permissions.BOT_MANAGE, () => can("manage", "AI"));
-  grant(permissions, Permissions.WHATSAPP_HEALTH_VIEW, () => can("view", "WhatsApp"));
-  grant(permissions, Permissions.LIVE_CHAT_MANAGE, () => can("manage", "WhatsApp"));
-  grant(permissions, Permissions.HOUSEKEEPING_MANAGE, () => can("manage", "Housekeeping"));
+  grant(user, Permissions.MENU_VIEW, () => can("view", "Menu"));
+  grant(user, Permissions.MENU_MANAGE, () => can("manage", "Menu"));
+  grant(user, Permissions.BOT_VIEW, () => can("view", "AI"));
+  grant(user, Permissions.BOT_PUBLISH, () => can("publish", "AI"));
+  grant(user, Permissions.BOT_MANAGE, () => can("manage", "AI"));
+  grant(user, Permissions.CAMPAIGN_VIEW, () => can("view", "Campaign"));
+  grant(user, Permissions.CAMPAIGN_CREATE, () => can("create", "Campaign"));
+  grant(user, Permissions.CAMPAIGN_SEND, () => can("send", "Campaign"));
+  grant(user, Permissions.HOTEL_SETTINGS_MANAGE, () => can("manage", "HotelSettings"));
+  grant(user, Permissions.HOTEL_BILLING_VIEW, () => can("view", "Billing"));
+  grant(user, Permissions.ANALYTICS_VIEW, () => can("view", "Analytics"));
+  grant(user, Permissions.ANALYTICS_EXPORT, () => can("export", "Analytics"));
+  grant(user, Permissions.FOLIO_VIEW, () => can("view", "Folio"));
+  grant(user, Permissions.FOLIO_MANAGE, () => can("manage", "Folio"));
+  grant(user, Permissions.RATE_PLAN_MANAGE, () => can("manage", "RatePlan"));
+  grant(user, Permissions.HOUSEKEEPING_MANAGE, () => can("manage", "Housekeeping"));
+  grant(user, Permissions.MAINTENANCE_MANAGE, () => can("manage", "Maintenance"));
+  grant(user, Permissions.LOST_FOUND_MANAGE, () => can("manage", "LostFound"));
+  grant(user, Permissions.WHATSAPP_HEALTH_VIEW, () => can("view", "WhatsApp"));
+  grant(user, Permissions.LIVE_CHAT_MANAGE, () => can("manage", "WhatsApp"));
+  grant(user, Permissions.ORGANIZATION_MANAGE, () => can("manage", "Organization"));
+  grant(user, Permissions.INVENTORY_MANAGE, () => can("manage", "Inventory"));
+  grant(user, Permissions.RESTAURANT_MANAGE, () => can("manage", "Restaurant"));
+  grant(user, Permissions.WORKFLOW_MANAGE, () => can("manage", "Workflow"));
+  grant(user, Permissions.FEATURE_MANAGE, () => can("manage", "Feature"));
+  grant(user, Permissions.MEDIA_MANAGE, () => can("manage", "Media"));
+  grant(user, Permissions.MEDIA_UPLOAD, () => can("upload", "Media"));
+  grant(user, Permissions.MEDIA_DELETE, () => can("delete", "Media"));
+  grant(user, Permissions.BILLING_VIEW, () => can("view", "Billing"));
 
   if (
-    permissions.has(Permissions.USER_VIEW) ||
-    permissions.has(Permissions.STAFF_VIEW) ||
-    permissions.has(Permissions.TICKET_VIEW_DEPT) ||
-    permissions.has(Permissions.TICKET_VIEW_ALL)
+    hasPermission(user, Permissions.USER_VIEW) ||
+    hasPermission(user, Permissions.STAFF_VIEW) ||
+    hasPermission(user, Permissions.TICKET_VIEW_DEPT) ||
+    hasPermission(user, Permissions.TICKET_VIEW_ALL)
   ) {
     can("view", "Hierarchy");
   }
@@ -124,8 +154,8 @@ export function buildAbility(user: CurrentUser | null): AppAbility {
   return build();
 }
 
-function grant(permissions: Set<string>, permission: string, callback: () => void) {
-  if (permissions.has(permission)) {
+function grant(user: CurrentUser, permission: string, callback: () => void) {
+  if (hasPermission(user, permission)) {
     callback();
   }
 }

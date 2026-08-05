@@ -4,6 +4,7 @@ import type { ApiEnvelope } from "@/types/domain";
 
 export const apiBaseURL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api/v1";
 export const ACCESS_DENIED_EVENT = "arcadia:access-denied";
+export const API_ERROR_DETAILS_EVENT = "arcadia:api-error-details";
 
 export interface AccessDeniedEventDetail {
   message: string;
@@ -11,6 +12,10 @@ export interface AccessDeniedEventDetail {
   method: string;
   url: string;
   kind: "missing_permission" | "missing_any_permission" | "scope" | "forbidden";
+  code?: string;
+  cause?: string;
+  hint?: string;
+  requestId?: string;
 }
 
 export interface ApiErrorField {
@@ -27,6 +32,7 @@ export interface ApiErrorDetails {
   requestId?: string;
   fields: ApiErrorField[];
   context?: Record<string, unknown>;
+  requiredPermissions: string[];
   status?: number;
   method?: string;
   url?: string;
@@ -63,6 +69,8 @@ api.interceptors.response.use(
     const accessDenied = accessDeniedDetailFromError(error);
     if (accessDenied && typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent<AccessDeniedEventDetail>(ACCESS_DENIED_EVENT, { detail: accessDenied }));
+    } else if (shouldShowApiErrorDialog(error) && typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent<ApiErrorDetails>(API_ERROR_DETAILS_EVENT, { detail: apiErrorDetails(error) }));
     }
     return Promise.reject(error);
   },
@@ -143,6 +151,7 @@ export function apiErrorDetails(error: unknown): ApiErrorDetails {
   return {
     message: error instanceof Error ? error.message : "Something went wrong",
     fields: [],
+    requiredPermissions: [],
   };
 }
 
@@ -158,7 +167,9 @@ export function accessDeniedDetailFromError(error: unknown): AccessDeniedEventDe
 
   const detail = apiErrorDetails(error);
   const message = detail.message || "You do not have access to perform this action.";
-  const requiredPermissions = parseRequiredPermissions(message);
+  const requiredPermissions = detail.requiredPermissions.length
+    ? detail.requiredPermissions
+    : parseRequiredPermissions(message);
   const lowerMessage = message.toLowerCase();
   const kind: AccessDeniedEventDetail["kind"] = lowerMessage.includes("missing one of permissions")
     ? "missing_any_permission"
@@ -174,6 +185,10 @@ export function accessDeniedDetailFromError(error: unknown): AccessDeniedEventDe
     method: (error.config?.method ?? "get").toUpperCase(),
     url,
     kind,
+    code: detail.code,
+    cause: detail.cause,
+    hint: detail.hint,
+    requestId: detail.requestId,
   };
 }
 
@@ -189,16 +204,18 @@ function normalizeApiErrorDetail(data: unknown, fallbackMessage: string): Omit<A
         requestId: stringValue(detail.request_id) || stringValue(detail.requestId) || undefined,
         fields: arrayValue(detail.fields).map(normalizeApiErrorField),
         context: recordValue(detail.context),
+        requiredPermissions: requiredPermissionsValue(detail.required_permissions, detail.context),
       };
     }
 
     return {
       message: stringValue(detail) || stringValue(data.message) || fallbackMessage,
       fields: [],
+      requiredPermissions: [],
     };
   }
 
-  return { message: fallbackMessage, fields: [] };
+  return { message: fallbackMessage, fields: [], requiredPermissions: [] };
 }
 
 function normalizeApiErrorField(value: unknown): ApiErrorField {
@@ -228,6 +245,19 @@ function stringValue(value: unknown) {
   return typeof value === "string" ? value : "";
 }
 
+function requiredPermissionsValue(value: unknown, contextValue: unknown) {
+  const direct = arrayValue(value).filter((permission): permission is string => typeof permission === "string");
+  if (direct.length) {
+    return direct;
+  }
+  if (!isRecord(contextValue)) {
+    return [];
+  }
+  return arrayValue(contextValue.required_permissions).filter(
+    (permission): permission is string => typeof permission === "string",
+  );
+}
+
 function parseRequiredPermissions(message: string) {
   const missingOneMatch = message.match(/Missing one of permissions:\s*(.+)$/i);
   if (missingOneMatch?.[1]) {
@@ -249,6 +279,15 @@ function isAccessDeniedDialogIgnoredUrl(url: string) {
     url.startsWith("/guest") ||
     url.includes("/guest/")
   );
+}
+
+function shouldShowApiErrorDialog(error: unknown) {
+  if (!axios.isAxiosError(error)) {
+    return false;
+  }
+  const status = error.response?.status ?? 0;
+  const url = error.config?.url ?? "";
+  return status >= 500 && !isAccessDeniedDialogIgnoredUrl(url);
 }
 
 function readStoredToken() {

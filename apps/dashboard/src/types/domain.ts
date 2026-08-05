@@ -139,6 +139,7 @@ export interface Ticket {
   room_number?: string | null;
   guest_name?: string | null;
   reservation_no?: string | null;
+  department_name?: string | null;
   stage: string;
   type: string;
   task_category_id: string | null;

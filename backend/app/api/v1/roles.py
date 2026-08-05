@@ -26,8 +26,6 @@ def list_permissions(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("role.view")),
 ) -> dict:
-    RBACService(db).seed_permissions()
-    db.commit()
     permissions = PermissionRepository(db).list_assignable()
     return ok([PermissionRead.model_validate(item).model_dump() for item in permissions])
 
@@ -38,8 +36,6 @@ def list_all_permissions(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("role.view")),
 ) -> dict:
-    RBACService(db).seed_permissions()
-    db.commit()
     permissions = PermissionRepository(db).list_all()
     return ok([PermissionRead.model_validate(item).model_dump() for item in permissions])
 
@@ -50,7 +46,6 @@ def list_permission_groups(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_permission("role.view")),
 ) -> dict:
-    RBACService(db).seed_permissions()
     groups = PermissionGroupRepository(db).list_all()
     return ok([PermissionGroupRead.model_validate(item).model_dump() for item in groups])
 

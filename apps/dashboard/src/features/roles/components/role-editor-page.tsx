@@ -72,10 +72,10 @@ export function RoleEditorPage({
         await updateRole.mutateAsync(payload);
         toast.success("Role updated");
       } else {
-        await createRole.mutateAsync(payload);
+        const createdRole = await createRole.mutateAsync(payload);
         toast.success("Role created");
+        router.replace(`/${hotelId}/settings/roles/${createdRole.id}`);
       }
-      router.push(`/${hotelId}/settings/roles`);
     } catch (error) {
       showApiErrorToast(error);
     }

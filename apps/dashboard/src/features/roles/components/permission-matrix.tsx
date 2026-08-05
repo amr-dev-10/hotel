@@ -27,7 +27,17 @@ const moduleOrder = [
   "campaigns",
   "analytics",
 ];
-const scopedPermissionCodes = new Set(["ticket.view", "shift.view", "shift.update", "staff.view", "staff.update"]);
+const scopedPermissionCodes = new Set([
+  "ticket.view",
+  "ticket.update",
+  "ticket.delete",
+  "ticket.assign_self",
+  "ticket.assign_others",
+  "shift.view",
+  "shift.update",
+  "staff.view",
+  "staff.update",
+]);
 const scopeOptions = [
   { value: "own", label: "Own" },
   { value: "department", label: "Department" },

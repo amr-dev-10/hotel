@@ -62,6 +62,7 @@ class TicketRead(ORMModel):
     room_number: str | None = None
     guest_name: str | None = None
     reservation_no: str | None = None
+    department_name: str | None = None
     stage: str
     type: str
     task_category_id: str | None = None

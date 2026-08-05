@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.api.dependencies import require_permission
 from app.core.database import get_db
+from app.core.permissions import Permissions
 from app.core.responses import ok
 from app.models.ops import HousekeepingChecklist
 from app.models.user import User
@@ -80,7 +81,7 @@ def update_housekeeping(
     housekeeping_id: str,
     payload: HousekeepingUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("ticket.assign")),
+    current_user: User = Depends(require_permission(Permissions.TICKET_UPDATE)),
 ) -> dict:
     task = HousekeepingService(db).update(hotel_id, housekeeping_id, payload, current_user.id)
     return ok(HousekeepingRead.model_validate(task).model_dump())

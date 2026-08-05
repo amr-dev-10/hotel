@@ -459,13 +459,15 @@ export function StaffProfilePage({
       {activeTab === "performance" ? <PerformancePanel metrics={metrics} tickets={assignedTickets} /> : null}
       {activeTab === "activity" ? <ActivityPanel shifts={userShifts} tickets={assignedTickets} user={user} /> : null}
       {activeTab === "permissions" ? (
-        <PermissionsPanel
-          assignPending={assignRoles.isPending}
-          onSave={handleAssignRoles}
-          onToggleRole={toggleRole}
-          roles={roles.data ?? []}
-          selectedRoles={selectedRoles}
-        />
+        <Can I="manage" a="Role" fallback={<DataState empty emptyTitle="You do not have access to manage staff roles." />}>
+          <PermissionsPanel
+            assignPending={assignRoles.isPending}
+            onSave={handleAssignRoles}
+            onToggleRole={toggleRole}
+            roles={roles.data ?? []}
+            selectedRoles={selectedRoles}
+          />
+        </Can>
       ) : null}
       {activeTab === "audit" ? <AuditPanel department={department} manager={manager} user={user} /> : null}
     </div>

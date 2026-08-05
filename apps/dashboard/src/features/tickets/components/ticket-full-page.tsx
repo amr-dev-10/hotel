@@ -77,18 +77,24 @@ export function TicketFullPage({
   ticketId: string;
 }) {
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<CommunicationTab>("internal");
+  const [reopenNote, setReopenNote] = useState("");
+  const [discussionMessage, setDiscussionMessage] = useState("");
+  const [guestReply, setGuestReply] = useState("");
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const ticketQuery = useTicket(hotelId, ticketId);
   const acceptances = useTicketAcceptances(hotelId, ticketId);
   const escalations = useTicketEscalations(hotelId, ticketId);
   const timeline = useTicketTimeline(hotelId, ticketId);
   const guestMessages = useTicketGuestMessages(hotelId, ticketId);
-  const departments = useDepartments(hotelId);
-  const guests = useGuests(hotelId);
-  const reservations = useReservations(hotelId);
-  const rooms = useRooms(hotelId);
-  const staff = useStaff(hotelId);
+  const departments = useDepartments(hotelId, { enabled: editDialogOpen });
+  const guests = useGuests(hotelId, { enabled: editDialogOpen });
+  const reservations = useReservations(hotelId, { enabled: editDialogOpen });
+  const rooms = useRooms(hotelId, { enabled: editDialogOpen });
+  const staff = useStaff(hotelId, { enabled: editDialogOpen });
   const categories = useTicketCategories(hotelId);
-  const conversations = useWhatsappConversations(hotelId);
+  const conversations = useWhatsappConversations(hotelId, { enabled: activeTab === "whatsapp-history" });
   const acceptTicket = useAcceptTicket(hotelId);
   const rejectTicket = useRejectTicket(hotelId);
   const completeTicket = useCompleteTicket(hotelId);
@@ -100,12 +106,6 @@ export function TicketFullPage({
   const ticket = ticketQuery.data;
   const whatsappHistory = useWhatsappMessages(hotelId, ticket?.conversation_id ?? "");
   const sendGuestMessage = useSendTicketGuestMessage(hotelId, ticketId, ticket?.conversation_id ?? null);
-  const [activeTab, setActiveTab] = useState<CommunicationTab>("internal");
-  const [reopenNote, setReopenNote] = useState("");
-  const [discussionMessage, setDiscussionMessage] = useState("");
-  const [guestReply, setGuestReply] = useState("");
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const departmentMap = useMemo(() => new Map((departments.data ?? []).map((department) => [department.id, department.name])), [departments.data]);
   const guestMap = useMemo(() => new Map((guests.data ?? []).map((guest) => [guest.id, guest.name])), [guests.data]);
   const reservationMap = useMemo(() => new Map((reservations.data ?? []).map((reservation) => [reservation.id, reservation.reservation_no])), [reservations.data]);
@@ -221,7 +221,7 @@ export function TicketFullPage({
               Complete
             </Button>
           </Can>
-          <Can I="assign" a="Ticket">
+          <Can I="edit" a="Ticket">
             <Button disabled={updateTicket.isPending} type="button" variant="secondary" onClick={() => setEditDialogOpen(true)}>
               <Pencil />
               Edit
@@ -299,9 +299,9 @@ export function TicketFullPage({
           <SidePanel icon={<FileText />} title="Ticket Details">
             <div className="grid gap-2">
               <Detail label="SLA" value={ticket.sla_due_at ? formatDistanceToNowStrict(new Date(ticket.sla_due_at), { addSuffix: true }) : "Not set"} />
-              <Detail label="Assigned to" value={ticket.assigned_to ? staffMap.get(ticket.assigned_to) ?? compactId(ticket.assigned_to) : "Unassigned"} />
-              <Detail label="Department" value={ticket.department_id ? departmentMap.get(ticket.department_id) ?? compactId(ticket.department_id) : "Unassigned"} />
-              <Detail label="Room" value={ticket.room_id ? `Room ${roomMap.get(ticket.room_id) ?? compactId(ticket.room_id)}` : "No room"} />
+              <Detail label="Assigned to" value={ticket.assigned_to_name ?? (ticket.assigned_to ? staffMap.get(ticket.assigned_to) ?? compactId(ticket.assigned_to) : "Unassigned")} />
+              <Detail label="Department" value={ticket.department_name ?? (ticket.department_id ? departmentMap.get(ticket.department_id) ?? compactId(ticket.department_id) : "Unassigned")} />
+              <Detail label="Room" value={ticket.room_number ? `Room ${ticket.room_number}` : ticket.room_id ? `Room ${roomMap.get(ticket.room_id) ?? compactId(ticket.room_id)}` : "No room"} />
               <Detail label="Source" value={titleCase(ticket.source)} />
               <Detail label="Created" value={format(new Date(ticket.created_at), "dd MMM yyyy, HH:mm")} />
             </div>
@@ -321,8 +321,8 @@ export function TicketFullPage({
 
           <SidePanel icon={<LinkIcon />} title="Related Records">
             <div className="grid gap-2">
-              <Detail label="Guest" value={ticket.guest_id ? guestMap.get(ticket.guest_id) ?? compactId(ticket.guest_id) : "No guest"} />
-              <Detail label="Reservation" value={ticket.reservation_id ? reservationMap.get(ticket.reservation_id) ?? compactId(ticket.reservation_id) : "No reservation"} />
+              <Detail label="Guest" value={ticket.guest_name ?? (ticket.guest_id ? guestMap.get(ticket.guest_id) ?? compactId(ticket.guest_id) : "No guest")} />
+              <Detail label="Reservation" value={ticket.reservation_no ?? (ticket.reservation_id ? reservationMap.get(ticket.reservation_id) ?? compactId(ticket.reservation_id) : "No reservation")} />
               <Detail label="Conversation" value={ticket.conversation_id ? `WhatsApp ${conversationMap.get(ticket.conversation_id) ?? compactId(ticket.conversation_id)}` : "No conversation"} />
             </div>
           </SidePanel>

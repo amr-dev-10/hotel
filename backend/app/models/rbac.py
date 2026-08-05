@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Table, Text, UniqueConstraint
+from sqlalchemy import Boolean, CheckConstraint, Column, ForeignKey, Integer, String, Table, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -10,6 +10,7 @@ role_permissions = Table(
     Column("role_id", ForeignKey("roles.id"), primary_key=True),
     Column("permission_id", ForeignKey("permissions.id"), primary_key=True),
     Column("scope", String(20), nullable=False, default="hotel", server_default="hotel"),
+    CheckConstraint("scope IN ('own', 'department', 'hotel')", name="ck_role_permissions_scope"),
 )
 
 user_roles = Table(

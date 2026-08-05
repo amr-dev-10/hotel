@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.api.dependencies import require_permission
 from app.core.database import get_db
+from app.core.permissions import Permissions
 from app.core.responses import ok
 from app.models.user import User
 from app.repositories.whatsapp_repository import LiveChatSessionRepository
@@ -29,7 +30,7 @@ def accept_live_chat(
     hotel_id: str,
     session_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("ticket.assign")),
+    current_user: User = Depends(require_permission(Permissions.TICKET_UPDATE)),
 ) -> dict:
     session = LiveChatService(db).accept(hotel_id, session_id, current_user.id)
     return ok(LiveChatSessionRead.model_validate(session).model_dump())
@@ -40,7 +41,7 @@ def end_live_chat(
     hotel_id: str,
     session_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("ticket.assign")),
+    current_user: User = Depends(require_permission(Permissions.TICKET_UPDATE)),
 ) -> dict:
     session = LiveChatService(db).end(hotel_id, session_id, "staff")
     return ok(LiveChatSessionRead.model_validate(session).model_dump())

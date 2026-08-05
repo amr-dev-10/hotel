@@ -20,22 +20,24 @@ export type GuestFilters = {
   q?: string;
   status?: string;
   limit?: number;
+  enabled?: boolean;
 };
 
 export function useGuests(hotelId: string, filters: GuestFilters = {}) {
   const limit = filters.limit ?? 50;
+  const { enabled, ...apiFilters } = filters;
   const query = useInfiniteQuery<ApiEnvelope<Guest[]>, Error>({
-    queryKey: queryKeys.guestsList(hotelId, compactParams({ ...filters, limit })),
+    queryKey: queryKeys.guestsList(hotelId, compactParams({ ...apiFilters, limit })),
     queryFn: ({ pageParam }) =>
       apiGetEnvelope<Guest[]>(`/hotels/${hotelId}/guests`, {
-        params: compactParams({ ...filters, limit, cursor: pageParam as string | undefined }),
+        params: compactParams({ ...apiFilters, limit, cursor: pageParam as string | undefined }),
       }),
     initialPageParam: undefined,
     getNextPageParam: (lastPage) => {
       const meta = lastPage.meta as CursorPageMeta | null | undefined;
       return meta?.has_more ? meta.next_cursor : undefined;
     },
-    enabled: Boolean(hotelId),
+    enabled: Boolean(hotelId) && (enabled ?? true),
     staleTime: 30_000,
   });
 

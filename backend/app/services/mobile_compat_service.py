@@ -27,6 +27,7 @@ from app.repositories.user_repository import FCMTokenRepository
 from app.schemas.ops import FCMTokenRead
 from app.services.auth_service import AuthService
 from app.services.notification_service import NotificationService
+from app.services.rbac_service import RBACService
 
 
 MOBILE_TERMINAL_STAGES = {"Completed", "Cancelled", "Delivered", "Closed"}
@@ -176,33 +177,45 @@ class MobileCompatService:
             "UnseenMessages": user.unseen_messages or [],
         }
 
-    def list_users(self, hotel_id: str) -> list[dict[str, Any]]:
+    def list_users(self, hotel_id: str, current_user: User | None = None) -> list[dict[str, Any]]:
         users = self.db.execute(
             select(User).where(User.hotel_id == hotel_id, User.deleted_at.is_(None)).order_by(User.name)
         ).scalars().all()
+        if current_user is not None:
+            rbac = RBACService(self.db)
+            users = [user for user in users if rbac.can_view_staff(current_user, user)]
         return [self.mobile_user(user) for user in users]
 
-    def upsert_user(self, hotel_id: str, employee_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    def upsert_user(
+        self,
+        hotel_id: str,
+        employee_id: str,
+        payload: dict[str, Any],
+        actor: User | None = None,
+    ) -> dict[str, Any]:
         user = self.resolve_user_any(employee_id, hotel_id)
         department = self.resolve_department(hotel_id, payload.get("Department"))
         password = _text(payload.get("Password"))
         email = _text(payload.get("Email")) or f"{employee_id}@mobile.local"
         name = _text(payload.get("Name")) or employee_id
         job_role = _text(payload.get("Jobrole") or payload.get("JobRole")) or "Attendent"
+        create_owner = payload.get("isHotelOwner") is True
+        if create_owner and not (actor and actor.is_hotel_owner):
+            raise forbidden("Only the hotel owner can create another owner account")
 
         if user is None:
             user = User(
                 hotel_id=hotel_id,
                 employee_code=employee_id,
                 department_id=department.id if department else None,
-                user_type="HOTEL_ADMIN" if payload.get("isHotelOwner") else "HOTEL_EMPLOYEE",
-                staff_level=self.staff_level_from_mobile_role(job_role, payload.get("isHotelOwner") is True),
+                user_type="HOTEL_ADMIN" if create_owner else "HOTEL_EMPLOYEE",
+                staff_level=self.staff_level_from_mobile_role(job_role, create_owner),
                 name=name,
                 email=email,
                 hashed_password=AuthService.password_hash(password or "changeme"),
                 job_role=job_role,
                 profile_image_url=_text(payload.get("ProfileImage")) or None,
-                is_hotel_owner=payload.get("isHotelOwner") is True,
+                is_hotel_owner=create_owner,
                 is_active=True,
                 is_on_duty=bool(payload.get("Status")),
                 online_for_chat=bool(payload.get("OnlineForChat")),
@@ -418,7 +431,14 @@ class MobileCompatService:
         }
         return base
 
-    def list_tasks(self, hotel_id: str, stage: str | None = None, assigned_to: str | None = None, deleted: bool = False) -> list[dict[str, Any]]:
+    def list_tasks(
+        self,
+        hotel_id: str,
+        stage: str | None = None,
+        assigned_to: str | None = None,
+        deleted: bool = False,
+        current_user: User | None = None,
+    ) -> list[dict[str, Any]]:
         statement = select(Ticket).where(Ticket.hotel_id == hotel_id)
         if deleted:
             statement = statement.where(Ticket.deleted_at.is_not(None))
@@ -437,6 +457,9 @@ class MobileCompatService:
             }
             statement = statement.where(Ticket.stage.in_(stage_aliases.get(stage, (canonical,))))
         rows = self.db.execute(statement.order_by(Ticket.created_at.desc())).scalars().all()
+        if current_user is not None:
+            rbac = RBACService(self.db)
+            rows = [row for row in rows if rbac.can_view_ticket(current_user, row)]
         tasks = [self.mobile_task(row) for row in rows]
         if stage:
             tasks = [task for task in tasks if _norm(task.get("Stage")) == _norm(stage)]
@@ -882,7 +905,7 @@ class MobileCompatService:
                 },
             )
 
-    def active_task_counts(self, hotel_id: str) -> dict[str, int]:
+    def active_task_counts(self, hotel_id: str, current_user: User | None = None) -> dict[str, int]:
         rows = self.db.execute(
             select(Ticket).where(
                 Ticket.hotel_id == hotel_id,
@@ -891,6 +914,9 @@ class MobileCompatService:
                 Ticket.stage.not_in(("approved", "Completed", "closed", "resolved", "cancelled")),
             )
         ).scalars().all()
+        if current_user is not None:
+            rbac = RBACService(self.db)
+            rows = [row for row in rows if rbac.can_view_ticket(current_user, row)]
         counts: dict[str, int] = {}
         for ticket in rows:
             user = self.db.get(User, ticket.assigned_to) if ticket.assigned_to else None

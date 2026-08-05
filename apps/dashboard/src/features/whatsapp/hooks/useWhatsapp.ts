@@ -97,11 +97,11 @@ export function useDeleteWhatsappConversation(hotelId: string, conversationId: s
   });
 }
 
-export function useWhatsappConversations(hotelId: string) {
+export function useWhatsappConversations(hotelId: string, options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: queryKeys.whatsapp.conversations(hotelId),
     queryFn: () => apiGet<WhatsAppConversation[]>(`/hotels/${hotelId}/whatsapp/conversations`),
-    enabled: Boolean(hotelId),
+    enabled: Boolean(hotelId) && (options.enabled ?? true),
     refetchInterval: WHATSAPP_INBOX_REFETCH_INTERVAL_MS,
   });
 }

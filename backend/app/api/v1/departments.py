@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import require_permission
+from app.api.dependencies import require_any_permission, require_permission
 from app.core.database import get_db
+from app.core.permissions import Permissions
 from app.core.responses import ok
 from app.models.department import Department
 from app.models.user import User
@@ -16,7 +17,15 @@ router = APIRouter()
 def list_departments(
     hotel_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("hotel.settings.manage")),
+    current_user: User = Depends(
+        require_any_permission(
+            Permissions.TICKET_VIEW,
+            Permissions.TICKET_CREATE,
+            Permissions.TICKET_UPDATE,
+            Permissions.WORKFLOW_MANAGE,
+            Permissions.HOTEL_SETTINGS_MANAGE,
+        )
+    ),
 ) -> dict:
     departments = DepartmentRepository(db).list_for_hotel(hotel_id)
     return ok([DepartmentRead.model_validate(item).model_dump() for item in departments])

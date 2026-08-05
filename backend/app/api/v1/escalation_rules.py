@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import require_permission
+from app.core.permissions import Permissions
 from app.core.database import get_db
 from app.core.responses import ok
 from app.models.user import User
@@ -17,7 +18,7 @@ router = APIRouter()
 def list_escalation_rules(
     hotel_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("hotel.settings.manage")),
+    current_user: User = Depends(require_permission(Permissions.WORKFLOW_MANAGE)),
 ) -> dict:
     rules = EscalationRuleRepository(db).list_active(hotel_id)
     category_names = _category_names(db, hotel_id, [item.task_category_id for item in rules])
@@ -29,7 +30,7 @@ def create_escalation_rule(
     hotel_id: str,
     payload: EscalationRuleCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("hotel.settings.manage")),
+    current_user: User = Depends(require_permission(Permissions.WORKFLOW_MANAGE)),
 ) -> dict:
     rule = EscalationRuleService(db).create(hotel_id, payload)
     return ok(_rule_read(rule, _category_names(db, hotel_id, [rule.task_category_id])).model_dump())
@@ -41,7 +42,7 @@ def update_escalation_rule(
     rule_id: str,
     payload: EscalationRuleUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("hotel.settings.manage")),
+    current_user: User = Depends(require_permission(Permissions.WORKFLOW_MANAGE)),
 ) -> dict:
     rule = EscalationRuleService(db).update(hotel_id, rule_id, payload)
     return ok(_rule_read(rule, _category_names(db, hotel_id, [rule.task_category_id])).model_dump())
@@ -52,7 +53,7 @@ def delete_escalation_rule(
     hotel_id: str,
     rule_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("hotel.settings.manage")),
+    current_user: User = Depends(require_permission(Permissions.WORKFLOW_MANAGE)),
 ) -> dict:
     EscalationRuleService(db).delete(hotel_id, rule_id)
     return ok({"deleted": True, "rule_id": rule_id})
@@ -62,7 +63,7 @@ def delete_escalation_rule(
 def reset_default_escalation_rules(
     hotel_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("hotel.settings.manage")),
+    current_user: User = Depends(require_permission(Permissions.WORKFLOW_MANAGE)),
 ) -> dict:
     rows = EscalationRuleService(db).reset_defaults(hotel_id)
     category_names = _category_names(db, hotel_id, [item.task_category_id for item in rows])

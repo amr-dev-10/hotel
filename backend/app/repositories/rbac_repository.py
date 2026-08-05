@@ -39,6 +39,13 @@ class PermissionRepository(BaseRepository[Permission]):
 
     def list_assignable(self) -> Sequence[Permission]:
         legacy_scope_codes = (
+            "ticket.assign",
+            "ticket.accept",
+            "ticket.reject",
+            "ticket.complete_own",
+            "ticket.close",
+            "ticket.approve",
+            "ticket.verify",
             "ticket.view_own",
             "ticket.view_dept",
             "ticket.view_all",

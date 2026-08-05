@@ -18,12 +18,19 @@ from app.core.error_handlers import register_error_handlers
 from app.core.performance import PerformanceMetricsMiddleware
 from app.core.rate_limiter import RateLimitMiddleware
 from app.models.ops import MediaFile
+from app.services.rbac_service import RBACService
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     if settings.auto_create_tables:
         init_db()
+    db = SessionLocal()
+    try:
+        RBACService(db).seed_permissions()
+        db.commit()
+    finally:
+        db.close()
     yield
 
 

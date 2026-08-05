@@ -162,6 +162,75 @@ def test_scoped_ticket_view_base_permission_limits_visibility() -> None:
         assert second.json()["data"]["id"] not in visible_ids
 
 
+def test_ticket_only_role_reads_ticket_context_without_module_access() -> None:
+    with TestClient(app) as client:
+        hotel_id, _, owner_token = _bootstrap(client)
+        owner_headers = {"Authorization": f"Bearer {owner_token}"}
+        suffix = uuid4().hex[:8]
+        staff_id = _create_user(client, hotel_id, owner_headers, "Ticket Only", f"ticket-only-{suffix}@example.com")
+        guest = client.post(
+            f"/api/v1/hotels/{hotel_id}/guests",
+            headers=owner_headers,
+            json={"name": "Ticket Guest", "phone": "+15550101010", "status": "in_house"},
+        )
+        assert guest.status_code == 200
+        rooms = client.get(f"/api/v1/hotels/{hotel_id}/rooms", headers=owner_headers)
+        assert rooms.status_code == 200
+        room_id = rooms.json()["data"][0]["id"]
+        role_id = _create_role(
+            client,
+            hotel_id,
+            owner_headers,
+            [
+                "ticket.view",
+                "ticket.create",
+                "ticket.update",
+                "ticket.delete",
+                "ticket.assign_self",
+                "ticket.assign_others",
+            ],
+        )
+        _assign_roles(client, hotel_id, owner_headers, staff_id, [role_id])
+
+        ticket = client.post(
+            f"/api/v1/hotels/{hotel_id}/tickets",
+            headers=owner_headers,
+            json={
+                "assigned_to": staff_id,
+                "guest_id": guest.json()["data"]["id"],
+                "room_id": room_id,
+                "item_description": "Ticket context only",
+                "priority": 2,
+            },
+        )
+        assert ticket.status_code == 200
+        ticket_id = ticket.json()["data"]["id"]
+
+        login = client.post(
+            "/api/v1/auth/login",
+            json={"email": f"ticket-only-{suffix}@example.com", "password": "secretpass123"},
+        )
+        assert login.status_code == 200
+        staff_headers = {"Authorization": f"Bearer {login.json()['data']['access_token']}"}
+
+        departments = client.get(f"/api/v1/hotels/{hotel_id}/departments", headers=staff_headers)
+        assert departments.status_code == 200
+
+        detail = client.get(f"/api/v1/hotels/{hotel_id}/tickets/{ticket_id}", headers=staff_headers)
+        assert detail.status_code == 200
+        payload = detail.json()["data"]
+        assert payload["assigned_to_name"] == "Ticket Only"
+        assert payload["guest_name"] == "Ticket Guest"
+        assert payload["room_number"] == "9101"
+
+        users = client.get(f"/api/v1/hotels/{hotel_id}/users", headers=staff_headers)
+        assert users.status_code == 403
+        guests = client.get(f"/api/v1/hotels/{hotel_id}/guests", headers=staff_headers)
+        assert guests.status_code == 403
+        settings = client.get(f"/api/v1/hotels/{hotel_id}/audit-logs", headers=staff_headers)
+        assert settings.status_code == 403
+
+
 def test_scoped_staff_view_limits_users_to_department() -> None:
     with TestClient(app) as client:
         hotel_id, _, owner_token = _bootstrap(client)
@@ -433,3 +502,115 @@ def test_staff_duty_update_is_limited_to_self_or_admin() -> None:
         )
         assert admin_duty.status_code == 200
         assert admin_duty.json()["data"]["is_on_duty"] is False
+
+
+def test_mobile_api_denies_low_privilege_staff_management_and_inventory() -> None:
+    with TestClient(app) as client:
+        hotel_id, _, owner_token = _bootstrap(client)
+        owner_headers = {"Authorization": f"Bearer {owner_token}"}
+        suffix = uuid4().hex[:8]
+        staff_id = _create_user(
+            client,
+            hotel_id,
+            owner_headers,
+            "Mobile Low Privilege",
+            f"mobile-low-{suffix}@example.com",
+        )
+        target_id = _create_user(
+            client,
+            hotel_id,
+            owner_headers,
+            "Mobile Target",
+            f"mobile-target-{suffix}@example.com",
+        )
+        login = client.post("/api/v1/auth/login", json={"email": f"mobile-low-{suffix}@example.com", "password": "secretpass123"})
+        assert login.status_code == 200
+        staff_headers = {"Authorization": f"Bearer {login.json()['data']['access_token']}"}
+
+        users = client.get(f"/api/v1/mobile/hotels/{hotel_id}/users", headers=staff_headers)
+        assert users.status_code == 403
+
+        update_user = client.patch(
+            f"/api/v1/mobile/hotels/{hotel_id}/users/{target_id}",
+            headers=staff_headers,
+            json={"Name": "Escalated Name"},
+        )
+        assert update_user.status_code == 403
+
+        delete_user = client.delete(f"/api/v1/mobile/hotels/{hotel_id}/users/{target_id}", headers=staff_headers)
+        assert delete_user.status_code == 403
+
+        add_inventory = client.post(
+            f"/api/v1/mobile/hotels/{hotel_id}/inventory",
+            headers=staff_headers,
+            json={"Name": "Unauthorized Item"},
+        )
+        assert add_inventory.status_code == 403
+
+        me = client.get("/api/v1/mobile/auth/me", headers=staff_headers)
+        assert me.status_code == 200
+        assert me.json()["data"]["EmployeeId"] == staff_id
+
+
+def test_mobile_task_list_respects_ticket_visibility_scope() -> None:
+    with TestClient(app) as client:
+        hotel_id, _, owner_token = _bootstrap(client)
+        owner_headers = {"Authorization": f"Bearer {owner_token}"}
+        suffix = uuid4().hex[:8]
+        staff_a = _create_user(client, hotel_id, owner_headers, "Mobile Task A", f"mobile-task-a-{suffix}@example.com")
+        staff_b = _create_user(client, hotel_id, owner_headers, "Mobile Task B", f"mobile-task-b-{suffix}@example.com")
+        role_id = _create_role(
+            client,
+            hotel_id,
+            owner_headers,
+            ["ticket.view"],
+            {"ticket.view": "own"},
+        )
+        _assign_roles(client, hotel_id, owner_headers, staff_a, [role_id])
+
+        first = client.post(
+            f"/api/v1/hotels/{hotel_id}/tickets",
+            headers=owner_headers,
+            json={"assigned_to": staff_a, "item_description": "Visible mobile task", "priority": 2},
+        )
+        assert first.status_code == 200
+        second = client.post(
+            f"/api/v1/hotels/{hotel_id}/tickets",
+            headers=owner_headers,
+            json={"assigned_to": staff_b, "item_description": "Hidden mobile task", "priority": 2},
+        )
+        assert second.status_code == 200
+
+        login = client.post("/api/v1/auth/login", json={"email": f"mobile-task-a-{suffix}@example.com", "password": "secretpass123"})
+        assert login.status_code == 200
+        staff_headers = {"Authorization": f"Bearer {login.json()['data']['access_token']}"}
+
+        tasks = client.get(f"/api/v1/mobile/hotels/{hotel_id}/tasks", headers=staff_headers)
+        assert tasks.status_code == 200
+        visible_ids = {item["TaskId"] for item in tasks.json()["data"]}
+        assert first.json()["data"]["id"] in visible_ids
+        assert second.json()["data"]["id"] not in visible_ids
+
+
+def test_system_roles_cannot_be_updated_or_replaced() -> None:
+    with TestClient(app) as client:
+        hotel_id, _, owner_token = _bootstrap(client)
+        owner_headers = {"Authorization": f"Bearer {owner_token}"}
+
+        roles = client.get(f"/api/v1/hotels/{hotel_id}/roles", headers=owner_headers)
+        assert roles.status_code == 200
+        system_role = next(role for role in roles.json()["data"] if role["is_system_role"])
+
+        renamed = client.put(
+            f"/api/v1/hotels/{hotel_id}/roles/{system_role['id']}",
+            headers=owner_headers,
+            json={"name": "Mutated System Role"},
+        )
+        assert renamed.status_code == 400
+
+        replaced = client.put(
+            f"/api/v1/hotels/{hotel_id}/roles/{system_role['id']}/permissions",
+            headers=owner_headers,
+            json={"permission_keys": []},
+        )
+        assert replaced.status_code == 400

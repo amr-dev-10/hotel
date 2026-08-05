@@ -51,6 +51,7 @@ import { useRouteHotelId } from "@/hooks/useRouteHotelId";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { api, apiGet } from "@/lib/api/client";
 import { showApiErrorToast } from "@/lib/api/error-toast";
+import { hasAnyPermission } from "@/lib/auth/permissions";
 import { cn, titleCase } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth.store";
 import type { ApiEnvelope, CurrentUser, EmployeeShift } from "@/types/domain";
@@ -589,8 +590,7 @@ function canAccessNavItem(item: NavItem, currentUser: CurrentUser | null, isHote
   if (!item.permissions?.length) {
     return true;
   }
-  const permissions = new Set(currentUser.permissions ?? []);
-  return item.permissions.some((permission) => permissions.has(permission));
+  return hasAnyPermission(currentUser, item.permissions);
 }
 
 function isSessionExpiredError(error: unknown) {
@@ -605,5 +605,12 @@ function isSessionExpiredError(error: unknown) {
     return false;
   }
 
-  return status === 401 || status === 403;
+  return (
+    status === 401 ||
+    (status === 403 &&
+      (message.includes("not active") ||
+        message.includes("token") ||
+        message.includes("session") ||
+        message.includes("authentication")))
+  );
 }

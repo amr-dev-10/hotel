@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.api.dependencies import require_permission
 from app.core.database import get_db
 from app.core.exceptions import not_found
+from app.core.permissions import Permissions
 from app.core.responses import ok
 from app.models.base import utcnow
 from app.models.user import User
@@ -180,7 +181,7 @@ def send_conversation_message(
     conversation_id: str,
     payload: WhatsAppMessageSendRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("ticket.assign")),
+    current_user: User = Depends(require_permission(Permissions.TICKET_UPDATE)),
 ) -> dict:
     result = WhatsAppAccountService(db).send_conversation_message(
         hotel_id,
@@ -209,7 +210,7 @@ def update_conversation(
     conversation_id: str,
     payload: WhatsAppConversationUpdateRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("ticket.assign")),
+    current_user: User = Depends(require_permission(Permissions.TICKET_UPDATE)),
 ) -> dict:
     repo = WhatsAppConversationRepository(db)
     conversation = repo.get(conversation_id)
@@ -243,7 +244,7 @@ def delete_conversation_profile(
     hotel_id: str,
     conversation_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("ticket.assign")),
+    current_user: User = Depends(require_permission(Permissions.TICKET_UPDATE)),
 ) -> dict:
     repo = WhatsAppConversationRepository(db)
     conversation = repo.get_for_hotel(hotel_id, conversation_id)
@@ -278,7 +279,7 @@ def delete_conversation(
     hotel_id: str,
     conversation_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("ticket.assign")),
+    current_user: User = Depends(require_permission(Permissions.TICKET_UPDATE)),
 ) -> dict:
     repo = WhatsAppConversationRepository(db)
     conversation = repo.get_for_hotel(hotel_id, conversation_id)

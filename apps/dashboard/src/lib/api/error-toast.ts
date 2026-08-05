@@ -2,9 +2,9 @@
 
 import { toast } from "sonner";
 
-import { apiErrorDetails, type ApiErrorDetails } from "@/lib/api/client";
+import { API_ERROR_DETAILS_EVENT, apiErrorDetails, type ApiErrorDetails } from "@/lib/api/client";
 
-export const API_ERROR_DETAILS_EVENT = "arcadia:api-error-details";
+export { API_ERROR_DETAILS_EVENT };
 
 export function showApiErrorToast(error: unknown, fallbackMessage?: string) {
   const detail = apiErrorDetails(error);

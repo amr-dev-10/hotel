@@ -1,6 +1,7 @@
 from collections.abc import Sequence
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import cast, func, or_, select
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import Session
 
 from app.models.base import utcnow
@@ -129,7 +130,7 @@ class TicketRepository(BaseRepository[Ticket]):
                 statement = statement.where(
                     or_(
                         Ticket.assigned_to == visibility_user_id,
-                        Ticket.followers.contains([visibility_user_id]),
+                        self._followers_contains(visibility_user_id),
                     )
                 )
         elif visibility_scope == "department":
@@ -183,6 +184,12 @@ class TicketRepository(BaseRepository[Ticket]):
                 )
             )
         return statement
+
+    def _followers_contains(self, user_id: str):
+        bind = self.db.get_bind()
+        if bind and bind.dialect.name == "postgresql":
+            return cast(Ticket.followers, postgresql.JSONB).contains([user_id])
+        return Ticket.followers.contains([user_id])
 
     def list_unresolved(self, hotel_id: str | None = None) -> Sequence[Ticket]:
         terminal = (

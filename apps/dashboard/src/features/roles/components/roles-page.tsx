@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { showApiErrorToast } from "@/lib/api/error-toast";
 
 import { PageBreadcrumbs } from "@/components/layout/page-breadcrumbs";
+import { Can } from "@/lib/auth/can";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataState } from "@/components/ui/data-state";
@@ -41,12 +42,14 @@ export function RolesPage({ hotelId }: { hotelId: string }) {
           hotelId={hotelId}
           items={[{ label: "Settings" }]}
         />
-        <Button asChild type="button">
-          <Link href={`/${hotelId}/settings/roles/new`}>
-            <Plus />
-            New role
-          </Link>
-        </Button>
+        <Can I="manage" a="Role">
+          <Button asChild type="button">
+            <Link href={`/${hotelId}/settings/roles/new`}>
+              <Plus />
+              New role
+            </Link>
+          </Button>
+        </Can>
       </div>
 
       {!roles.data?.length ? (
@@ -75,15 +78,17 @@ export function RolesPage({ hotelId }: { hotelId: string }) {
                 <Button asChild size="sm" type="button" variant="secondary">
                   <Link href={`/${hotelId}/settings/roles/${role.id}`}>Edit</Link>
                 </Button>
-                <Button
-                  disabled={role.is_system_role || deleteRole.isPending}
-                  size="icon"
-                  type="button"
-                  variant="ghost"
-                  onClick={() => handleDelete(role.id)}
-                >
-                  {deleteRole.isPending ? <Loader2 className="animate-spin" /> : <Trash2 />}
-                </Button>
+                <Can I="manage" a="Role">
+                  <Button
+                    disabled={role.is_system_role || deleteRole.isPending}
+                    size="icon"
+                    type="button"
+                    variant="ghost"
+                    onClick={() => handleDelete(role.id)}
+                  >
+                    {deleteRole.isPending ? <Loader2 className="animate-spin" /> : <Trash2 />}
+                  </Button>
+                </Can>
               </div>
             </div>
           ))}

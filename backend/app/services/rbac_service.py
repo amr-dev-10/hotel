@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.permissions import Permissions
-from app.core.exceptions import bad_request, forbidden, not_found
+from app.core.exceptions import bad_request, missing_permission, not_found
 from app.models.rbac import Permission, PermissionGroup, Role
 from app.models.user import User
 from app.repositories.rbac_repository import PermissionGroupRepository, PermissionRepository, RoleRepository
@@ -36,6 +36,23 @@ SCOPED_PERMISSION_ALIASES = {
     (Permissions.SHIFT_UPDATE, "own"): Permissions.SHIFT_UPDATE_OWN,
 }
 EQUIVALENT_PERMISSIONS = {
+    Permissions.TICKET_UPDATE: {
+        Permissions.TICKET_ACCEPT,
+        Permissions.TICKET_REJECT,
+        Permissions.TICKET_COMPLETE_OWN,
+        Permissions.TICKET_CLOSE,
+        Permissions.TICKET_APPROVE,
+        Permissions.TICKET_VERIFY,
+    },
+    Permissions.TICKET_ACCEPT: {Permissions.TICKET_UPDATE},
+    Permissions.TICKET_REJECT: {Permissions.TICKET_UPDATE},
+    Permissions.TICKET_COMPLETE_OWN: {Permissions.TICKET_UPDATE},
+    Permissions.TICKET_CLOSE: {Permissions.TICKET_UPDATE},
+    Permissions.TICKET_APPROVE: {Permissions.TICKET_UPDATE},
+    Permissions.TICKET_VERIFY: {Permissions.TICKET_UPDATE},
+    Permissions.TICKET_ASSIGN_SELF: {Permissions.TICKET_ASSIGN, Permissions.TICKET_ASSIGN_OTHERS},
+    Permissions.TICKET_ASSIGN_OTHERS: {Permissions.TICKET_ASSIGN},
+    Permissions.TICKET_ASSIGN: {Permissions.TICKET_ASSIGN_OTHERS, Permissions.TICKET_UPDATE},
     Permissions.USER_VIEW: {Permissions.STAFF_VIEW},
     Permissions.USER_CREATE: {Permissions.STAFF_CREATE},
     Permissions.USER_UPDATE: {Permissions.STAFF_UPDATE},
@@ -47,7 +64,28 @@ EQUIVALENT_PERMISSIONS = {
     Permissions.STAFF_DELETE: {Permissions.USER_DELETE},
     Permissions.STAFF_MANAGE: {Permissions.USER_MANAGE},
 }
+GRANT_EQUIVALENT_PERMISSIONS = {
+    Permissions.TICKET_ACCEPT: ((Permissions.TICKET_UPDATE, None),),
+    Permissions.TICKET_REJECT: ((Permissions.TICKET_UPDATE, None),),
+    Permissions.TICKET_COMPLETE_OWN: ((Permissions.TICKET_UPDATE, "own"),),
+    Permissions.TICKET_CLOSE: ((Permissions.TICKET_UPDATE, None),),
+    Permissions.TICKET_APPROVE: ((Permissions.TICKET_UPDATE, None),),
+    Permissions.TICKET_VERIFY: ((Permissions.TICKET_UPDATE, None),),
+    Permissions.TICKET_ASSIGN: (
+        (Permissions.TICKET_UPDATE, None),
+        (Permissions.TICKET_ASSIGN_OTHERS, None),
+        (Permissions.TICKET_ASSIGN_SELF, None),
+    ),
+    Permissions.TICKET_ASSIGN_OTHERS: ((Permissions.TICKET_ASSIGN_SELF, None),),
+}
 CANONICAL_DISPLAY_PERMISSIONS = {
+    Permissions.TICKET_ACCEPT: Permissions.TICKET_UPDATE,
+    Permissions.TICKET_REJECT: Permissions.TICKET_UPDATE,
+    Permissions.TICKET_COMPLETE_OWN: Permissions.TICKET_UPDATE,
+    Permissions.TICKET_CLOSE: Permissions.TICKET_UPDATE,
+    Permissions.TICKET_APPROVE: Permissions.TICKET_UPDATE,
+    Permissions.TICKET_VERIFY: Permissions.TICKET_UPDATE,
+    Permissions.TICKET_ASSIGN: Permissions.TICKET_ASSIGN_OTHERS,
     Permissions.USER_VIEW: Permissions.STAFF_VIEW,
     Permissions.USER_CREATE: Permissions.STAFF_CREATE,
     Permissions.USER_UPDATE: Permissions.STAFF_UPDATE,
@@ -131,10 +169,8 @@ class RBACService:
                 Permissions.TICKET_VIEW,
                 Permissions.TICKET_VIEW_ALL,
                 Permissions.TICKET_CREATE,
-                Permissions.TICKET_ASSIGN,
-                Permissions.TICKET_ACCEPT,
-                Permissions.TICKET_REJECT,
-                Permissions.TICKET_COMPLETE_OWN,
+                Permissions.TICKET_UPDATE,
+                Permissions.TICKET_ASSIGN_OTHERS,
                 Permissions.GUEST_VIEW,
                 Permissions.GUEST_VIEW_BASIC,
                 Permissions.GUEST_CREATE,
@@ -155,9 +191,8 @@ class RBACService:
             [
                 Permissions.TICKET_VIEW_OWN,
                 Permissions.TICKET_CREATE,
-                Permissions.TICKET_ACCEPT,
-                Permissions.TICKET_REJECT,
-                Permissions.TICKET_COMPLETE_OWN,
+                Permissions.TICKET_UPDATE,
+                Permissions.TICKET_ASSIGN_SELF,
                 Permissions.SHIFT_VIEW_OWN,
                 Permissions.SHIFT_UPDATE_OWN,
             ],
@@ -245,6 +280,7 @@ class RBACService:
         role = self.roles.get_for_hotel(hotel_id, role_id)
         if not role:
             raise not_found("Role not found")
+        self._ensure_role_is_mutable(role)
         old_grants = self.role_permission_reads(role)
         self.set_role_permissions(role, permission_codes, permission_scopes)
         AuditService(self.db).log(
@@ -298,6 +334,7 @@ class RBACService:
         role = self.roles.get_for_hotel(hotel_id, role_id)
         if not role:
             raise not_found("Role not found")
+        self._ensure_role_is_mutable(role)
         old_payload = {
             "name": role.name,
             "description": role.description,
@@ -338,6 +375,11 @@ class RBACService:
         self.db.delete(role)
         self.clear_permission_cache()
         self.db.commit()
+
+    @staticmethod
+    def _ensure_role_is_mutable(role: Role) -> None:
+        if role.is_system_role:
+            raise bad_request("System roles cannot be modified. Clone the role before customizing it.")
 
     def _permission_grants_for_user(self, user: User) -> tuple[set[str], PermissionScopeMap]:
         now = monotonic()
@@ -400,7 +442,7 @@ class RBACService:
         if user.is_hotel_owner:
             return
         if not self.has_permission(user, permission_code):
-            raise forbidden(f"Missing permission: {permission_code}")
+            raise missing_permission(permission_code)
 
     def has_permission(self, user: User, permission_code: str) -> bool:
         if user.is_hotel_owner:
@@ -426,6 +468,37 @@ class RBACService:
     def can_view_ticket(self, user: User, ticket) -> bool:
         scope = self.ticket_visibility_scope(user)
         if scope == "all":
+            return True
+        if scope == "department":
+            return bool(user.department_id and ticket.department_id == user.department_id)
+        if scope == "own":
+            followers = ticket.followers or []
+            return ticket.assigned_to == user.id or user.id in followers
+        return False
+
+    def can_update_ticket(self, user: User, ticket) -> bool:
+        return self._ticket_permission_allows(user, ticket, Permissions.TICKET_UPDATE)
+
+    def can_delete_ticket(self, user: User, ticket) -> bool:
+        return self._ticket_permission_allows(user, ticket, Permissions.TICKET_DELETE)
+
+    def can_assign_ticket_to_self(self, user: User, ticket) -> bool:
+        return self._ticket_permission_allows(
+            user,
+            ticket,
+            Permissions.TICKET_ASSIGN_OTHERS,
+        ) or self._ticket_permission_allows(user, ticket, Permissions.TICKET_ASSIGN_SELF)
+
+    def can_assign_ticket_to_others(self, user: User, ticket) -> bool:
+        return self._ticket_permission_allows(user, ticket, Permissions.TICKET_ASSIGN_OTHERS)
+
+    def _ticket_permission_allows(self, user: User, ticket, permission_code: str) -> bool:
+        if user.is_hotel_owner:
+            return True
+        if not self.has_permission(user, permission_code):
+            return False
+        scope = self.permission_scope(user, permission_code)
+        if scope == "hotel":
             return True
         if scope == "department":
             return bool(user.department_id and ticket.department_id == user.department_id)
@@ -576,11 +649,18 @@ def expand_permission_grants(grants: Iterable[tuple[str, str]]) -> tuple[set[str
         permissions.add(code)
         permission_scopes.setdefault(code, set()).add(scope)
 
-        for equivalent in EQUIVALENT_PERMISSIONS.get(code, set()):
+        for equivalent, equivalent_scope in grant_equivalent_permissions(code, scope):
             permissions.add(equivalent)
-            permission_scopes.setdefault(equivalent, set()).add(scope)
+            permission_scopes.setdefault(equivalent, set()).add(equivalent_scope)
 
         legacy_alias = SCOPED_PERMISSION_ALIASES.get((code, scope))
         if legacy_alias:
             permissions.add(legacy_alias)
     return permissions, permission_scopes
+
+
+def grant_equivalent_permissions(code: str, scope: str) -> tuple[tuple[str, str], ...]:
+    configured = GRANT_EQUIVALENT_PERMISSIONS.get(code)
+    if configured is not None:
+        return tuple((permission_code, normalize_scope(equivalent_scope or scope)) for permission_code, equivalent_scope in configured)
+    return tuple((permission_code, scope) for permission_code in EQUIVALENT_PERMISSIONS.get(code, set()))

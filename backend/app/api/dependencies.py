@@ -3,7 +3,7 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db, set_tenant_context
-from app.core.exceptions import forbidden
+from app.core.exceptions import forbidden, missing_any_permission
 from app.core.permissions import Permissions
 from app.core.security import decode_access_token
 from app.models.platform_admin import PlatformAdmin
@@ -82,7 +82,7 @@ def require_any_permission(*permission_codes: str):
         set_tenant_context(db, hotel_id)
         rbac = RBACService(db)
         if not rbac.has_any(current_user, permission_codes):
-            raise forbidden(f"Missing one of permissions: {', '.join(permission_codes)}")
+            raise missing_any_permission(permission_codes)
         return current_user
 
     return dependency

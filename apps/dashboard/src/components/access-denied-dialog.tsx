@@ -21,6 +21,9 @@ type AccessDeniedState = AccessDeniedEventDetail & {
 const permissionDescriptions: Record<string, string> = {
   "ticket.view": "View tickets",
   "ticket.create": "Create tickets",
+  "ticket.update": "Update tickets",
+  "ticket.assign_self": "Assign tickets to self",
+  "ticket.assign_others": "Assign tickets to other staff",
   "ticket.assign": "Assign or edit tickets",
   "ticket.accept": "Accept dispatched tickets",
   "ticket.reject": "Reject dispatched tickets",
@@ -36,6 +39,7 @@ const permissionDescriptions: Record<string, string> = {
   "role.view": "View roles",
   "role.manage": "Manage roles and access",
   "hotel.settings.manage": "Manage hotel settings",
+  "workflow.manage": "Manage workflow settings",
   "analytics.view": "View analytics",
   "analytics.export": "Export analytics",
   "guest.view": "View guests",
@@ -129,8 +133,20 @@ export function AccessDeniedDialog() {
             ) : null}
 
             <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
-              Ask an owner or role admin to add the required permission to your role. If you already have the permission, ask them to check whether your scope should be Own, Department, or Hotel.
+              {accessDenied.hint ??
+                "Ask an owner or role admin to add the required permission to your role. If you already have the permission, ask them to check whether your scope should be Own, Department, or Hotel."}
             </div>
+
+            {accessDenied.cause || accessDenied.requestId ? (
+              <div className="grid gap-1 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                {accessDenied.cause ? <p>{accessDenied.cause}</p> : null}
+                {accessDenied.requestId ? (
+                  <p>
+                    Request ID: <span className="font-mono text-slate-800">{accessDenied.requestId}</span>
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
 
             <div className="flex justify-end">
               <Button type="button" onClick={() => setAccessDenied(null)}>
@@ -174,7 +190,7 @@ function inferPermissionHints(detail: AccessDeniedEventDetail) {
     return [{ code: method === "GET" ? "role.view" : "role.manage", label: method === "GET" ? "View roles" : "Manage roles and access" }];
   }
   if (url.includes("/routing-rules") || url.includes("/task-slas") || url.includes("/escalation-rules")) {
-    return [{ code: "hotel.settings.manage", label: "Manage hotel workflow settings" }];
+    return [{ code: "workflow.manage", label: "Manage workflow settings" }];
   }
   return [];
 }

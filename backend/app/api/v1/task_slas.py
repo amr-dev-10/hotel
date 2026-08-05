@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import require_permission
+from app.core.permissions import Permissions
 from app.core.database import get_db
 from app.core.responses import ok
 from app.models.user import User
@@ -18,7 +19,7 @@ def list_task_slas(
     hotel_id: str,
     department_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("hotel.settings.manage")),
+    current_user: User = Depends(require_permission(Permissions.WORKFLOW_MANAGE)),
 ) -> dict:
     rows = TaskTypeSLARepository(db).list_for_department(hotel_id, department_id)
     category_names = _category_names(db, hotel_id, [item.ticket_category_id for item in rows])
@@ -31,7 +32,7 @@ def create_task_sla(
     department_id: str,
     payload: TaskTypeSLACreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("hotel.settings.manage")),
+    current_user: User = Depends(require_permission(Permissions.WORKFLOW_MANAGE)),
 ) -> dict:
     row = SLAService(db).create(hotel_id, department_id, payload)
     return ok(_sla_read(row, _category_names(db, hotel_id, [row.ticket_category_id])).model_dump())
@@ -44,7 +45,7 @@ def update_task_sla(
     sla_id: str,
     payload: TaskTypeSLAUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("hotel.settings.manage")),
+    current_user: User = Depends(require_permission(Permissions.WORKFLOW_MANAGE)),
 ) -> dict:
     row = SLAService(db).update(hotel_id, department_id, sla_id, payload)
     return ok(_sla_read(row, _category_names(db, hotel_id, [row.ticket_category_id])).model_dump())
@@ -56,7 +57,7 @@ def delete_task_sla(
     department_id: str,
     sla_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("hotel.settings.manage")),
+    current_user: User = Depends(require_permission(Permissions.WORKFLOW_MANAGE)),
 ) -> dict:
     SLAService(db).delete(hotel_id, department_id, sla_id)
     return ok({"deleted": True, "sla_id": sla_id})
