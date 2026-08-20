@@ -16,6 +16,9 @@ Architecture documents are versioned by folder so new designs can be added witho
 - `ai-chatbot-development-and-testing.md` - AI chatbot MVP implementation map, configuration, Windows dev run commands, automated tests, live smoke test, and troubleshooting.
 - `ai-chatbot-conversation-test-cases.md` - manual conversational QA cases for hotel guest messages, expected AI routing/ticket/reply behavior, hotel-owned AI provider setup, and xAI Grok distinction notes.
 - `order-computation-functional-flow.md` - Food and Beverage POS order total calculation flow, current backend behavior, and recommended charge/discount extension model.
+- `database-model-table-inventory.md` - current SQLAlchemy model table inventory with technical and business uses.
+- `database-er-diagram.md` - model-derived database ER diagrams split by domain for readability.
+- `feature-list-and-dfd-level-0.md` - current feature inventory and Level 0 data flow diagram.
 
 ## Versions
 

@@ -17,6 +17,7 @@ from app.repositories.rbac_repository import RoleRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.user import UserUpdate
 from app.services.audit_service import AuditService
+from app.services.ops_service import MediaService
 from app.services.rbac_service import RBACService
 
 
@@ -138,10 +139,12 @@ class UserService:
 
         now = utcnow()
         old_payload = self._user_audit_payload(user)
+        old_profile_image_url = user.profile_image_url
         user.is_active = False
         user.is_deleted = True
         user.deleted_at = now
         user.deleted_by = actor.id
+        user.profile_image_url = None
 
         self.db.execute(
             update(Ticket)
@@ -167,6 +170,7 @@ class UserService:
             old_payload=old_payload,
             new_payload=self._user_audit_payload(user),
         )
+        MediaService(self.db).cleanup_unreferenced_urls(hotel_id, [old_profile_image_url])
         self.db.commit()
 
     def reset_password(

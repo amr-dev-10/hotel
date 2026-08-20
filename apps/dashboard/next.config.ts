@@ -7,6 +7,19 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   output: "standalone",
   outputFileTracingRoot: path.join(process.cwd(), "../.."),
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          {
+            key: "Permissions-Policy",
+            value: "geolocation=(self)",
+          },
+        ],
+      },
+    ];
+  },
   async rewrites() {
     return [
       {

@@ -11,11 +11,13 @@ import {
   CalendarDays,
   ChefHat,
   ChevronDown,
+  CheckCircle2,
   CircleHelp,
-  LogIn,
   Gauge,
   GitBranch,
   ListChecks,
+  Loader2,
+  LogIn,
   LogOut,
   Menu,
   MessageCircle,
@@ -46,7 +48,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Permissions, ticketViewPermissions } from "@/constants/permissions";
-import { useShifts, useUpdateShift } from "@/features/staff/hooks/useStaff";
+import { useAttendanceToday, useCheckIn, useCheckOut } from "@/features/staff/hooks/useAttendance";
 import { useRouteHotelId } from "@/hooks/useRouteHotelId";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { api, apiGet } from "@/lib/api/client";
@@ -54,7 +56,7 @@ import { showApiErrorToast } from "@/lib/api/error-toast";
 import { hasAnyPermission } from "@/lib/auth/permissions";
 import { cn, titleCase } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth.store";
-import type { ApiEnvelope, CurrentUser, EmployeeShift } from "@/types/domain";
+import type { ApiEnvelope, CurrentUser } from "@/types/domain";
 
 type NavItem = {
   label: string;
@@ -124,13 +126,13 @@ export function DashboardShell({
     staleTime: 60_000,
   });
 
-  const refreshCurrentUser = useCallback(async () => {
+  const refreshCurrentUser = useCallback(async (force = false) => {
     if (!token) {
       return;
     }
 
     const now = Date.now();
-    if (now - lastAuthRefreshAt.current < 30_000) {
+    if (!force && now - lastAuthRefreshAt.current < 30_000) {
       return;
     }
     lastAuthRefreshAt.current = now;
@@ -241,7 +243,6 @@ export function DashboardShell({
     switchHotel(hotelId);
   }, [currentUser?.hotel_id, hotelId, mounted, router, switchHotel, token]);
 
-  const isStaffPortalRoute = pathname === `/${hotelId}/staff-portal` || pathname?.startsWith(`/${hotelId}/staff-portal/`);
   const hotelName = hotelQuery.data?.name ?? "Arcadia";
   const sidebarWidthClass = sidebarCollapsed ? "lg:w-[4.75rem] lg:hover:w-[17rem]" : "lg:w-[17rem]";
   const contentOffsetClass = sidebarCollapsed ? "lg:pl-[4.75rem]" : "lg:pl-[17rem]";
@@ -389,7 +390,11 @@ export function DashboardShell({
           </div>
 
           <div className="flex min-w-0 shrink-0 items-center gap-1 rounded-md border border-white/10 bg-white/[0.06] p-1 shadow-[0_12px_30px_rgba(2,6,23,0.2)]">
-            {isStaffPortalRoute ? <StaffPortalHeaderActions currentUser={currentUser} hotelId={hotelId} /> : null}
+            <AttendanceHeaderAction
+              currentUser={currentUser}
+              hotelId={hotelId}
+              onRefreshCurrentUser={() => refreshCurrentUser(true)}
+            />
             <span className="hidden h-8 items-center rounded-md bg-[var(--success-soft)] px-3 text-xs font-semibold text-[var(--success)] lg:inline-flex">
               Live sync
             </span>
@@ -492,89 +497,107 @@ function HeaderUserMenu({
   );
 }
 
-function StaffPortalHeaderActions({
+function AttendanceHeaderAction({
   hotelId,
   currentUser,
+  onRefreshCurrentUser,
 }: {
   hotelId: string;
   currentUser: CurrentUser | null;
+  onRefreshCurrentUser: () => Promise<void>;
 }) {
-  const shifts = useShifts(hotelId);
-  const updateShift = useUpdateShift(hotelId);
-  const today = new Date().toISOString().slice(0, 10);
-  const currentShift = useMemo(() => {
-    const todayShifts = (shifts.data ?? []).filter(
-      (shift) => shift.user_id === currentUser?.id && shift.shift_date === today,
-    );
+  const attendanceToday = useAttendanceToday(hotelId);
+  const checkIn = useCheckIn(hotelId);
+  const checkOut = useCheckOut(hotelId);
+  const attendance = attendanceToday.data;
+  const isPending = checkIn.isPending || checkOut.isPending;
 
-    return todayShifts.find((shift) => !["completed", "on_leave"].includes(shift.status)) ?? todayShifts[0];
-  }, [currentUser?.id, shifts.data, today]);
-
-  async function updateShiftStatus(shift: EmployeeShift, status: "checked_in" | "completed") {
+  async function handleCheckIn() {
     try {
-      await updateShift.mutateAsync({
-        shiftId: shift.id,
-        payload: {
-          status,
-          actual_start: status === "checked_in" ? new Date().toISOString() : shift.actual_start,
-          actual_end: status === "completed" ? new Date().toISOString() : shift.actual_end,
-        },
-      });
-      toast.success(status === "checked_in" ? "Checked in" : "Checked out");
+      await checkIn.mutateAsync({ method: "web_nav" });
+      await onRefreshCurrentUser();
+      toast.success("Checked in");
     } catch (error) {
       showApiErrorToast(error);
     }
   }
 
-  if (shifts.isLoading) {
-    return <span className="hidden rounded bg-white/10 px-2 py-1 text-xs font-semibold text-white/70 md:inline-flex">Shift loading</span>;
+  async function handleCheckOut() {
+    try {
+      await checkOut.mutateAsync({ method: "web_nav" });
+      await onRefreshCurrentUser();
+      toast.success("Checked out");
+    } catch (error) {
+      showApiErrorToast(error);
+    }
   }
 
-  if (!currentShift) {
+  if (!currentUser || currentUser.is_hotel_owner || currentUser.user_type === "SUPER_ADMIN") {
+    return null;
+  }
+
+  if (attendanceToday.isLoading) {
     return (
-      <Button className="h-8 px-2 text-xs sm:px-3" disabled type="button" variant="secondary">
-        <LogIn />
-        <span className="hidden sm:inline">No shift</span>
+      <Button className="h-8 px-2 text-xs sm:px-3" disabled title="Loading shift status" type="button" variant="secondary">
+        <Loader2 className="animate-spin" />
+        <span className="hidden sm:inline">Shift</span>
       </Button>
     );
   }
 
-  if (currentShift.status === "checked_in") {
+  if (attendance?.can_check_out) {
     return (
       <Button
         aria-label="Check out"
         className="h-8 px-2 text-xs sm:px-3"
-        disabled={updateShift.isPending}
+        disabled={isPending}
+        title={attendance.message}
         type="button"
         variant="secondary"
-        onClick={() => updateShiftStatus(currentShift, "completed")}
+        onClick={handleCheckOut}
       >
-        <LogOut />
+        {isPending ? <Loader2 className="animate-spin" /> : <LogOut />}
         <span className="hidden sm:inline">Check out</span>
       </Button>
     );
   }
 
-  if (["completed", "on_leave"].includes(currentShift.status)) {
+  if (attendance?.can_check_in) {
     return (
-      <span className="hidden rounded bg-[var(--success-soft)] px-2 py-1 text-xs font-semibold text-[var(--success)] sm:inline-flex">
-        {titleCase(currentShift.status)}
-      </span>
+      <Button
+        aria-label="Check in"
+        className="h-8 px-2 text-xs sm:px-3"
+        disabled={isPending}
+        title={attendance.message}
+        type="button"
+        onClick={handleCheckIn}
+      >
+        {isPending ? <Loader2 className="animate-spin" /> : <LogIn />}
+        <span className="hidden sm:inline">Check in</span>
+      </Button>
+    );
+  }
+
+  const status = normalizeAttendanceStatus(attendance?.log?.attendance_status ?? (attendance?.assignment ? "scheduled" : "no_shift"));
+  if (["completed", "holiday", "weekend"].includes(status)) {
+    return (
+      <Button className="h-8 px-2 text-xs sm:px-3" disabled title={attendance?.message} type="button" variant="secondary">
+        <CheckCircle2 />
+        <span className="hidden sm:inline">{titleCase(status)}</span>
+      </Button>
     );
   }
 
   return (
-    <Button
-      aria-label="Check in"
-      className="h-8 px-2 text-xs sm:px-3"
-      disabled={updateShift.isPending}
-      type="button"
-      onClick={() => updateShiftStatus(currentShift, "checked_in")}
-    >
+    <Button className="h-8 px-2 text-xs sm:px-3" disabled title={attendance?.message ?? "No active shift assignment for today"} type="button" variant="secondary">
       <LogIn />
-      <span className="hidden sm:inline">Check in</span>
+      <span className="hidden sm:inline">No shift</span>
     </Button>
   );
+}
+
+function normalizeAttendanceStatus(status: string) {
+  return status.toLowerCase().replaceAll(" ", "_");
 }
 
 function canAccessNavItem(item: NavItem, currentUser: CurrentUser | null, isHotelAdmin: boolean) {

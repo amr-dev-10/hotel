@@ -1,5 +1,5 @@
-from datetime import date
 from collections.abc import Sequence
+from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
@@ -192,7 +192,7 @@ def check_in(
         hotel_id,
         current_user,
         payload or AttendanceActionPayload(),
-        request.client.host if request.client else None,
+        _client_ip(request),
     )
     return ok(_log_read(db, hotel_id, log))
 
@@ -210,7 +210,7 @@ def check_out(
         hotel_id,
         current_user,
         payload or AttendanceActionPayload(),
-        request.client.host if request.client else None,
+        _client_ip(request),
     )
     return ok(_log_read(db, hotel_id, log))
 
@@ -276,6 +276,24 @@ def _ensure_self_access(hotel_id: str, current_user: User, db: Session) -> None:
     set_tenant_context(db, hotel_id)
 
 
+def _client_ip(request: Request) -> str | None:
+    forwarded_for = request.headers.get("x-forwarded-for")
+    if forwarded_for:
+        for value in forwarded_for.split(","):
+            ip_address = value.strip()
+            if ip_address:
+                return ip_address
+
+    real_ip = request.headers.get("x-real-ip")
+    if real_ip and real_ip.strip():
+        return real_ip.strip()
+
+    if request.client and request.client.host:
+        return request.client.host
+
+    return None
+
+
 def _staff_by_id(db: Session, hotel_id: str) -> dict[str, User]:
     return {user.id: user for user in UserRepository(db).list_for_hotel(hotel_id, limit=5000)}
 
@@ -319,16 +337,18 @@ def _assignment_read_from_context(
 
 def _log_reads(db: Session, hotel_id: str, logs: Sequence[AttendanceLog]) -> list[dict]:
     staff = _staff_by_id(db, hotel_id)
-    return [_log_read_from_context(log, staff) for log in logs]
+    now = utcnow()
+    return [_log_read_from_context(log, staff, now=now) for log in logs]
 
 
 def _log_read(db: Session, hotel_id: str, log: AttendanceLog) -> dict:
-    return _log_read_from_context(log, _staff_by_id(db, hotel_id))
+    return _log_read_from_context(log, _staff_by_id(db, hotel_id), now=utcnow())
 
 
-def _log_read_from_context(log: AttendanceLog, staff: dict[str, User]) -> dict:
+def _log_read_from_context(log: AttendanceLog, staff: dict[str, User], now: datetime | None = None) -> dict:
     employee = staff.get(log.employee_id)
     data = AttendanceLogRead.model_validate(log).model_dump()
+    data["worked_minutes"] = AttendanceService.evaluated_worked_minutes(log, now=now)
     data["employee_name"] = employee.name if employee else None
     data["employee_code"] = employee.employee_code if employee else None
     return data

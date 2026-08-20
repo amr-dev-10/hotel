@@ -118,8 +118,8 @@ export function useCheckIn(hotelId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (payload: AttendanceActionPayload = { method: "web" }) =>
-      apiPost<AttendanceLog>(`/hotels/${hotelId}/attendance/check-in`, payload),
+    mutationFn: async (payload: AttendanceActionPayload = { method: "web" }) =>
+      apiPost<AttendanceLog>(`/hotels/${hotelId}/attendance/check-in`, await withAttendanceContext(payload)),
     onSuccess: () => invalidateAttendanceState(queryClient, hotelId),
   });
 }
@@ -128,8 +128,8 @@ export function useCheckOut(hotelId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (payload: AttendanceActionPayload = { method: "web" }) =>
-      apiPost<AttendanceLog>(`/hotels/${hotelId}/attendance/check-out`, payload),
+    mutationFn: async (payload: AttendanceActionPayload = { method: "web" }) =>
+      apiPost<AttendanceLog>(`/hotels/${hotelId}/attendance/check-out`, await withAttendanceContext(payload)),
     onSuccess: () => invalidateAttendanceState(queryClient, hotelId),
   });
 }
@@ -160,4 +160,55 @@ function invalidateAttendanceState(queryClient: ReturnType<typeof useQueryClient
   void queryClient.invalidateQueries({ queryKey: ["attendance", hotelId, "logs"] });
   void queryClient.invalidateQueries({ queryKey: ["attendance", hotelId, "dashboard"] });
   void queryClient.invalidateQueries({ queryKey: queryKeys.staff(hotelId) });
+}
+
+async function withAttendanceContext(payload: AttendanceActionPayload): Promise<AttendanceActionPayload> {
+  const gpsLocation = payload.gps_location === undefined ? await requestAttendanceGpsLocation() : payload.gps_location;
+  const deviceInfo = payload.device_info === undefined ? browserDeviceInfo() : payload.device_info;
+  return {
+    ...payload,
+    device_info: deviceInfo,
+    gps_location: gpsLocation,
+  };
+}
+
+function browserDeviceInfo() {
+  if (typeof navigator === "undefined") {
+    return null;
+  }
+
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return [navigator.userAgent, timeZone].filter(Boolean).join(" | ").slice(0, 255);
+}
+
+async function requestAttendanceGpsLocation(): Promise<string | null> {
+  if (typeof navigator === "undefined" || !navigator.geolocation) {
+    return null;
+  }
+
+  if (navigator.permissions?.query) {
+    try {
+      const permission = await navigator.permissions.query({ name: "geolocation" });
+      if (permission.state === "denied") {
+        return null;
+      }
+    } catch {
+      // Some browsers expose geolocation without supporting PermissionStatus for it.
+    }
+  }
+
+  return new Promise((resolve) => {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude, accuracy } = position.coords;
+        resolve(`${latitude.toFixed(6)},${longitude.toFixed(6)};accuracy=${Math.round(accuracy)}m`);
+      },
+      () => resolve(null),
+      {
+        enableHighAccuracy: true,
+        maximumAge: 60_000,
+        timeout: 8_000,
+      },
+    );
+  });
 }

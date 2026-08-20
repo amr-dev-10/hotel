@@ -63,17 +63,19 @@ export function StaffAttendancePage({ hotelId }: { hotelId: string }) {
       </div>
 
       <section className="overflow-x-auto rounded-md border border-slate-200 bg-white">
-        <div className="grid min-w-[760px] grid-cols-[1fr_150px_150px_130px_140px] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-normal text-slate-500">
+        <div className="grid min-w-[1120px] grid-cols-[1fr_130px_130px_120px_130px_150px_190px] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-normal text-slate-500">
           <span>Employee</span>
           <span>Check in</span>
           <span>Check out</span>
           <span>Hours worked</span>
           <span>Status</span>
+          <span>IP address</span>
+          <span>Location</span>
         </div>
         {logs.length ? (
           paginatedLogs.map((log) => (
             <div
-              className="grid min-w-[760px] grid-cols-[1fr_150px_150px_130px_140px] items-center gap-3 border-b border-slate-100 px-4 py-3 text-sm last:border-b-0"
+              className="grid min-w-[1120px] grid-cols-[1fr_130px_130px_120px_130px_150px_190px] items-center gap-3 border-b border-slate-100 px-4 py-3 text-sm last:border-b-0"
               key={log.id}
             >
               <span className="truncate font-medium">{log.employee_name ?? log.employee_code ?? "Unknown staff"}</span>
@@ -81,6 +83,12 @@ export function StaffAttendancePage({ hotelId }: { hotelId: string }) {
               <span className="truncate text-slate-600">{timeLabel(log.actual_end)}</span>
               <span className="truncate text-slate-600">{workedHours(log)}</span>
               <Badge variant={attendanceVariant(log)}>{titleCase(log.attendance_status)}</Badge>
+              <span className="truncate text-slate-600" title={log.ip_address ?? "Not captured"}>
+                {log.ip_address ?? "Not captured"}
+              </span>
+              <span className="truncate text-slate-600" title={locationLabel(log)}>
+                {locationLabel(log)}
+              </span>
             </div>
           ))
         ) : (
@@ -130,6 +138,10 @@ function timeLabel(value: string | null) {
   }
   const normalized = value.includes("T") ? value : `2026-01-01T${value}`;
   return new Intl.DateTimeFormat("en-IN", { hour: "2-digit", minute: "2-digit" }).format(new Date(normalized));
+}
+
+function locationLabel(log: AttendanceLog) {
+  return log.gps_location ?? "Not captured";
 }
 
 function attendanceVariant(log: AttendanceLog): "green" | "amber" | "blue" | "rose" | "default" {

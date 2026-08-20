@@ -49,6 +49,12 @@ export function DispatchAlert({ hotelId }: { hotelId: string }) {
     return Math.max(0, Date.parse(dispatch.expires_at) - now);
   }, [dispatch?.expires_at, now]);
 
+  useEffect(() => {
+    if (remaining !== null && remaining <= 0) {
+      setActiveDispatch(null);
+    }
+  }, [remaining, setActiveDispatch]);
+
   if (!dispatch) {
     return null;
   }

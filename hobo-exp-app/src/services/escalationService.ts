@@ -1,7 +1,7 @@
 import { TenantManager } from './tenant';
 import { presentLocalEscalationNotification } from './notifications';
 import { getDepartmentResolutionMs } from './departmentService';
-import { startTaskAlert, isTaskAlertActive } from './taskAlert';
+import { startTaskAlert, isTaskAlertActive, stopTaskAlert } from './taskAlert';
 import { Task, EscalationNotification } from '../types';
 import { TasksService } from './backend';
 import { apiGet } from './apiClient';
@@ -95,8 +95,12 @@ export function isEscalationForUser(
   e: EscalationNotification,
   opts: { isOwner: boolean; department?: string | null },
 ): boolean {
-  if (opts.isOwner) return true;
-  return !!e.department && normDept(e.department) === normDept(opts.department);
+  if (opts.isOwner) return e.level === 'admin';
+  return (
+    e.level !== 'admin' &&
+    !!e.department &&
+    normDept(e.department) === normDept(opts.department)
+  );
 }
 
 async function fetchEscalations(hotelId: string, opts: { isOwner: boolean; department?: string | null }) {
@@ -185,6 +189,9 @@ export function startEscalationAlerts(
 
   const unsubscribe = subscribeToEscalations(hotelId, opts, (list) => {
     activeCount = list.length;
+    if (activeCount === 0 && isTaskAlertActive()) {
+      void stopTaskAlert();
+    }
     for (const e of list) {
       const key = `${e.ticketId}:${e.level}`;
       if (seen.has(key)) continue;

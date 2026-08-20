@@ -19,6 +19,7 @@
       "bundleIdentifier": "com.hobostays.hoboexp",
       "infoPlist": {
         "NSCameraUsageDescription": "Camera is needed to capture task photos and scan QR codes.",
+        "NSLocationWhenInUseUsageDescription": "HoBo Experience uses your location to attach GPS coordinates to attendance check-in and check-out records.",
         "NSPhotoLibraryUsageDescription": "Photo library is needed to upload task photos.",
         "ITSAppUsesNonExemptEncryption": false
       },
@@ -33,6 +34,8 @@
       "versionCode": 25,
       "newArchEnabled": false,
       "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.CAMERA",
         "android.permission.INTERNET",
         "android.permission.ACCESS_NETWORK_STATE",

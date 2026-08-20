@@ -16,6 +16,7 @@ from app.schemas.menu import (
     MenuItemRead,
     MenuItemUpdate,
 )
+from app.services.ops_service import MediaService
 
 router = APIRouter()
 
@@ -122,11 +123,13 @@ def update_item(
         from app.core.exceptions import not_found
 
         raise not_found("Menu item not found")
+    old_image_url = item.image_url
     data = payload.model_dump(exclude_unset=True, exclude={"tax_config_ids"})
     for field, value in data.items():
         setattr(item, field, value)
     if payload.tax_config_ids is not None:
         repo.set_item_taxes(item.id, payload.tax_config_ids)
+    MediaService(db).cleanup_removed_urls(hotel_id, old_image_url, item.image_url)
     repo.commit(item)
     return ok(_menu_item_read(repo, item).model_dump())
 
@@ -144,7 +147,10 @@ def delete_item(
         from app.core.exceptions import not_found
 
         raise not_found("Menu item not found")
+    old_image_url = item.image_url
     repo.soft_delete(item, utcnow(), current_user.id)
+    MediaService(db).cleanup_unreferenced_urls(hotel_id, [old_image_url])
+    db.commit()
     return ok({"deleted": True})
 
 

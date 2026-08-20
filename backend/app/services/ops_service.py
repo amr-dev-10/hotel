@@ -1,13 +1,20 @@
 import base64
 import binascii
 from pathlib import Path
+from typing import Any
 from uuid import uuid4
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import bad_request
 from app.models.base import utcnow
+from app.models.knowledge import KnowledgeDocument, KnowledgeDocumentVersion
+from app.models.menu import MenuItem
 from app.models.ops import Invoice, MediaFile, Notification, Subscription
+from app.models.ops import ExportJob, ImportJob, LostFoundItem
+from app.models.ticket import Ticket
+from app.models.user import User
 from app.repositories.ops_repository import InvoiceRepository, MediaFileRepository, NotificationRepository, SubscriptionRepository
 from app.schemas.ops import InvoiceCreate, MediaFileCreate, NotificationCreate
 from app.schemas.ops import SubscriptionUpgrade
@@ -104,6 +111,9 @@ class MediaService:
             except (UnicodeEncodeError, binascii.Error, ValueError) as exc:
                 raise bad_request("file_data_base64 must be valid base64") from exc
         file_url = payload.file_url
+        existing = self._find_existing_file(hotel_id, payload, decoded_size, file_url)
+        if existing:
+            return existing
         if not file_url and payload.file_data_base64:
             suffix = Path(payload.file_name or "").suffix or _suffix_for_media_type(payload.file_type)
             file_url = f"/media/mobile/{hotel_id}/{uuid4().hex}{suffix}"
@@ -124,6 +134,152 @@ class MediaService:
         self.db.commit()
         self.db.refresh(media)
         return media
+
+    def cleanup_unreferenced_urls(self, hotel_id: str, urls: set[str] | list[str] | tuple[str, ...]) -> int:
+        deleted = 0
+        self.db.flush()
+        for url in {clean for value in urls if (clean := _clean_media_url(value))}:
+            rows = self.db.execute(
+                select(MediaFile)
+                .where(MediaFile.hotel_id == hotel_id, MediaFile.file_url == url)
+                .order_by(MediaFile.created_at, MediaFile.id)
+            ).scalars().all()
+            if len(rows) > 1 and self.is_url_referenced(hotel_id, url):
+                for duplicate in rows[1:]:
+                    self.db.delete(duplicate)
+                    deleted += 1
+                continue
+            if rows and not self.is_url_referenced(hotel_id, url):
+                for media in rows:
+                    self.db.delete(media)
+                    deleted += 1
+        if deleted:
+            self.db.flush()
+        return deleted
+
+    def cleanup_removed_urls(self, hotel_id: str, before: Any, after: Any) -> int:
+        return self.cleanup_unreferenced_urls(
+            hotel_id,
+            _extract_media_urls(before) - _extract_media_urls(after),
+        )
+
+    def cleanup_orphaned_files(self, hotel_id: str) -> int:
+        deleted = 0
+        self.db.flush()
+        rows = self.db.execute(
+            select(MediaFile).where(MediaFile.hotel_id == hotel_id).order_by(MediaFile.file_url, MediaFile.created_at, MediaFile.id)
+        ).scalars().all()
+        seen_urls: set[str] = set()
+        for media in rows:
+            if media.file_url in seen_urls:
+                self.db.delete(media)
+                deleted += 1
+                continue
+            seen_urls.add(media.file_url)
+            if not self.is_url_referenced(hotel_id, media.file_url):
+                self.db.delete(media)
+                deleted += 1
+        if deleted:
+            self.db.flush()
+        return deleted
+
+    def is_url_referenced(self, hotel_id: str, url: str) -> bool:
+        if not _clean_media_url(url):
+            return False
+        checks = [
+            select(User.id).where(
+                User.hotel_id == hotel_id,
+                User.deleted_at.is_(None),
+                User.profile_image_url == url,
+            ),
+            select(MenuItem.id).where(
+                MenuItem.hotel_id == hotel_id,
+                MenuItem.deleted_at.is_(None),
+                MenuItem.image_url == url,
+            ),
+            select(LostFoundItem.id).where(
+                LostFoundItem.hotel_id == hotel_id,
+                LostFoundItem.photo_url == url,
+            ),
+            select(KnowledgeDocument.id).where(
+                KnowledgeDocument.hotel_id == hotel_id,
+                KnowledgeDocument.is_active.is_(True),
+                KnowledgeDocument.file_url == url,
+            ),
+            select(KnowledgeDocumentVersion.id).where(
+                KnowledgeDocumentVersion.hotel_id == hotel_id,
+                KnowledgeDocumentVersion.file_url == url,
+            ),
+            select(ExportJob.id).where(
+                ExportJob.hotel_id == hotel_id,
+                ExportJob.file_url == url,
+            ),
+            select(ImportJob.id).where(
+                ImportJob.hotel_id == hotel_id,
+                ImportJob.source_file_url == url,
+            ),
+        ]
+        for statement in checks:
+            if self.db.execute(statement.limit(1)).first():
+                return True
+
+        active_tickets = self.db.execute(
+            select(Ticket.mobile_payload).where(
+                Ticket.hotel_id == hotel_id,
+                Ticket.deleted_at.is_(None),
+            )
+        ).scalars().all()
+        return any(url in _extract_media_urls(payload) for payload in active_tickets)
+
+    def _find_existing_file(
+        self,
+        hotel_id: str,
+        payload: MediaFileCreate,
+        decoded_size: int | None,
+        file_url: str | None,
+    ) -> MediaFile | None:
+        if file_url:
+            existing = self.db.execute(
+                select(MediaFile)
+                .where(MediaFile.hotel_id == hotel_id, MediaFile.file_url == file_url)
+                .order_by(MediaFile.created_at, MediaFile.id)
+            ).scalars().first()
+            if existing:
+                return existing
+        if not payload.file_data_base64:
+            return None
+        return self.db.execute(
+            select(MediaFile)
+            .where(
+                MediaFile.hotel_id == hotel_id,
+                MediaFile.file_type == payload.file_type,
+                MediaFile.file_size_bytes == decoded_size,
+                MediaFile.file_data_base64 == payload.file_data_base64,
+            )
+            .order_by(MediaFile.created_at, MediaFile.id)
+        ).scalars().first()
+
+
+def _clean_media_url(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    url = value.strip()
+    return url or None
+
+
+def _extract_media_urls(value: Any) -> set[str]:
+    urls: set[str] = set()
+    if isinstance(value, str):
+        url = value.strip()
+        if url.startswith("/media/") or url.startswith("http://") or url.startswith("https://"):
+            urls.add(url)
+    elif isinstance(value, dict):
+        for nested in value.values():
+            urls.update(_extract_media_urls(nested))
+    elif isinstance(value, list | tuple | set):
+        for nested in value:
+            urls.update(_extract_media_urls(nested))
+    return urls
 
 
 def _suffix_for_media_type(media_type: str) -> str:

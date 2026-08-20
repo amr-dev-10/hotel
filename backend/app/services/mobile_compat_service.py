@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import base64
 from datetime import date, datetime
-from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
@@ -18,15 +17,16 @@ from app.models.department import Department
 from app.models.guest import Guest
 from app.models.hotel import Hotel
 from app.models.inventory import InventoryItem
-from app.models.ops import MediaFile, Notification
+from app.models.ops import Notification
 from app.models.room import Room
 from app.models.ticket import MobileChatMessage, Ticket
 from app.models.user import User
 from app.models.whatsapp import WhatsAppConversation, WhatsAppMessage
 from app.repositories.user_repository import FCMTokenRepository
-from app.schemas.ops import FCMTokenRead
+from app.schemas.ops import FCMTokenRead, MediaFileCreate
 from app.services.auth_service import AuthService
 from app.services.notification_service import NotificationService
+from app.services.ops_service import MediaService
 from app.services.rbac_service import RBACService
 
 
@@ -104,6 +104,13 @@ def _mobile_employee_id(user: User | None) -> str:
 
 def _safe_payload(ticket: Ticket) -> dict[str, Any]:
     return ticket.mobile_payload if isinstance(ticket.mobile_payload, dict) else {}
+
+
+def _int_value(value: Any) -> int:
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
 
 
 class MobileCompatService:
@@ -223,6 +230,7 @@ class MobileCompatService:
             )
             self.db.add(user)
         else:
+            old_profile_image_url = user.profile_image_url
             if "EmployeeId" in payload or not user.employee_code:
                 user.employee_code = _text(payload.get("EmployeeId")) or employee_id
             if "Name" in payload:
@@ -240,6 +248,7 @@ class MobileCompatService:
                 user.is_on_duty = bool(payload.get("Status"))
             if "ProfileImage" in payload:
                 user.profile_image_url = _text(payload.get("ProfileImage")) or None
+                MediaService(self.db).cleanup_unreferenced_urls(hotel_id, [old_profile_image_url])
             if "OnlineForChat" in payload:
                 user.online_for_chat = bool(payload.get("OnlineForChat"))
             if isinstance(payload.get("UnseenMessages"), list):
@@ -260,9 +269,12 @@ class MobileCompatService:
 
     def delete_user(self, hotel_id: str, employee_id: str, actor_id: str | None = None) -> dict[str, Any]:
         user = self.require_user(employee_id, hotel_id)
+        old_profile_image_url = user.profile_image_url
         user.deleted_at = utcnow()
         user.deleted_by = actor_id
         user.is_active = False
+        user.profile_image_url = None
+        MediaService(self.db).cleanup_unreferenced_urls(hotel_id, [old_profile_image_url])
         self.db.commit()
         return {"deleted": True, "user_id": employee_id}
 
@@ -560,13 +572,48 @@ class MobileCompatService:
 
     def update_task(self, hotel_id: str, task_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         ticket = self.require_ticket(hotel_id, task_id)
-        self.apply_mobile_patch(ticket, payload, commit=True)
-        if payload.get("Escalated") or "EscalationLevel" in payload:
+        is_escalation_update = bool(payload.get("Escalated") or "EscalationLevel" in payload)
+        previous_level = _int_value(_safe_payload(ticket).get("EscalationLevel"))
+        self.apply_mobile_patch(ticket, payload, commit=not is_escalation_update)
+        if is_escalation_update:
+            level = _int_value(_safe_payload(ticket).get("EscalationLevel"))
+            reassigned = self.apply_mobile_escalation_assignment(ticket, level, previous_level)
+            self.db.commit()
+            self.db.refresh(ticket)
             self.notify_escalation(ticket)
+            if reassigned:
+                self.notify_task_assignment(ticket)
         return self.mobile_task(ticket)
 
+    def apply_mobile_escalation_assignment(self, ticket: Ticket, level: int, previous_level: int) -> bool:
+        if level <= 0 or level <= previous_level:
+            return False
+        target = self.escalation_assignee(ticket, level)
+        if not target or target.id == ticket.assigned_to:
+            return False
+        now = str(self.epoch_ms(utcnow()))
+        history = self.assignment_history(ticket, f"escalated_level_{level}")
+        self.apply_mobile_patch(
+            ticket,
+            {
+                "AssignedToID": _mobile_employee_id(target),
+                "AssignedToName": target.name,
+                "Stage": "Assigned",
+                "WorkflowStep": "Accepted",
+                "AssignedTime": now,
+                "AcceptedTime": now,
+                "TimerStartTime": now,
+                "SlaAlertSent": False,
+                "CandidateIds": [],
+                "AssignmentHistory": history,
+            },
+            commit=False,
+        )
+        return True
+
     def apply_mobile_patch(self, ticket: Ticket, patch: dict[str, Any], commit: bool = True) -> None:
-        payload = {**_safe_payload(ticket), **patch}
+        old_payload = _safe_payload(ticket)
+        payload = {**old_payload, **patch}
         if "Stage" in patch:
             ticket.stage = MOBILE_STAGE_TO_CANONICAL.get(_text(patch["Stage"]), _text(patch["Stage"]))
         if "WorkflowStep" in patch:
@@ -616,6 +663,7 @@ class MobileCompatService:
             payload["AssignedToID"] = _mobile_employee_id(assignee)
             payload["AssignedToName"] = assignee.name if assignee else ""
         ticket.mobile_payload = payload
+        MediaService(self.db).cleanup_removed_urls(ticket.hotel_id, old_payload, payload)
         if commit:
             self.db.commit()
             self.db.refresh(ticket)
@@ -711,8 +759,10 @@ class MobileCompatService:
 
     def delete_task(self, hotel_id: str, task_id: str, actor_id: str | None = None) -> dict[str, Any]:
         ticket = self.require_ticket(hotel_id, task_id)
+        old_payload = _safe_payload(ticket)
         ticket.deleted_at = utcnow()
         ticket.deleted_by = actor_id
+        MediaService(self.db).cleanup_removed_urls(hotel_id, old_payload, {})
         self.db.commit()
         return {"deleted": True, "task_id": task_id}
 
@@ -844,6 +894,33 @@ class MobileCompatService:
             {"event": "new_ticket", "taskId": ticket.id, "ticket_id": ticket.id, "hotel_id": ticket.hotel_id},
         )
 
+    def escalation_assignee(self, ticket: Ticket, level: int) -> User | None:
+        current_id = ticket.assigned_to
+        recipients = [user for user in self.escalation_recipients(ticket, level) if user.id != current_id]
+        current_user = self.db.get(User, current_id) if current_id else None
+        if current_user and current_user.reports_to:
+            direct_superior = next((user for user in recipients if user.id == current_user.reports_to), None)
+            if direct_superior:
+                return direct_superior
+
+        if not recipients and level < 2:
+            recipients = [user for user in self.escalation_recipients(ticket, 2) if user.id != current_id]
+        if not recipients:
+            return None
+
+        load = {
+            user.id: self.db.execute(
+                select(func.count()).select_from(Ticket).where(
+                    Ticket.hotel_id == ticket.hotel_id,
+                    Ticket.assigned_to == user.id,
+                    Ticket.deleted_at.is_(None),
+                    Ticket.stage.not_in(("approved", "Completed", "closed", "resolved", "cancelled")),
+                )
+            ).scalar_one()
+            for user in recipients
+        }
+        return sorted(recipients, key=lambda user: (not user.is_on_duty, load[user.id], user.name))[0]
+
     def escalation_recipients(self, ticket: Ticket, level: int) -> list[User]:
         users = self.db.execute(
             select(User).where(
@@ -867,7 +944,7 @@ class MobileCompatService:
 
     def notify_escalation(self, ticket: Ticket) -> None:
         task = self.mobile_task(ticket)
-        level = int(task.get("EscalationLevel") or 0)
+        level = _int_value(task.get("EscalationLevel"))
         if level <= 0:
             return
         item = _text(task.get("ItemOrdered")) or ticket.item_description or "Ticket"
@@ -1232,7 +1309,7 @@ class MobileCompatService:
             level = task.get("EscalationLevel")
             if not level and not task.get("Escalated"):
                 continue
-            level_name = "admin" if int(level or 0) >= 2 else "manager"
+            level_name = "admin" if _int_value(level) >= 2 else "manager"
             items.append(
                 {
                     "ticketId": ticket.id,
@@ -1258,27 +1335,21 @@ class MobileCompatService:
 
     # ----- media -----
     async def save_upload(self, hotel_id: str, uploaded: UploadFile, current_user: User | None = None) -> dict[str, Any]:
-        suffix = Path(uploaded.filename or "").suffix or ".jpg"
-        filename = f"{uuid4().hex}{suffix}"
         content = await uploaded.read()
         if not content:
             raise bad_request("Uploaded file is empty")
-        url = f"/media/mobile/{hotel_id}/{filename}"
-        media = MediaFile(
+        media = MediaService(self.db).register_file(
             hotel_id=hotel_id,
-            file_url=url,
-            file_type=uploaded.content_type or "application/octet-stream",
-            file_name=uploaded.filename,
-            file_size_bytes=len(content),
-            storage_provider="database",
-            file_data_base64=base64.b64encode(content).decode("ascii"),
+            payload=MediaFileCreate(
+                file_type=uploaded.content_type or "application/octet-stream",
+                file_name=uploaded.filename,
+                file_size_bytes=len(content),
+                storage_provider="database",
+                file_data_base64=base64.b64encode(content).decode("ascii"),
+            ),
             uploaded_by=current_user.id if current_user else None,
-            created_at=utcnow(),
         )
-        self.db.add(media)
-        self.db.commit()
-        self.db.refresh(media)
-        return {"id": media.id, "url": url, "file_url": url}
+        return {"id": media.id, "url": media.file_url, "file_url": media.file_url}
 
     # ----- misc -----
     @staticmethod

@@ -7,6 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { navigationRef } from './src/navigation/navigationRef';
 import { MessageBanner } from './src/components/common/MessageBanner';
+import { requestLocationPermissionOnLaunch } from './src/services/locationPermission';
 import { setupNotificationHandlers } from './src/services/notifications';
 import { configureTaskAlertAudio } from './src/services/taskAlert';
 
@@ -22,6 +23,7 @@ export default function App() {
     }).finally(() => setFontsLoaded(true));
 
     void configureTaskAlertAudio();
+    void requestLocationPermissionOnLaunch();
     const teardown = setupNotificationHandlers();
     return teardown;
   }, []);

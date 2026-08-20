@@ -111,7 +111,8 @@ def upload_profile_image(
 ) -> dict:
     if not payload.file_type.startswith("image/"):
         raise bad_request("Profile image upload must be an image")
-    media = MediaService(db).register_file(current_user.hotel_id, payload, current_user.id)
+    media_service = MediaService(db)
+    media = media_service.register_file(current_user.hotel_id, payload, current_user.id)
     old_payload = {"profile_image_url": current_user.profile_image_url}
     current_user.profile_image_url = media.file_url
     AuditService(db).log(
@@ -123,6 +124,30 @@ def upload_profile_image(
         old_payload=old_payload,
         new_payload={"profile_image_url": current_user.profile_image_url},
     )
+    media_service.cleanup_removed_urls(current_user.hotel_id, old_payload, {"profile_image_url": current_user.profile_image_url})
+    db.commit()
+    db.refresh(current_user)
+    return ok(_current_user_payload(db, current_user).model_dump())
+
+
+@router.delete("/me/profile-image")
+def delete_profile_image(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    media_service = MediaService(db)
+    old_payload = {"profile_image_url": current_user.profile_image_url}
+    current_user.profile_image_url = None
+    AuditService(db).log(
+        current_user.hotel_id,
+        "user.profile_image_removed",
+        "user",
+        current_user.id,
+        current_user.id,
+        old_payload=old_payload,
+        new_payload={"profile_image_url": None},
+    )
+    media_service.cleanup_removed_urls(current_user.hotel_id, old_payload, {"profile_image_url": None})
     db.commit()
     db.refresh(current_user)
     return ok(_current_user_payload(db, current_user).model_dump())

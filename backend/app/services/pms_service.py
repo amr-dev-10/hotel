@@ -22,6 +22,7 @@ from app.schemas.pms import (
     MaintenanceUpdate,
 )
 from app.services.audit_service import AuditService
+from app.services.ops_service import MediaService
 
 
 class HousekeepingService:
@@ -178,9 +179,11 @@ class LostFoundService:
         item = self.items.get_for_hotel(hotel_id, item_id)
         if not item:
             raise not_found("Lost and found item not found")
+        old_photo_url = item.photo_url
         for key, value in payload.model_dump(exclude_unset=True).items():
             setattr(item, key, value)
         self.audit.log(hotel_id, "lost_found.updated", "lost_found", item.id, actor_id)
+        MediaService(self.db).cleanup_removed_urls(hotel_id, old_photo_url, item.photo_url)
         self.db.commit()
         self.db.refresh(item)
         return item

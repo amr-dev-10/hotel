@@ -244,17 +244,36 @@ class AttendanceService:
         return holiday
 
     def today_for_user(self, hotel_id: str, user: User, target_date: date | None = None) -> dict:
-        attendance_date = target_date or utcnow().date()
+        now = utcnow()
+        attendance_date = target_date or now.date()
         assignment = self.assignments.active_for_employee_on_date(hotel_id, user.id, attendance_date)
         template = self.templates.get_for_hotel(hotel_id, assignment.shift_template_id) if assignment else None
         log = self.logs.get_for_employee_date(hotel_id, user.id, attendance_date)
         holiday = self.holidays.get_by_date(hotel_id, attendance_date)
         is_working_day = self._is_assignment_working_day(assignment, attendance_date)
+        scheduled_start, scheduled_end = self._attendance_window(attendance_date, template, log)
+        is_current_date = attendance_date == now.date()
+        is_shift_active = bool(
+            is_current_date
+            and scheduled_start
+            and scheduled_end
+            and self._is_within_shift_window(now, scheduled_start, scheduled_end)
+        )
 
-        can_check_in = bool(assignment and template and is_working_day and not holiday and not log)
-        if log and not log.actual_start and log.attendance_status == STATUS_SCHEDULED:
-            can_check_in = True
-        can_check_out = bool(log and log.actual_start and not log.actual_end and log.attendance_status == STATUS_CHECKED_IN)
+        can_check_in = bool(
+            assignment
+            and template
+            and is_working_day
+            and not holiday
+            and is_shift_active
+            and self._log_can_check_in(log)
+        )
+        can_check_out = bool(
+            is_current_date
+            and log
+            and log.actual_start
+            and log.attendance_status == STATUS_CHECKED_IN
+        )
 
         if holiday:
             message = f"Holiday: {holiday.title}"
@@ -262,10 +281,14 @@ class AttendanceService:
             message = "No active shift assignment for today."
         elif not is_working_day:
             message = "Today is not part of your assigned working days."
-        elif log and log.actual_end:
+        elif log and log.attendance_status == STATUS_COMPLETED and is_shift_active:
+            message = "Checked out. You can check in again while your shift is active."
+        elif log and log.attendance_status == STATUS_COMPLETED:
             message = "Attendance completed for today."
-        elif log and log.actual_start:
+        elif log and log.attendance_status == STATUS_CHECKED_IN:
             message = "You are checked in."
+        elif not is_shift_active:
+            message = "Shift is not active right now."
         else:
             message = "Ready for check-in."
 
@@ -286,7 +309,8 @@ class AttendanceService:
         payload: AttendanceActionPayload,
         ip_address: str | None = None,
     ) -> AttendanceLog:
-        attendance_date = utcnow().date()
+        now = utcnow()
+        attendance_date = now.date()
         assignment = self.assignments.active_for_employee_on_date(hotel_id, user.id, attendance_date)
         if not assignment:
             raise bad_request("No active shift assignment for today")
@@ -300,23 +324,29 @@ class AttendanceService:
             raise bad_request("Assigned shift template is inactive or missing")
 
         log = self.logs.get_for_employee_date(hotel_id, user.id, attendance_date)
-        if log and log.actual_start:
+        if log and log.attendance_status == STATUS_CHECKED_IN:
             raise bad_request("Already checked in for today")
-        if log and log.attendance_status not in {STATUS_SCHEDULED, STATUS_ABSENT}:
+        if log and log.attendance_status not in {STATUS_SCHEDULED, STATUS_ABSENT, STATUS_COMPLETED}:
             raise bad_request("Attendance record cannot be checked in")
         if not log:
             log = self._new_scheduled_log(hotel_id, user.id, attendance_date, assignment, template)
             self.db.add(log)
 
-        now = utcnow()
+        if not self._is_within_shift_window(now, log.scheduled_start, log.scheduled_end):
+            raise bad_request("Check-in is only allowed during the assigned shift window")
+
         log.actual_start = now
+        log.actual_end = None
         log.attendance_status = STATUS_CHECKED_IN
         log.arrival_status = self._arrival_status(now, template, log.scheduled_start)
         log.late_minutes = self._late_minutes(now, template, log.scheduled_start)
+        log.early_leave_minutes = 0
+        log.overtime_minutes = 0
         log.checkin_method = payload.method
-        log.device_info = payload.device_info
-        log.gps_location = payload.gps_location
-        log.ip_address = ip_address
+        log.checkout_method = None
+        log.device_info = payload.device_info or log.device_info
+        log.gps_location = payload.gps_location or log.gps_location
+        log.ip_address = ip_address or log.ip_address
         log.notes = payload.notes or log.notes
         log.updated_at = now
         user.is_on_duty = True
@@ -331,14 +361,12 @@ class AttendanceService:
         payload: AttendanceActionPayload,
         ip_address: str | None = None,
     ) -> AttendanceLog:
-        attendance_date = utcnow().date()
-        log = self.logs.get_for_employee_date(hotel_id, user.id, attendance_date)
-        if not log or not log.actual_start:
-            raise bad_request("Check-in is required before check-out")
-        if log.actual_end:
-            raise bad_request("Already checked out for today")
-
         now = utcnow()
+        attendance_date = now.date()
+        log = self.logs.get_for_employee_date(hotel_id, user.id, attendance_date)
+        if not log or not log.actual_start or log.attendance_status != STATUS_CHECKED_IN:
+            raise bad_request("Check-in is required before check-out")
+
         log.actual_end = now
         log.attendance_status = STATUS_COMPLETED
         log.checkout_method = payload.method
@@ -526,6 +554,37 @@ class AttendanceService:
         end = datetime.combine(end_date, template.end_time).replace(tzinfo=UTC)
         return start, end
 
+    @staticmethod
+    def _attendance_window(
+        attendance_date: date,
+        template: ShiftTemplate | None,
+        log: AttendanceLog | None,
+    ) -> tuple[datetime | None, datetime | None]:
+        if log and log.scheduled_start and log.scheduled_end:
+            return log.scheduled_start, log.scheduled_end
+        if template:
+            return AttendanceService._scheduled_window(attendance_date, template)
+        return None, None
+
+    @staticmethod
+    def _is_within_shift_window(
+        now: datetime,
+        scheduled_start: datetime | None,
+        scheduled_end: datetime | None,
+    ) -> bool:
+        if not scheduled_start or not scheduled_end:
+            return False
+        now = AttendanceService._as_utc(now)
+        scheduled_start = AttendanceService._as_utc(scheduled_start)
+        scheduled_end = AttendanceService._as_utc(scheduled_end)
+        return scheduled_start <= now <= scheduled_end
+
+    @staticmethod
+    def _log_can_check_in(log: AttendanceLog | None) -> bool:
+        if not log:
+            return True
+        return log.attendance_status in {STATUS_SCHEDULED, STATUS_ABSENT, STATUS_COMPLETED}
+
     def _new_scheduled_log(
         self,
         hotel_id: str,
@@ -577,11 +636,23 @@ class AttendanceService:
             return
         actual_start = AttendanceService._as_utc(log.actual_start)
         actual_end = AttendanceService._as_utc(log.actual_end)
-        log.worked_minutes = max(0, int((actual_end - actual_start).total_seconds() // 60))
+        interval_minutes = max(0, int((actual_end - actual_start).total_seconds() // 60))
+        log.worked_minutes = (log.worked_minutes or 0) + interval_minutes
         if log.scheduled_end:
             scheduled_end = AttendanceService._as_utc(log.scheduled_end)
             log.early_leave_minutes = max(0, int((scheduled_end - actual_end).total_seconds() // 60))
             log.overtime_minutes = max(0, int((actual_end - scheduled_end).total_seconds() // 60))
+
+    @staticmethod
+    def evaluated_worked_minutes(log: AttendanceLog, now: datetime | None = None) -> int:
+        total_minutes = max(0, log.worked_minutes or 0)
+        if log.attendance_status != STATUS_CHECKED_IN or not log.actual_start:
+            return total_minutes
+
+        current_start = AttendanceService._as_utc(log.actual_start)
+        evaluated_at = AttendanceService._as_utc(now or utcnow())
+        active_minutes = max(0, int((evaluated_at - current_start).total_seconds() // 60))
+        return total_minutes + active_minutes
 
     @staticmethod
     def _as_utc(value: datetime) -> datetime:

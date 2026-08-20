@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.api.dependencies import ensure_hotel_access, get_current_user, require_hotel_admin, require_permission
 from app.core.database import get_db
+from app.core.exceptions import bad_request
 from app.core.responses import ok
 from app.models.user import User
 from app.repositories.ops_repository import (
@@ -191,9 +192,28 @@ def delete_media(
 ) -> dict:
     media = MediaFileRepository(db).get_for_hotel(hotel_id, media_id)
     if media:
+        if MediaService(db).is_url_referenced(hotel_id, media.file_url):
+            duplicates = [
+                duplicate
+                for duplicate in MediaFileRepository(db).list_for_hotel(hotel_id, limit=500)
+                if duplicate.file_url == media.file_url and duplicate.id != media.id
+            ]
+            if not duplicates:
+                raise bad_request("Media file is still used. Remove it from the related record first.")
         db.delete(media)
         db.commit()
     return ok({"deleted": True, "media_id": media_id})
+
+
+@router.post("/media/cleanup-orphans")
+def cleanup_orphaned_media(
+    hotel_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("media.delete")),
+) -> dict:
+    deleted = MediaService(db).cleanup_orphaned_files(hotel_id)
+    db.commit()
+    return ok({"deleted": deleted})
 
 
 @router.get("/billing/subscription")
